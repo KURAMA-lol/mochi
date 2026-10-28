@@ -223,18 +223,22 @@ const PRESETS = {
   mistral:{n:'Mistral',t:'openai',u:'https://api.mistral.ai/v1',m:'mistral-small-latest',tags:''},
   cerebras:{n:'Cerebras',t:'openai',u:'https://api.cerebras.ai/v1',m:'llama3.1-8b',tags:'fast'},
   local:{n:'Local / Ollama',t:'openai',u:'http://127.0.0.1:11434/v1',m:'llama3.2',tags:'local,cheap'},
-  custom:{n:'Custom',t:'openai',u:'',m:'',tags:''}
+  prexzy:{n:'PrexzyAPIs AIWriter',t:'generic',u:'https://prexzyapis.com/ai/aiwriter-chat?prompt={prompt}',m:'',tags:'free'},
+  endpoint:{n:'Custom endpoint (any URL)',t:'generic',u:'https://example.com/ai/chat?prompt={prompt}',m:'',tags:''},
+  custom:{n:'Custom OpenAI-compatible',t:'openai',u:'',m:'',tags:''}
 };
 $('preset').innerHTML = Object.entries(PRESETS).map(([k,v]) => `<option value="${k}">${v.n}</option>`).join('');
 
 function addProvider(){
   const p = PRESETS[$('preset').value];
   cfg.providers.push({id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: p.n, type: p.t, baseUrl: p.u, apiKey: '', model: p.m,
-    enabled: true, priority: cfg.providers.length + 1, weight: 1, tags: p.tags, timeoutSec: 30, maxTokens: 300, temperature: 0.8});
+    enabled: true, priority: cfg.providers.length + 1, weight: 1, tags: p.tags, timeoutSec: 30, maxTokens: 300, temperature: 0.8,
+    method: 'GET', headers: '', bodyTemplate: '', responsePath: '', promptMode: 'full'});
   save(); renderProviders();
   const last = document.querySelector('#plist details:last-child'); if (last) last.open = true;
 }
 function P(i,k,v){ cfg.providers[i][k] = v; save(); }
+function T(i,v){ P(i,'type',v); renderProviders(); const d = document.querySelectorAll('#plist details')[i]; if (d) d.open = true; }
 function delProvider(i){ if (confirm('Delete ' + cfg.providers[i].name + '?')) { cfg.providers.splice(i,1); save(); renderProviders(); } }
 function testP(i){
   const el = $('res'+i); el.className = 'res'; el.textContent = 'Testing...';
@@ -251,12 +255,26 @@ function renderProviders(){
     <summary><span>${p.enabled?'🟢':'⚪'} ${esc(p.name)} <span class="tag">${esc(p.model)}</span></span><span class="tag">#${p.priority}</span></summary>
     <label>Name</label><input value="${esc(p.name)}" oninput="P(${i},'name',this.value)">
     <label>API type</label>
-    <select onchange="P(${i},'type',this.value)">
-      ${['openai','anthropic','gemini'].map(t => `<option value="${t}" ${p.type===t?'selected':''}>${t==='openai'?'OpenAI-compatible':t}</option>`).join('')}
+    <select onchange="T(${i},this.value)">
+      ${[['openai','OpenAI-compatible'],['anthropic','Anthropic'],['gemini','Gemini'],['generic','Custom endpoint (any URL: GET / POST)']].map(t => `<option value="${t[0]}" ${p.type===t[0]?'selected':''}>${t[1]}</option>`).join('')}
     </select>
-    <label>Base URL</label><input value="${esc(p.baseUrl)}" oninput="P(${i},'baseUrl',this.value.trim())" autocapitalize="off">
+    <label>${p.type==='generic'?'URL template  (use {prompt}, {message}, {key}, {model})':'Base URL'}</label><input value="${esc(p.baseUrl)}" oninput="P(${i},'baseUrl',this.value.trim())" autocapitalize="off">
     <label>API key</label><input type="password" value="${esc(p.apiKey)}" oninput="P(${i},'apiKey',this.value.trim())" autocapitalize="off" placeholder="paste key here">
-    <label>Model</label><input value="${esc(p.model)}" oninput="P(${i},'model',this.value.trim())" autocapitalize="off">
+    <label>${p.type==='generic'?'Model (optional, only if the URL uses {model})':'Model'}</label><input value="${esc(p.model)}" oninput="P(${i},'model',this.value.trim())" autocapitalize="off">
+    ${p.type==='generic' ? `
+    <div class="card2" style="background:var(--card2);border-radius:12px;padding:4px 10px 10px;margin-top:10px">
+      <div class="mut" style="margin-top:8px">If the URL has no {prompt}, the text is added at the very end (so <i>...?prompt=</i> works).</div>
+      <div class="row">
+        <div><label>Method</label><select onchange="P(${i},'method',this.value)"><option ${p.method!=='POST'?'selected':''}>GET</option><option ${p.method==='POST'?'selected':''}>POST</option></select></div>
+        <div><label>Text sent</label><select onchange="P(${i},'promptMode',this.value)"><option value="full" ${p.promptMode!=='last'?'selected':''}>Personality + chat</option><option value="last" ${p.promptMode==='last'?'selected':''}>Only my message</option></select></div>
+      </div>
+      <label>Answer location in JSON (blank = auto-detect, e.g. result or data.text)</label>
+      <input value="${esc(p.responsePath||'')}" oninput="P(${i},'responsePath',this.value.trim())" autocapitalize="off" placeholder="auto">
+      <label>POST body (blank = {&quot;prompt&quot;:&quot;{prompt}&quot;})</label>
+      <textarea style="min-height:60px" oninput="P(${i},'bodyTemplate',this.value)" autocapitalize="off">${esc(p.bodyTemplate||'')}</textarea>
+      <label>Extra headers (one per line, e.g. Authorization: Bearer {key})</label>
+      <textarea style="min-height:60px" oninput="P(${i},'headers',this.value)" autocapitalize="off">${esc(p.headers||'')}</textarea>
+    </div>` : ''}
     <div class="row">
       <div><label>Priority (low first)</label><input type="number" value="${p.priority}" onchange="P(${i},'priority',+this.value)"></div>
       <div><label>Weight</label><input type="number" min="1" value="${p.weight}" onchange="P(${i},'weight',+this.value)"></div>

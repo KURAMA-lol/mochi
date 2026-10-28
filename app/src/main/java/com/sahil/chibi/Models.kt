@@ -8,7 +8,7 @@ data class Msg(val role: String, val content: String)
 data class Provider(
     var id: String,
     var name: String,
-    var type: String,          // openai | anthropic | gemini
+    var type: String,          // openai | anthropic | gemini | generic
     var baseUrl: String,
     var apiKey: String,
     var model: String,
@@ -18,7 +18,13 @@ data class Provider(
     var tags: String,          // comma separated: fast, smart, code, cheap ...
     var timeoutSec: Int,
     var maxTokens: Int,
-    var temperature: Double
+    var temperature: Double,
+    // --- only used by type "generic" (any plain URL endpoint) ---
+    var method: String = "GET",          // GET | POST
+    var headers: String = "",            // one per line: Name: value   ({key} allowed)
+    var bodyTemplate: String = "",       // POST body, e.g. {"prompt":"{prompt}"}
+    var responsePath: String = "",       // e.g. result.text  (blank = auto-detect)
+    var promptMode: String = "full"      // full = personality + recent chat, last = only your message
 ) {
     fun tagList(): List<String> =
         tags.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
@@ -30,7 +36,8 @@ data class Provider(
     }
 
     fun usable(): Boolean =
-        enabled && baseUrl.isNotBlank() && model.isNotBlank() && (apiKey.isNotBlank() || isLocal())
+        enabled && baseUrl.isNotBlank() &&
+            (type == "generic" || (model.isNotBlank() && (apiKey.isNotBlank() || isLocal())))
 
     companion object {
         fun fromJson(o: JSONObject) = Provider(
@@ -46,7 +53,12 @@ data class Provider(
             tags = o.optString("tags", ""),
             timeoutSec = o.optInt("timeoutSec", 30),
             maxTokens = o.optInt("maxTokens", 300),
-            temperature = o.optDouble("temperature", 0.8)
+            temperature = o.optDouble("temperature", 0.8),
+            method = o.optString("method", "GET"),
+            headers = o.optString("headers", ""),
+            bodyTemplate = o.optString("bodyTemplate", ""),
+            responsePath = o.optString("responsePath", ""),
+            promptMode = o.optString("promptMode", "full")
         )
     }
 }

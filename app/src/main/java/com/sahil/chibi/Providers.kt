@@ -8,16 +8,23 @@ import java.net.URL
 object Http {
     class HttpError(val code: Int, message: String) : Exception(message)
 
-    fun postJson(url: String, headers: Map<String, String>, body: String, timeoutMs: Int): String {
+    fun postJson(url: String, headers: Map<String, String>, body: String, timeoutMs: Int): String =
+        request("POST", url, headers, body, timeoutMs)
+
+    fun request(method: String, url: String, headers: Map<String, String>, body: String?, timeoutMs: Int): String {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
-            c.requestMethod = "POST"
+            c.requestMethod = method
             c.connectTimeout = minOf(timeoutMs, 15000)
             c.readTimeout = timeoutMs
-            c.doOutput = true
-            c.setRequestProperty("Content-Type", "application/json")
+            c.setRequestProperty("Accept", "application/json, text/plain, */*")
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Mochi/1.0")
+            if (body != null) {
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/json")
+            }
             for ((k, v) in headers) c.setRequestProperty(k, v)
-            c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            if (body != null) c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = c.responseCode
             val stream = if (code in 200..299) c.inputStream else c.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
@@ -35,6 +42,7 @@ object Adapters {
         return when (p.type) {
             "anthropic" -> anthropic(p, system, clean)
             "gemini" -> gemini(p, system, clean)
+            "generic" -> Generic.call(p, system, clean)
             else -> openai(p, system, clean)
         }
     }
