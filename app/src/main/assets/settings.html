@@ -142,6 +142,12 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <input type="number" min="2" max="40" id="history" onchange="Pz('history',+this.value)">
   </div>
   <div class="card">
+    <label>Character style</label>
+    <select id="style" onchange="Pz('style',this.value)">
+      <option value="pixel">Pixel art</option><option value="smooth">Original (smooth)</option>
+    </select>
+  </div>
+  <div class="card">
     <label>Speak replies out loud</label>
     <select id="ttsMode" onchange="Pz('ttsMode',this.value)">
       <option value="never">Never</option><option value="voice">Only when I used voice</option><option value="always">Always</option>
@@ -168,7 +174,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 if (!window.Android) {
   let store = localStorage.getItem('cfg');
   window.Android = {
-    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Hina',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12}}),
+    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Hina',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12,style:'pixel'}}),
     saveConfig: j => { store = j; localStorage.setItem('cfg', j); return true },
     getStatus: () => JSON.stringify({overlay:false,mic:true,notif:true,running:false}),
     openOverlaySettings(){}, requestPerms(){}, start(){}, summon(){}, stop(){},
@@ -340,7 +346,7 @@ function Pz(k,v){ cfg.persona[k] = v; save(); }
 function resetPrompt(){ if (confirm('Reset to the default personality?')) { cfg.persona.prompt = DEF_PROMPT; renderPersona(); save(); } }
 function renderPersona(){
   const p = cfg.persona;
-  ['name','userName','prompt','voiceLang','ttsMode','aiChatterMin','history','size','pitch'].forEach(k => { if ($(k)) $(k).value = p[k] ?? ''; });
+  ['name','userName','prompt','voiceLang','ttsMode','style','aiChatterMin','history','size','pitch'].forEach(k => { if ($(k)) $(k).value = p[k] ?? ''; });
   $('walking').checked = p.walking !== false; $('idleChatter').checked = p.idleChatter !== false;
   $('sizev').textContent = p.size; $('pitchv').textContent = p.pitch;
 }

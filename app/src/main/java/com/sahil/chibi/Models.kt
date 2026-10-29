@@ -121,12 +121,13 @@ data class PersonaCfg(
     val ttsMode: String = "voice", // never | voice | always
     val voiceLang: String = "en-IN",
     val pitch: Double = 1.35,
-    val history: Int = 12
+    val history: Int = 12,
+    val style: String = "pixel" // pixel | smooth
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("name", name).put("userName", userName).put("prompt", prompt).put("size", size)
         .put("walking", walking).put("idleChatter", idleChatter).put("aiChatterMin", aiChatterMin)
-        .put("ttsMode", ttsMode).put("voiceLang", voiceLang).put("pitch", pitch).put("history", history)
+        .put("ttsMode", ttsMode).put("voiceLang", voiceLang).put("pitch", pitch).put("history", history).put("style", style)
 
     companion object {
         fun fromJson(o: JSONObject): PersonaCfg {
@@ -138,7 +139,8 @@ data class PersonaCfg(
                 o.optBoolean("walking", d.walking), o.optBoolean("idleChatter", d.idleChatter),
                 o.optInt("aiChatterMin", d.aiChatterMin), o.optString("ttsMode", d.ttsMode),
                 o.optString("voiceLang", d.voiceLang), o.optDouble("pitch", d.pitch),
-                o.optInt("history", d.history).coerceIn(2, 40)
+                o.optInt("history", d.history).coerceIn(2, 40),
+                o.optString("style", d.style)
             )
         }
     }

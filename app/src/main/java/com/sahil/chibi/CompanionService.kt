@@ -241,6 +241,7 @@ class CompanionService : Service() {
         if (chibi != null) return
         cfg = ConfigStore.load(this)
         val c = ChibiView(this)
+        c.pixel = cfg.persona.style != "smooth"
         val w = dp((cfg.persona.size * 0.8f).toInt())
         val h = dp(cfg.persona.size)
         lp = overlayLp(
@@ -411,6 +412,7 @@ class CompanionService : Service() {
     }
 
     private fun decide(now: Long, c: ChibiView) {
+        c.pixel = cfg.persona.style != "smooth"
         val r = Random.nextFloat()
         val (sw, _) = screen()
         var dur = Random.nextLong(2500, 5500)

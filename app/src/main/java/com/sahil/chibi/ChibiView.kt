@@ -21,6 +21,7 @@ class ChibiView(ctx: Context) : View(ctx) {
     var action = "idle"           // idle walk sit sleep wave drag
     var facingRight = true
     var talking = false
+    var pixel = true              // true = pixel-art, false = smooth
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
@@ -108,6 +109,20 @@ class ChibiView(ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         val now = SystemClock.uptimeMillis()
         val t = now / 1000f
+        if (!pixel) {
+            p.isAntiAlias = true
+            val sc = min(width / 100f, height / 130f)
+            c.save()
+            c.translate((width - 100f * sc) / 2f, (height - 130f * sc) / 2f)
+            c.scale(sc, sc)
+            if (!facingRight) c.scale(-1f, 1f, 50f, 0f)
+            cv = c
+            drawGirl(t, now)
+            c.restore()
+            postInvalidateDelayed(40)
+            return
+        }
+        p.isAntiAlias = false
         if (bmp == null) { bmp = Bitmap.createBitmap(PW, PH, Bitmap.Config.ARGB_8888); bc = Canvas(bmp!!) }
         val b = bmp!!; val g = bc!!
         b.eraseColor(0)
