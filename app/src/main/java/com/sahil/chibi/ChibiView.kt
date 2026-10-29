@@ -184,8 +184,9 @@ class ChibiView(ctx: Context) : View(ctx) {
         for (y in 2..21) {
             row(y, 4, 5, 'H'); row(y, 18, 19, 'H')
         }
-        row(2, 8, 15, 'H'); row(3, 6, 17, 'h'); row(4, 5, 7, 'h')
-        row(4, 10, 12, 'h'); row(4, 15, 17, 'h')
+        row(2, 8, 15, 'H'); row(3, 6, 17, 'h')
+        row(4, 5, 7, 'h'); row(4, 9, 11, 'h'); row(4, 14, 16, 'h')
+        row(5, 5, 6, 'H'); row(5, 17, 18, 'H')
         row(5, 5, 18, 'D'); row(6, 4, 19, 'D')
 
         // Face shape inset into the hair; tiny pixel eyes and shy blush.
@@ -200,9 +201,9 @@ class ChibiView(ctx: Context) : View(ctx) {
         }
         val blink = now < blinkUntil || action == "sleep"
         if (!blink) {
-            row(8, 8, 9, 'W'); row(8, 14, 15, 'W')
-            px(9, 8, 'I'); px(14, 8, 'I'); px(9, 9, 'i'); px(14, 9, 'i')
-            px(8, 8, 'W'); px(15, 8, 'W')
+            row(8, 8, 10, 'W'); row(8, 13, 15, 'W')
+            px(9, 8, 'I'); px(10, 8, 'I'); px(13, 8, 'I'); px(14, 8, 'I')
+            px(9, 9, 'I'); px(14, 9, 'I')
         } else {
             row(8, 8, 10, 'D'); row(8, 13, 15, 'D')
         }
@@ -213,12 +214,10 @@ class ChibiView(ctx: Context) : View(ctx) {
             px(11, 12, 's'); px(12, 12, 's')
         }
 
-        // Blunt fringe and metal forehead protector.
+        // Blunt fringe; no forehead plate, matching Hinata’s neck-protector look.
         row(4, 6, 17, 'D'); row(5, 6, 8, 'D'); row(5, 11, 12, 'D'); row(5, 15, 17, 'D')
         row(5, 8, 10, 'h'); row(5, 13, 14, 'h')
-        row(3, 8, 15, 'G'); row(4, 8, 15, 'G')
-        row(3, 7, 7, 'D'); row(3, 16, 16, 'D')
-        row(3, 10, 13, 'g'); px(10, 3, 'K'); px(11, 3, 'g'); px(12, 3, 'K')
+        // Keep the forehead clean: Hinata's protector sits at her neck in this outfit.
 
         // Long side locks over the shoulders.
         for (y in 10..23) {
@@ -230,12 +229,13 @@ class ChibiView(ctx: Context) : View(ctx) {
         row(23, 4, 6, 'K'); row(23, 17, 19, 'K')
 
         // Neck and forehead-protector collar.
-        row(14, 9, 14, 'S'); row(15, 8, 15, 'K')
-        row(15, 8, 15, 'G'); row(16, 9, 14, 'g')
-        px(10, 15, 'K'); px(11, 15, 'G'); px(12, 15, 'K'); px(13, 15, 'G')
+        row(14, 9, 14, 'S')
+        row(15, 8, 15, 'K'); row(16, 8, 15, 'G')
+        row(17, 9, 14, 'g')
+        px(10, 16, 'K'); px(11, 16, 'G'); px(12, 16, 'K'); px(13, 16, 'G')
 
         // Jacket outline, pale sleeves, lavender torso and zipper.
-        row(16, 6, 17, 'K'); row(17, 5, 18, 'K'); row(18, 4, 19, 'K')
+        row(17, 6, 17, 'K'); row(18, 5, 18, 'K'); row(19, 4, 19, 'K')
         row(19, 4, 19, 'K'); row(20, 4, 19, 'K'); row(21, 4, 19, 'K')
         row(22, 4, 19, 'K'); row(23, 5, 18, 'K'); row(24, 5, 18, 'K')
         row(25, 6, 17, 'K'); row(26, 7, 16, 'K')
