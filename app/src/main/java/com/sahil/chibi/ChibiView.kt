@@ -31,19 +31,19 @@ class ChibiView(ctx: Context) : View(ctx) {
     private val INK = 0xFF4A3358.toInt()
     private val SKIN = 0xFFFFE8D8.toInt()
     private val SKIN_SH = 0xFFF6CDB8.toInt()
-    private val HAIR = 0xFFF6A9C9.toInt()
-    private val HAIR_D = 0xFFDE82AD.toInt()
-    private val HAIR_L = 0xFFFFD9EA.toInt()
-    private val CREAM = 0xFFFFF6EA.toInt()
-    private val CREAM_SH = 0xFFEBD8C4.toInt()
-    private val PINK = 0xFFFF7FA8.toInt()
-    private val LAV = 0xFFB9A4FF.toInt()
-    private val IRIS = 0xFF7E63F0.toInt()
-    private val IRIS_L = 0xFFC9B6FF.toInt()
-    private val BLUSH = 0xFFFF6F95.toInt()
+    private val HAIR = 0xFF28243F.toInt()
+    private val HAIR_D = 0xFF17172C.toInt()
+    private val HAIR_L = 0xFF62568E.toInt()
+    private val CREAM = 0xFFF1EFF7.toInt()
+    private val CREAM_SH = 0xFFD6D0E5.toInt()
+    private val PINK = 0xFF9B83D0.toInt()
+    private val LAV = 0xFFB7A3E8.toInt()
+    private val IRIS = 0xFFBEB2E9.toInt()
+    private val IRIS_L = 0xFFEAE4FF.toInt()
+    private val BLUSH = 0xFFE9A6C0.toInt()
     private val WHITE = 0xFFFFFFFF.toInt()
-    private val BOOT = 0xFF5A3F6B.toInt()
-    private val SOCK = 0xFFE9DEFF.toInt()
+    private val BOOT = 0xFF29263F.toInt()
+    private val SOCK = 0xFFDCD6EB.toInt()
 
     // pixel-art: draw into a tiny bitmap, then scale up with no smoothing
     private val PW = 64
@@ -159,18 +159,16 @@ class ChibiView(ctx: Context) : View(ctx) {
         val hy = 47 + bob + (if (sitting) 14 else if (sleeping) 16 else 0)
         val swing = if (walking) sin(t * 9) * 5 else 0f
 
-        // --- pigtails (behind) ---
-        val sway = sin(t * 3) * 4 + (if (walking) sin(t * 9) * 9 else 0f)
-        for (side in intArrayOf(-1, 1)) {
-            cv.save(); rot(sway * side + side * 6, 50 + side * 28, hy + 4)
-            fillOval(50 + side * 31 - 5.5, hy + 4, 50 + side * 31 + 5.5, hy + 34, HAIR_D)
-            strokeOval(50 + side * 31 - 5.5, hy + 4, 50 + side * 31 + 5.5, hy + 34, INK, 1.1)
-            fillOval(50 + side * 31 - 3.4, hy + 8, 50 + side * 31 - 0.6, hy + 26, HAIR, 190)
-            cv.restore()
-            fillCircle(50 + side * 29, hy + 4, 3.3, PINK); strokeCircle(50 + side * 29, hy + 4, 3.3, INK, 1)
-        }
-        // --- back hair ---
-        fillOval(17, hy - 30, 83, hy + 34, HAIR_D)
+        // --- long straight indigo hair behind the body ---
+        val sway = sin(t * 2.4f) * 1.8f + (if (walking) sin(t * 9) * 3.5f else 0f)
+        beginPath(); moveTo(20, hy - 20); cubicTo(12, hy - 34, 24, hy - 34, 34, hy - 32)
+        cubicTo(45, hy - 37, 58, hy - 36, 68, hy - 31); cubicTo(84, hy - 31, 89, hy - 16, 80, hy + 13)
+        lineTo(79 + sway, hy + 47); lineTo(69 + sway, hy + 44); lineTo(62, hy + 48)
+        lineTo(51, hy + 45); lineTo(39, hy + 48); lineTo(30 - sway, hy + 44); lineTo(21 - sway, hy + 47)
+        lineTo(20, hy + 13); cubicTo(12, hy - 2, 14, hy - 12, 20, hy - 20); closePath()
+        fillPath(HAIR_D); strokePath(INK, 1.2)
+        line(30, hy - 20, 31 - sway, hy + 39, HAIR, 2.1, 210)
+        line(69, hy - 20, 68 + sway, hy + 39, HAIR_L, 1.2, 180)
 
         // --- legs ---
         if (!sitting && !sleeping) {
@@ -194,11 +192,16 @@ class ChibiView(ctx: Context) : View(ctx) {
         fillPath(CREAM); strokePath(INK, 1.3)
         beginPath(); moveTo(29.3, hy + 51); quadTo(50, hy + 57, 70.7, hy + 51); lineTo(71, hy + 55)
         quadTo(50, hy + 60, 29, hy + 55); closePath()
-        fillPath(PINK)
-        fillOval(50, hy + 28, 70, hy + 54, CREAM_SH, 120)
-        fillCircle(50, hy + 43, 3.1, PINK)
-        fillCircle(45.7, hy + 38.6, 1.35, PINK); fillCircle(50, hy + 37.2, 1.35, PINK); fillCircle(54.3, hy + 38.6, 1.35, PINK)
-        line(46, hy + 27, 45, hy + 36, PINK, 1.3); line(54, hy + 27, 55, hy + 36, PINK, 1.3)
+        fillPath(LAV)
+        // white jacket panels and center zip
+        beginPath(); moveTo(38, hy + 25); lineTo(45, hy + 29); lineTo(42, hy + 49); lineTo(31, hy + 51); closePath(); fillPath(CREAM)
+        beginPath(); moveTo(62, hy + 25); lineTo(55, hy + 29); lineTo(58, hy + 49); lineTo(69, hy + 51); closePath(); fillPath(CREAM)
+        line(50, hy + 27, 50, hy + 55, CREAM_SH, 1.2)
+        // small metal Leaf-style plate at the collar
+        fillRect(43, hy + 23, 57, hy + 30, 0xFF777487.toInt())
+        strokeP(INK, 0.7, 255); cv.drawRect(43f, hy + 23, 57f, hy + 30, p)
+        arc(46, hy + 24, 54, hy + 29, 185, 245, false, 0xFF24243A.toInt(), 0.8)
+        fillCircle(51.5, hy + 27, 0.7, 0xFF24243A.toInt())
 
         // --- arms (sleeves) ---
         val lax: Float; val lay: Float; val rax: Float; val ray: Float
@@ -218,12 +221,13 @@ class ChibiView(ctx: Context) : View(ctx) {
         val tilt = (if (sleeping) 8f else if (mood == "shy") 3f else 0f) + sin(t * 2) * 1.1f
         cv.save(); rot(tilt, 50, hy + 28)
 
-        // side locks
+        // long face-framing locks
         for (side in intArrayOf(-1, 1)) {
-            val x = 50 + side * 31
-            beginPath(); moveTo(x, hy - 8); quadTo(x + side * 5, hy + 10, x + side * 0.5, hy + 27)
-            quadTo(x - side * 5, hy + 15, x - side * 4, hy - 2); closePath()
-            fillPath(HAIR_D)
+            val x = 50 + side * 29
+            beginPath(); moveTo(x, hy - 13); quadTo(x + side * 4, hy + 10, x + side * 1, hy + 43)
+            quadTo(x - side * 4, hy + 34, x - side * 5, hy + 8); closePath()
+            fillPath(HAIR_D); strokePath(INK, 0.8)
+            line(x - side * 1.5, hy - 2, x - side * 2, hy + 32, HAIR_L, 0.9, 180)
         }
         // face
         fillOval(20, hy - 28, 80, hy + 28, SKIN)
@@ -256,27 +260,20 @@ class ChibiView(ctx: Context) : View(ctx) {
         fillCircle(50, hy + 14.5, 0.9, SKIN_SH)
         mouth(t, hy)
 
-        // hair cap + fringe
+        // straight indigo cap and blunt, slightly separated bangs
         beginPath(); moveTo(19, hy + 8); cubicTo(12, hy - 30, 88, hy - 30, 81, hy + 8)
-        quadTo(80, hy + 14, 76, hy + 10); quadTo(74, hy - 6, 69, hy + 3); quadTo(64, hy - 4, 60, hy - 9)
-        quadTo(56, hy + 3, 50, hy - 6); quadTo(44, hy + 3, 40, hy - 9); quadTo(36, hy - 4, 31, hy + 3)
-        quadTo(26, hy - 6, 24, hy + 10); quadTo(20, hy + 14, 19, hy + 8); closePath()
-        fillPath(HAIR); strokePath(INK, 1.3)
-        beginPath(); moveTo(27, hy - 6); quadTo(28, hy - 20, 41, hy - 24); quadTo(33, hy - 18, 31, hy - 6); closePath()
-        fillPath(HAIR_L, 200)
-        beginPath(); moveTo(72, hy - 8); quadTo(72, hy - 16, 66, hy - 21); quadTo(70, hy - 12, 69, hy - 8); closePath()
-        fillPath(HAIR_D, 150)
-
-        // cat-ear hairband
-        for (side in intArrayOf(-1, 1)) {
-            cv.save(); rot(sin(t * 2.2 + side) * (if (talking) 4.0 else 1.5) * side, 50 + side * 18, hy - 24)
-            beginPath(); moveTo(50 + side * 9, hy - 25); lineTo(50 + side * 16, hy - 44)
-            quadTo(50 + side * 28, hy - 40, 50 + side * 29, hy - 20); closePath()
-            fillPath(CREAM); strokePath(INK, 1.3)
-            beginPath(); moveTo(50 + side * 13.5, hy - 26); lineTo(50 + side * 18, hy - 38)
-            quadTo(50 + side * 25, hy - 35, 50 + side * 25.5, hy - 23); closePath()
-            fillPath(PINK, 230)
-            cv.restore()
+        lineTo(76, hy + 5); lineTo(72, hy + 10); lineTo(67, hy + 3); lineTo(62, hy + 10)
+        lineTo(57, hy + 4); lineTo(52, hy + 10); lineTo(47, hy + 4); lineTo(42, hy + 10)
+        lineTo(37, hy + 3); lineTo(32, hy + 10); lineTo(27, hy + 4); lineTo(23, hy + 10)
+        closePath(); fillPath(HAIR_D); strokePath(INK, 1.3)
+        beginPath(); moveTo(25, hy - 9); quadTo(34, hy - 25, 48, hy - 26)
+        quadTo(37, hy - 18, 34, hy - 8); closePath(); fillPath(HAIR_L, 175)
+        beginPath(); moveTo(70, hy - 13); quadTo(67, hy - 22, 61, hy - 25)
+        quadTo(70, hy - 20, 73, hy - 8); closePath(); fillPath(HAIR, 130)
+        line(42, hy - 22, 40, hy - 8, HAIR_L, 1.0, 190)
+        line(58, hy - 23, 59, hy - 10, HAIR_L, 0.8, 170)
+        // Hinata's signature straight silhouette: no cat-ear accessories
+        cv.restore()
         }
         // hair clip
         fillCircle(66, hy - 14, 2.6, LAV); strokeCircle(66, hy - 14, 2.6, INK, 0.9)
