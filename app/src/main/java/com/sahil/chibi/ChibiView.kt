@@ -167,7 +167,7 @@ class ChibiView(ctx: Context) : View(ctx) {
             line(42, 96, 40, 108, 0xFF4A5273.toInt(), 0.7f, 180); line(56, 96, 58, 108, 0xFF4A5273.toInt(), 0.7f, 180)
             fillRect(34, 84, 40, 92, 0xFF20263D.toInt()); fillRect(34.7f, 84.7f, 39.5f, 86.4f, 0xFFD9D9E2.toInt())
             fillRect(34.7f, 87.4f, 39.5f, 89.1f, 0xFFD9D9E2.toInt()); fillRect(34.7f, 90f, 39.5f, 91.2f, 0xFFD9D9E2.toInt())
-            fillRect(31, 85, 36, 96, 0xFF252B40.toInt()); strokeP(INK, 0.65f); cv.drawRect(31f, 85f, 36f, 96f, p)
+            fillRect(31, 85, 36, 96, 0xFF252B40.toInt()); strokeP(INK, 0.65f, 255); cv.drawRect(31f, 85f, 36f, 96f, p)
             fillRect(39, 113, 46, 120, SKIN); fillRect(53, 113, 59, 120, SKIN)
             beginPath(); moveTo(37, 118); cubicTo(40, 117, 45, 117, 47, 119); lineTo(48, 124); cubicTo(47, 127, 37, 127, 35, 124); closePath(); fillPath(0xFF171D30.toInt()); strokePath(INK, 0.7f)
             beginPath(); moveTo(52, 119); cubicTo(54, 117, 59, 117, 61, 119); lineTo(63, 124); cubicTo(62, 127, 52, 127, 50, 124); closePath(); fillPath(0xFF171D30.toInt()); strokePath(INK, 0.7f)
@@ -201,7 +201,7 @@ class ChibiView(ctx: Context) : View(ctx) {
             line(50, 69, 50, 74, 0xFFE2A995.toInt(), 0.5f); line(47, 72, 49, 74, 0xFFE2A995.toInt(), 0.45f)
         }
         // Dark collar plate and tiny Leaf-inspired emblem.
-        fillRect(41, 34, 59, 41, 0xFF24283A.toInt()); fillRect(42, 34, 58, 39, 0xFFBFC1D0.toInt()); strokeP(INK, 0.55f); cv.drawRect(42f, 34f, 58f, 39f, p)
+        fillRect(41, 34, 59, 41, 0xFF24283A.toInt()); fillRect(42, 34, 58, 39, 0xFFBFC1D0.toInt()); strokeP(INK, 0.55f, 255); cv.drawRect(42f, 34f, 58f, 39f, p)
         beginPath(); moveTo(47, 35); cubicTo(44, 36, 44, 38, 47, 38); lineTo(53, 38); cubicTo(56, 38, 56, 36, 53, 35); lineTo(52, 36); lineTo(48, 36); closePath(); fillPath(0xFF44485B.toInt())
 
         // Small face, pale lavender Byakugan eyes and blunt fringe.
@@ -216,7 +216,7 @@ class ChibiView(ctx: Context) : View(ctx) {
         val by = hy + 7
         if (mood == "angry") { line(42, by + 1, 47, by - 0.3f, HAIR_D, 0.8f); line(53, by - 0.3f, 58, by + 1, HAIR_D, 0.8f) }
         else { line(42, by, 47, by - 0.2f, HAIR_D, 0.6f); line(53, by - 0.2f, 58, by, HAIR_D, 0.6f) }
-        eye(45, hy + 12, blink, if (mood == "shy") -0.5f else 0f); eye(55, hy + 12, blink, if (mood == "shy") -0.5f else 0f)
+        eye(45f, hy + 12f, blink, if (mood == "shy") -0.5f else 0f); eye(55f, hy + 12f, blink, if (mood == "shy") -0.5f else 0f)
         line(50, hy + 13, 49.5f, hy + 16, 0xFFD99E91.toInt(), 0.35f); mouth(t, hy)
         // Smooth indigo cap and blunt, separated bangs.
         beginPath(); moveTo(38, hy + 8); cubicTo(36, hy + 2, 39, hy - 5, 45, hy - 6)
@@ -227,7 +227,7 @@ class ChibiView(ctx: Context) : View(ctx) {
         line(52, hy - 4, 54, hy, HAIR_L, 0.7f, 180); line(57, hy - 2, 58, hy, HAIR_L, 0.7f, 180)
         // Metal forehead plate and small Leaf-inspired emblem.
         fillRect(43, hy + 0.5f, 57, hy + 4.5f, 0xFF272B3D.toInt()); fillRect(44, hy + 1f, 56, hy + 4f, 0xFFBFC1D0.toInt())
-        strokeP(0xFF676A80.toInt(), 0.4f); cv.drawRect(44f, hy + 1f, 56f, hy + 4f, p)
+        strokeP(0xFF676A80.toInt(), 0.4f, 255); cv.drawRect(44f, hy + 1f, 56f, hy + 4f, p)
         beginPath(); moveTo(47, hy + 2); cubicTo(45.5f, hy + 2, 45.5f, hy + 3.5f, 47, hy + 3.5f)
         lineTo(52, hy + 3.5f); cubicTo(53.5f, hy + 3.5f, 53.5f, hy + 2, 52, hy + 2)
         lineTo(51, hy + 2.5f); lineTo(48, hy + 2.5f); closePath(); fillPath(0xFF484B60.toInt())
@@ -255,7 +255,7 @@ class ChibiView(ctx: Context) : View(ctx) {
             fillCircle(cx - 1.05f + look, cy - 1.8f, 0.95f, WHITE)
             fillCircle(cx + 1.2f + look, cy + 0.5f, 0.42f, 0xFFDAD9F6.toInt())
         }
-        strokeP(INK, 0.85f); cv.drawOval(RectF(cx - rx, cy - ry, cx + rx, cy + ry), p)
+        strokeP(INK, 0.85f, 255); cv.drawOval(RectF(cx - rx, cy - ry, cx + rx, cy + ry), p)
         line(cx - 3.2f, cy - ry + 0.2f, cx - 1.5f, cy - ry - 0.8f, HAIR_D, 0.75f)
         line(cx + 1.2f, cy - ry - 0.65f, cx + 3.1f, cy - ry + 0.1f, HAIR_D, 0.65f)
     }
