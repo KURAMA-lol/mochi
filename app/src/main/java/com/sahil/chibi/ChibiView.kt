@@ -13,15 +13,15 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Draws Hina as a hand-built pixel-grid sprite with crisp nearest-neighbour scaling.
- * Logical drawing box is 100 x 130 units; the character is a discrete 24x42 pixel sprite.
+ * Draws Hina as the approved lavender phone mascot with smooth anime-inspired linework.
+ * Logical drawing box is 100 x 130 units.
  */
 class ChibiView(ctx: Context) : View(ctx) {
     var mood = "neutral"          // happy excited shy sad angry sleepy smug neutral
     var action = "idle"           // idle walk sit sleep wave drag
     var facingRight = true
     var talking = false
-    var pixel = true              // true = pixel-art, false = smooth
+    var pixel = false              // true = pixel-art, false = smooth
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
@@ -145,173 +145,195 @@ class ChibiView(ctx: Context) : View(ctx) {
      * Each character below is one pixel in a 24x42 sprite grid; nearest-neighbour
      * bitmap scaling in onDraw keeps every pixel crisp on high-density screens.
      */
+
+    // Hina uses the approved lavender phone-mascot design: bobbed violet hair,
+    // luminous purple eyes, pearl hoodie dress, lilac sleeves, wing antennae and sneakers.
     private fun drawGirl(t: Float, now: Long) {
-        val grid = Array(42) { CharArray(24) { '.' } }
-        fun row(y: Int, left: Int, right: Int, ch: Char) {
-            if (y in grid.indices) for (x in left..right) if (x in 0..23) grid[y][x] = ch
+        val bob = when (action) {
+            "walk" -> abs(sin(t * 8f)) * 1.4f
+            "wave" -> sin(t * 4f) * 0.7f
+            "sleep" -> 1.4f
+            else -> sin(t * 2.4f) * 0.8f
         }
-        fun box(x1: Int, y1: Int, x2: Int, y2: Int, ch: Char) {
-            for (y in y1..y2) row(y, x1, x2, ch)
-        }
-        fun px(x: Int, y: Int, ch: Char) { if (x in 0..23 && y in 0..41) grid[y][x] = ch }
+        cv.save()
+        cv.translate(0f, bob)
 
-        val palette = mapOf(
-            'K' to 0xFF171A2B.toInt(), 'D' to 0xFF25253D.toInt(),
-            'H' to 0xFF343452.toInt(), 'h' to 0xFF7775B7.toInt(),
-            'S' to 0xFFFFD8C8.toInt(), 's' to 0xFFE9AFA6.toInt(),
-            'B' to 0xFFF19AA9.toInt(), 'W' to 0xFFFFF8FF.toInt(),
-            'I' to 0xFFBEBBEF.toInt(), 'i' to 0xFF77749F.toInt(),
-            'L' to 0xFFA99ACF.toInt(), 'V' to 0xFF8976B8.toInt(),
-            'C' to 0xFFEAE6F0.toInt(), 'c' to 0xFFD0C9DE.toInt(),
-            'N' to 0xFF303751.toInt(), 'n' to 0xFF424967.toInt(),
-            'T' to 0xFFE2E0EA.toInt(), 'G' to 0xFFBFC2D2.toInt(),
-            'g' to 0xFF55596F.toInt(), 'O' to 0xFF171D30.toInt(),
-            'o' to 0xFF646C89.toInt(), 'P' to 0xFFCB9A91.toInt()
-        )
+        val hair = 0xFF38294D.toInt()
+        val hairShade = 0xFF241D37.toInt()
+        val hairLight = 0xFF7657A7.toInt()
+        val pearl = 0xFFF8F6FF.toInt()
+        val lilac = 0xFFCAB4F0.toInt()
+        val lilacDeep = 0xFF9B7ACB.toInt()
+        val violet = 0xFF9D65ED.toInt()
+        val skin = 0xFFFFDCCF.toInt()
+        val coral = 0xFFFF8B72.toInt()
+        val blue = 0xFFBCE8FF.toInt()
+        val outline = 0xFF514064.toInt()
 
-        // Hair silhouette: rounded crown, long straight locks and tapered ends.
-        val hair = arrayOf(
-            8 to 15, 6 to 17, 4 to 19, 3 to 20, 2 to 21, 2 to 21,
-            1 to 22, 1 to 22, 1 to 22, 1 to 22, 1 to 22, 1 to 22,
-            1 to 22, 1 to 22, 1 to 22, 1 to 22, 1 to 22, 1 to 22,
-            2 to 21, 2 to 21, 3 to 20, 3 to 20, 4 to 19, 4 to 19
-        )
-        for (y in hair.indices) row(y, hair[y].first, hair[y].second, 'K')
-        for (y in 1..22) {
-            row(y, if (y < 4) 4 else 2, if (y < 4) 19 else 21, 'D')
-        }
-        // Indigo shading and discrete pixel highlights.
-        for (y in 2..21) {
-            row(y, 4, 5, 'H'); row(y, 18, 19, 'H')
-        }
-        row(2, 8, 15, 'H'); row(3, 6, 17, 'h')
-        row(4, 5, 7, 'h'); row(4, 9, 11, 'h'); row(4, 14, 16, 'h')
-        row(5, 5, 6, 'H'); row(5, 17, 18, 'H')
-        row(5, 5, 18, 'D'); row(6, 4, 19, 'D')
+        // Translucent wing/antenna ornaments behind the silhouette.
+        fillOval(8, 43, 28, 53, blue, 150)
+        strokeOval(8, 43, 28, 53, 0xFF9CCEF3.toInt(), 0.8f, 220)
+        line(10, 48, 25, 46, 0xFFFFFFFF.toInt(), 0.7f, 210)
+        fillOval(72, 42, 92, 52, blue, 145)
+        strokeOval(72, 42, 92, 52, 0xFF9CCEF3.toInt(), 0.8f, 220)
+        line(75, 47, 90, 45, 0xFFFFFFFF.toInt(), 0.7f, 210)
+        // Small antenna tips.
+        line(20, 45, 13, 34, outline, 0.8f)
+        fillCircle(12.5f, 33.5f, 1.5f, violet)
+        line(79, 44, 86, 35, outline, 0.8f)
+        fillCircle(86.5f, 34.5f, 1.5f, violet)
 
-        // Face shape inset into the hair; tiny pixel eyes and shy blush.
-        row(5, 7, 16, 'S'); row(6, 6, 17, 'S'); row(7, 6, 17, 'S')
-        row(8, 6, 17, 'S'); row(9, 6, 17, 'S'); row(10, 6, 17, 'S')
-        row(11, 7, 16, 'S'); row(12, 8, 15, 'S'); row(13, 9, 14, 'S')
-        row(8, 6, 7, 's'); row(8, 16, 17, 's')
-        row(9, 7, 8, 'B'); row(9, 15, 16, 'B')
-        row(7, 8, 10, 'K'); row(7, 13, 15, 'K')
-        if (mood == "angry") {
-            px(8, 7, 'K'); px(9, 6, 'K'); px(14, 6, 'K'); px(15, 7, 'K')
-        }
-        val blink = now < blinkUntil || action == "sleep"
-        if (!blink) {
-            row(8, 8, 10, 'W'); row(8, 13, 15, 'W')
-            px(9, 8, 'I'); px(10, 8, 'I'); px(13, 8, 'I'); px(14, 8, 'I')
-            px(9, 9, 'I'); px(14, 9, 'I')
-        } else {
-            row(8, 8, 10, 'D'); row(8, 13, 15, 'D')
-        }
-        row(11, 11, 12, 's')
-        if (mood == "happy" || mood == "excited" || mood == "shy") {
-            px(10, 12, 'P'); px(11, 12, 'P'); px(12, 12, 'P')
-        } else {
-            px(11, 12, 's'); px(12, 12, 's')
-        }
+        // Back-mounted phone device, visible over the left shoulder.
+        beginPath(); moveTo(21, 43); lineTo(29, 41); lineTo(34, 53)
+        lineTo(27, 56); closePath(); fillPath(outline)
+        beginPath(); moveTo(22, 43.5f); lineTo(28.5f, 42); lineTo(32.5f, 52.5f)
+        lineTo(27.5f, 54.5f); closePath(); fillPath(0xFFD9D9E8.toInt())
+        beginPath(); moveTo(23, 44); lineTo(28, 43); lineTo(31, 50)
+        lineTo(26.5f, 52); closePath(); fillPath(0xFF262435.toInt())
+        fillCircle(27.5f, 53.2f, 0.6f, coral)
 
-        // Blunt fringe; no forehead plate, matching Hinata’s neck-protector look.
-        row(4, 6, 17, 'D'); row(5, 6, 8, 'D'); row(5, 11, 12, 'D'); row(5, 15, 17, 'D')
-        row(5, 8, 10, 'h'); row(5, 13, 14, 'h')
-        // Keep the forehead clean: Hinata's protector sits at her neck in this outfit.
+        // Legs behind the hoodie dress.
+        beginPath(); moveTo(38, 78); quadTo(34, 88, 31, 98)
+        lineTo(37, 100); lineTo(47, 84); lineTo(51, 79); closePath()
+        fillPath(skin); strokePath(outline, 0.65f)
+        beginPath(); moveTo(54, 78); quadTo(58, 89, 63, 99)
+        lineTo(70, 97); lineTo(66, 83); lineTo(64, 77); closePath()
+        fillPath(skin); strokePath(outline, 0.65f)
+        // Socks and chunky lavender sneakers.
+        fillPath(pearl); beginPath(); moveTo(31, 95); lineTo(37, 96)
+        lineTo(36, 102); lineTo(30, 102); closePath(); fillPath(pearl)
+        beginPath(); moveTo(63, 94); lineTo(69, 94); lineTo(72, 101)
+        lineTo(65, 102); closePath(); fillPath(pearl)
+        beginPath(); moveTo(29, 100); quadTo(23, 101, 23, 106)
+        quadTo(24, 110, 34, 109); lineTo(41, 107); lineTo(37, 101); closePath()
+        fillPath(lilac); strokePath(outline, 0.75f)
+        beginPath(); moveTo(62, 100); quadTo(61, 105, 65, 109)
+        lineTo(78, 109); quadTo(82, 107, 78, 103); lineTo(71, 99); closePath()
+        fillPath(lilac); strokePath(outline, 0.75f)
+        line(27, 105, 37, 105, pearl, 1.4f); line(66, 105, 77, 105, pearl, 1.4f)
+        line(30, 102, 35, 106, lilacDeep, 0.6f); line(68, 102, 73, 106, lilacDeep, 0.6f)
+        fillOval(23, 108, 41, 110, pearl); fillOval(63, 108, 81, 110, pearl)
 
-        // Long side locks over the shoulders.
-        for (y in 10..23) {
-            row(y, 2, 4, if (y < 17) 'D' else 'K')
-            row(y, 19, 21, if (y < 17) 'D' else 'K')
-        }
-        for (y in 11..21) { px(3, y, 'H'); px(20, y, 'H') }
-        row(22, 3, 5, 'K'); row(22, 18, 20, 'K')
-        row(23, 4, 6, 'K'); row(23, 17, 19, 'K')
+        // Hoodie dress silhouette with soft rounded puff sleeves.
+        beginPath(); moveTo(39, 43); quadTo(32, 44, 29, 49)
+        lineTo(23, 61); quadTo(22, 66, 27, 68)
+        lineTo(34, 64); lineTo(32, 77)
+        quadTo(49, 83, 68, 77); lineTo(66, 63)
+        lineTo(73, 68); quadTo(78, 66, 76, 61)
+        lineTo(70, 49); quadTo(66, 44, 59, 43); closePath()
+        fillPath(pearl); strokePath(outline, 0.8f)
+        // Lilac side panels and rounded sleeve shading.
+        beginPath(); moveTo(34, 48); quadTo(28, 53, 27, 62)
+        lineTo(33, 64); lineTo(39, 50); closePath(); fillPath(lilac)
+        beginPath(); moveTo(64, 48); quadTo(71, 54, 72, 62)
+        lineTo(66, 65); lineTo(60, 50); closePath(); fillPath(lilac)
+        fillOval(22, 59, 33, 68, lilac); fillOval(66, 59, 77, 68, lilac)
+        strokeOval(22, 59, 33, 68, outline, 0.65f)
+        strokeOval(66, 59, 77, 68, outline, 0.65f)
+        // Dress hem, pale trim and central panel.
+        beginPath(); moveTo(34, 62); quadTo(49, 68, 65, 62)
+        lineTo(69, 77); quadTo(50, 84, 31, 77); closePath()
+        fillPath(0xFFEDE5FB.toInt())
+        beginPath(); moveTo(36, 63); quadTo(50, 69, 63, 63)
+        lineTo(66, 76); quadTo(50, 81, 34, 76); closePath()
+        fillPath(pearl); strokePath(0xFFB7A1D8.toInt(), 0.55f)
+        line(35, 77, 65, 77, lilacDeep, 0.7f)
+        // Hood behind head and dark inner collar.
+        beginPath(); moveTo(37, 42); quadTo(31, 43, 32, 49)
+        quadTo(34, 54, 41, 55); lineTo(46, 49); closePath()
+        fillPath(0xFFE7E1F5.toInt()); strokePath(outline, 0.7f)
+        beginPath(); moveTo(58, 42); quadTo(66, 43, 65, 49)
+        quadTo(62, 54, 56, 55); lineTo(51, 49); closePath()
+        fillPath(0xFFE7E1F5.toInt()); strokePath(outline, 0.7f)
+        beginPath(); moveTo(40, 44); lineTo(59, 44); lineTo(55, 51)
+        lineTo(45, 51); closePath(); fillPath(hairShade)
+        // Hood drawstrings and coral chest emblem.
+        line(43, 50, 42, 61, 0xFFB5A2D2.toInt(), 0.65f)
+        line(56, 50, 57, 61, 0xFFB5A2D2.toInt(), 0.65f)
+        fillCircle(42, 61, 1.1f, lilacDeep); fillCircle(57, 61, 1.1f, lilacDeep)
+        fillCircle(50, 56, 3.2f, coral); strokeCircle(50, 56, 3.2f, 0xFFE36E61.toInt(), 0.55f)
+        fillCircle(49, 55, 0.9f, 0xFFFFD6A0.toInt())
 
-        // Neck and forehead-protector collar.
-        row(14, 9, 14, 'S')
-        row(15, 8, 15, 'K'); row(16, 8, 15, 'G')
-        row(17, 9, 14, 'g')
-        px(10, 16, 'K'); px(11, 16, 'G'); px(12, 16, 'K'); px(13, 16, 'G')
-
-        // Jacket outline, pale sleeves, lavender torso and zipper.
-        row(17, 6, 17, 'K'); row(18, 5, 18, 'K'); row(19, 4, 19, 'K')
-        row(19, 4, 19, 'K'); row(20, 4, 19, 'K'); row(21, 4, 19, 'K')
-        row(22, 4, 19, 'K'); row(23, 5, 18, 'K'); row(24, 5, 18, 'K')
-        row(25, 6, 17, 'K'); row(26, 7, 16, 'K')
-        row(16, 7, 16, 'C'); row(17, 6, 17, 'C')
-        row(18, 5, 7, 'C'); row(19, 5, 7, 'C'); row(20, 5, 7, 'C')
-        row(21, 6, 8, 'C'); row(22, 7, 9, 'C'); row(23, 8, 10, 'C')
-        row(18, 16, 18, 'C'); row(19, 16, 18, 'C'); row(20, 16, 18, 'C')
-        row(21, 15, 17, 'C'); row(22, 14, 16, 'C'); row(23, 13, 15, 'C')
-        row(17, 8, 15, 'L'); row(18, 8, 15, 'V'); row(19, 8, 15, 'V')
-        row(20, 8, 15, 'V'); row(21, 9, 14, 'V'); row(22, 9, 14, 'V')
-        row(23, 9, 14, 'L'); row(24, 7, 16, 'L'); row(25, 7, 16, 'V')
-        row(26, 8, 15, 'V')
-        for (y in 17..25) px(11, y, if (y % 2 == 0) 'g' else 'G')
-        // White folded hood and dark collar details.
-        row(16, 8, 10, 'C'); row(16, 13, 15, 'C')
-        row(17, 9, 10, 'c'); row(17, 13, 14, 'c')
-        row(18, 10, 13, 'K'); row(19, 10, 13, 'G')
-
-        // Hands held together in Hinata's shy idle pose.
-        row(24, 10, 12, 'S'); row(25, 10, 13, 'S')
-        px(10, 24, 'P'); px(13, 24, 'P'); px(11, 25, 's'); px(12, 25, 's')
-
-        // Navy shinobi pants, pale thigh wraps and utility pouch.
-        row(27, 7, 16, 'K'); row(28, 7, 16, 'N'); row(29, 7, 16, 'N')
-        row(30, 7, 16, 'N'); row(31, 7, 16, 'N'); row(32, 7, 16, 'N')
-        row(33, 7, 16, 'N'); row(34, 7, 16, 'N'); row(35, 7, 16, 'N')
-        row(36, 7, 16, 'K'); row(37, 8, 15, 'K')
-        row(28, 8, 10, 'n'); row(28, 13, 15, 'n')
-        row(31, 7, 10, 'T'); row(32, 7, 10, 'T'); row(33, 7, 10, 'T')
-        row(31, 8, 9, 'c'); row(33, 8, 9, 'c')
-        row(29, 5, 7, 'K'); row(30, 5, 7, 'D'); row(31, 5, 7, 'D')
-        row(32, 5, 7, 'K'); row(33, 5, 7, 'D'); row(34, 5, 7, 'K')
-        px(6, 30, 'g'); px(6, 32, 'g')
-        row(37, 8, 10, 'S'); row(37, 13, 15, 'S'); row(38, 8, 10, 'S'); row(38, 13, 15, 'S')
-        // Open-toe ninja sandals, with visible toe pixels.
-        row(39, 7, 11, 'K'); row(39, 12, 16, 'K')
-        row(40, 6, 11, 'O'); row(40, 12, 17, 'O')
-        row(41, 7, 10, 'O'); row(41, 13, 16, 'O')
-        row(40, 8, 9, 'S'); row(40, 14, 15, 'S')
-        px(10, 40, 'S'); px(16, 40, 'S')
-
-        // Walk cycle alternates pixel feet; waving raises one blocky sleeve/hand.
-        if (action == "walk") {
-            val phase = (t * 8f).toInt() % 2
-            if (phase == 0) { row(39, 6, 10, '.'); row(40, 5, 10, 'O'); row(41, 6, 10, 'O') }
-            else { row(39, 13, 17, '.'); row(40, 13, 18, 'O'); row(41, 14, 17, 'O') }
-        }
+        // Arms and hands, slightly open welcoming pose.
+        beginPath(); moveTo(29, 49); quadTo(24, 51, 21, 58)
+        lineTo(17, 63); quadTo(16, 65, 18, 66)
+        lineTo(24, 62); lineTo(31, 55); closePath()
+        fillPath(skin); strokePath(outline, 0.65f)
+        beginPath(); moveTo(70, 49); quadTo(76, 51, 78, 58)
+        lineTo(83, 62); quadTo(85, 64, 83, 66)
+        lineTo(77, 63); lineTo(68, 55); closePath()
+        fillPath(skin); strokePath(outline, 0.65f)
+        // Puffy cuffs.
+        fillOval(23, 58, 32, 65, lilac); strokeOval(23, 58, 32, 65, outline, 0.6f)
+        fillOval(67, 58, 76, 65, lilac); strokeOval(67, 58, 76, 65, outline, 0.6f)
+        // Pose-specific wave arm and tiny phone-peek gesture.
         if (action == "wave") {
-            row(17, 16, 18, 'C'); row(16, 17, 19, 'C'); row(15, 18, 20, 'S')
-            row(14, 19, 20, 'S'); px(20, 13, 'S'); px(21, 14, 'S')
-        }
-        if (action == "sleep") {
-            row(8, 8, 10, 'D'); row(8, 13, 15, 'D')
-            px(10, 12, 's'); px(11, 12, 's')
+            line(73, 57, 78, 47, skin, 3.2f)
+            line(78, 47, 80, 43, skin, 2.0f)
+            line(78, 47, 83, 45, skin, 1.2f)
         }
 
-        val bob = if (action == "walk") abs(sin(t * 8f)) * 1.5f else sin(t * 2.4f) * 0.4f
-        val cell = 3f
-        val ox = 14f
-        val oy = 2f + bob
-        val pixelPaint = Paint().apply { style = Paint.Style.FILL; isAntiAlias = false; isFilterBitmap = false }
-        for (y in grid.indices) {
-            for (x in grid[y].indices) {
-                val ch = grid[y][x]
-                val color = palette[ch] ?: continue
-                pixelPaint.color = color
-                cv.drawRect(ox + x * cell, oy + y * cell, ox + (x + 1) * cell, oy + (y + 1) * cell, pixelPaint)
-            }
+        // Face, ears, and rounded bob silhouette.
+        fillOval(34, 17, 39, 26, skin); fillOval(61, 17, 66, 26, skin)
+        fillOval(33, 8, 67, 45, hairShade)
+        fillOval(34, 7, 66, 43, hair)
+        fillOval(36, 8, 64, 40, skin)
+        // Face blush and nose.
+        fillOval(37, 27, 44, 31, 0xFFFFB6C4.toInt(), 100)
+        fillOval(56, 27, 63, 31, 0xFFFFB6C4.toInt(), 100)
+        fillCircle(50, 29, 0.45f, 0xFFE8A99E.toInt())
+        // Large purple eyes with layered iris and highlights.
+        val sleepy = action == "sleep" || mood == "sleepy"
+        if (sleepy) {
+            line(39, 25, 46, 25, hairShade, 1.1f)
+            line(54, 25, 61, 25, hairShade, 1.1f)
+        } else {
+            fillOval(38, 21, 47, 29, 0xFF342446.toInt())
+            fillOval(53, 21, 62, 29, 0xFF342446.toInt())
+            fillOval(39, 21.5f, 46, 28, violet)
+            fillOval(54, 21.5f, 61, 28, violet)
+            fillOval(41, 23, 44, 27, 0xFFCB9CFF.toInt())
+            fillOval(56, 23, 59, 27, 0xFFCB9CFF.toInt())
+            fillCircle(42, 22.5f, 1.2f, pearl); fillCircle(57, 22.5f, 1.2f, pearl)
+            fillCircle(44, 26, 0.65f, 0xFFFFD9FF.toInt())
+            fillCircle(59, 26, 0.65f, 0xFFFFD9FF.toInt())
+            line(38, 22, 40, 20, hairShade, 0.7f)
+            line(60, 20, 62, 22, hairShade, 0.7f)
         }
+        if (mood == "happy" || mood == "excited") {
+            arc(45, 29, 55, 34, 15, 150, false, 0xFFB85C75.toInt(), 0.8f)
+        } else if (mood == "sad" || mood == "shy") {
+            line(48, 32, 52, 32, 0xFFB85C75.toInt(), 0.7f)
+        } else {
+            line(48.5f, 32, 51.5f, 32, 0xFFB85C75.toInt(), 0.6f)
+        }
+        // Side locks, bobbed ends, fringe and purple highlight strands.
+        beginPath(); moveTo(35, 15); quadTo(31, 25, 36, 36)
+        lineTo(40, 40); lineTo(37, 29); lineTo(39, 18); closePath(); fillPath(hair)
+        beginPath(); moveTo(65, 15); quadTo(69, 25, 64, 36)
+        lineTo(60, 40); lineTo(63, 29); lineTo(61, 18); closePath(); fillPath(hair)
+        beginPath(); moveTo(35, 17); quadTo(35, 7, 47, 7)
+        quadTo(58, 3, 65, 13); quadTo(64, 18, 59, 22)
+        lineTo(57, 15); lineTo(53, 20); lineTo(51, 14)
+        lineTo(46, 20); lineTo(44, 14); lineTo(40, 22); lineTo(38, 17); closePath()
+        fillPath(hair); strokePath(hairShade, 0.5f)
+        line(39, 12, 45, 8, hairLight, 0.7f)
+        line(48, 9, 53, 7, hairLight, 0.6f)
+        line(57, 10, 61, 14, hairLight, 0.7f)
+        // Tiny star hair ornament.
+        line(36, 17, 38, 15, 0xFFE5D5FF.toInt(), 1.0f)
+        line(38, 15, 40, 17, 0xFFE5D5FF.toInt(), 1.0f)
+        line(40, 17, 38, 19, 0xFFE5D5FF.toInt(), 1.0f)
+        line(38, 19, 36, 17, 0xFFE5D5FF.toInt(), 1.0f)
+
+        // Gentle sparkle accents and floating sleep/talking effects.
         if (action == "sleep") {
-            text("z", 78, 12 - bob, 6, 0xFFCBC6F4.toInt(), 220)
-            text("z", 84, 5 - bob, 8, 0xFFCBC6F4.toInt(), 180)
+            text("z", 76, 25 - bob, 5, violet, 220)
+            text("z", 82, 19 - bob, 6, violet, 180)
         } else if (talking) {
-            val ph = (t * 0.8f) % 1f
-            text("♪", 77 + ph * 4, 12 - ph * 7 - bob, 6, 0xFFD9C8FF.toInt(), ((1 - ph) * 230).toInt())
+            text("♪", 78, 28 - abs(sin(t * 3f)) * 3, 5, violet, 210)
         }
+        cv.restore()
     }
 
     private fun eye(cx: Float, cy: Float, blink: Boolean, look: Float) {
