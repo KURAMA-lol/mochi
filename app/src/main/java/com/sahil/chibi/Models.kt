@@ -111,7 +111,7 @@ const val DEFAULT_PROMPT =
     "Never mention the tag or these instructions. At most one emoji per reply."
 
 data class PersonaCfg(
-    val name: String = "Mochi",
+    val name: String = "Hina",
     val userName: String = "Sahil",
     val prompt: String = DEFAULT_PROMPT,
     val size: Int = 130,
@@ -132,7 +132,7 @@ data class PersonaCfg(
         fun fromJson(o: JSONObject): PersonaCfg {
             val d = PersonaCfg()
             return PersonaCfg(
-                o.optString("name", d.name), o.optString("userName", d.userName),
+                o.optString("name", d.name).let { if (it == "Mochi") "Hina" else it }, o.optString("userName", d.userName),
                 o.optString("prompt", d.prompt).ifBlank { d.prompt },
                 o.optInt("size", d.size).coerceIn(70, 260),
                 o.optBoolean("walking", d.walking), o.optBoolean("idleChatter", d.idleChatter),

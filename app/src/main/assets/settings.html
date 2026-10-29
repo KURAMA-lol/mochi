@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Mochi</title>
+<title>Hina</title>
 <style>
 :root{--bg:#15101f;--card:#211a36;--card2:#2a2145;--tx:#f4f0ff;--mut:#a79fc4;--ac:#ff8fb8;--ac2:#7e6bff;--ok:#6fe3a0;--bad:#ff6b7d;--line:#352c55}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -47,7 +47,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 </style>
 </head>
 <body>
-<header><div style="font-size:30px">🌸</div><div><h1>Mochi</h1><small>your tiny phone companion</small></div></header>
+<header><div style="font-size:30px">🌸</div><div><h1>Hina</h1><small>your tiny phone companion</small></div></header>
 
 <!-- HOME -->
 <section id="home" class="on">
@@ -58,17 +58,17 @@ th{color:var(--mut);font-weight:500;font-size:12px}
       <button class="b ghost" onclick="Android.requestPerms()">2 · Mic + notifications</button>
     </div>
     <div class="btns">
-      <button class="b pink" onclick="Android.start()">Start Mochi</button>
+      <button class="b pink" onclick="Android.start()">Start Hina</button>
       <button class="b" onclick="Android.summon()">Call her</button>
       <button class="b red" onclick="Android.stop()">Stop</button>
     </div>
-    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap Mochi on screen to chat; drag her anywhere; long-press to pat her.</p>
+    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap Hina on screen to chat; drag her anywhere; long-press to pat her.</p>
   </div>
   <h2>Other ways to call her</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
-    • Quick Settings tile: edit your tiles and add <b>Call Mochi</b><br>
-    • Home-screen icon <b>Call Mochi</b> (long-press it and drag it to your home screen)
+    • Quick Settings tile: edit your tiles and add <b>Call Hina</b><br>
+    • Home-screen icon <b>Call Hina</b> (long-press it and drag it to your home screen)
   </div>
   <h2>Backup / restore settings</h2>
   <div class="card">
@@ -168,7 +168,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 if (!window.Android) {
   let store = localStorage.getItem('cfg');
   window.Android = {
-    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Mochi',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12}}),
+    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Hina',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12}}),
     saveConfig: j => { store = j; localStorage.setItem('cfg', j); return true },
     getStatus: () => JSON.stringify({overlay:false,mic:true,notif:true,running:false}),
     openOverlaySettings(){}, requestPerms(){}, start(){}, summon(){}, stop(){},
@@ -203,7 +203,7 @@ function tab(id){
 function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
-  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Mochi running');
+  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Hina running');
 }
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
 function imp(){

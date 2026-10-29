@@ -8,12 +8,12 @@ import android.os.Bundle
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
-/** Quick Settings tile: pull down the shade, tap "Call Mochi". */
+/** Quick Settings tile: pull down the shade, tap "Call Hina". */
 class SummonTileService : TileService() {
     override fun onStartListening() {
         qsTile?.let {
             it.state = if (CompanionService.running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-            it.label = "Call Mochi"
+            it.label = "Call Hina"
             it.updateTile()
         }
     }

@@ -1,6 +1,7 @@
 package com.sahil.chibi
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -12,7 +13,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Draws Mochi: an original chibi girl (pink hair, cat-ear hairband, cream hoodie) with Canvas.
+ * Draws Hina (pixel-art): an original chibi girl (pink hair, cat-ear hairband, cream hoodie) with Canvas.
  * Logical drawing box is 100 x 130 units. The drawing code mirrors design/draw.js 1:1.
  */
 class ChibiView(ctx: Context) : View(ctx) {
@@ -42,6 +43,16 @@ class ChibiView(ctx: Context) : View(ctx) {
     private val WHITE = 0xFFFFFFFF.toInt()
     private val BOOT = 0xFF5A3F6B.toInt()
     private val SOCK = 0xFFE9DEFF.toInt()
+
+    // pixel-art: draw into a tiny bitmap, then scale up with no smoothing
+    private val PW = 64
+    private val PH = 84
+    private val PS = 0.64f
+    private var bmp: Bitmap? = null
+    private var bc: Canvas? = null
+    private val bp = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
+
+    init { p.isAntiAlias = false }
 
     private var nextBlink = 0L
     private var blinkUntil = 0L
@@ -97,13 +108,19 @@ class ChibiView(ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         val now = SystemClock.uptimeMillis()
         val t = now / 1000f
-        val s = min(width / 100f, height / 130f)
-        c.save()
-        c.translate((width - 100f * s) / 2f, (height - 130f * s) / 2f)
-        c.scale(s, s)
-        if (!facingRight) c.scale(-1f, 1f, 50f, 0f)
-        cv = c
+        if (bmp == null) { bmp = Bitmap.createBitmap(PW, PH, Bitmap.Config.ARGB_8888); bc = Canvas(bmp!!) }
+        val b = bmp!!; val g = bc!!
+        b.eraseColor(0)
+        g.save(); g.scale(PS, PS)
+        cv = g
         drawGirl(t, now)
+        g.restore()
+        val s = min(width / 100f, height / 130f)
+        val dw = PW / PS * s; val dh = PH / PS * s
+        val dx = (width - 100f * s) / 2f; val dy = (height - 130f * s) / 2f
+        c.save()
+        if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
+        c.drawBitmap(b, null, RectF(dx, dy, dx + dw, dy + dh), bp)
         c.restore()
         postInvalidateDelayed(40)
     }

@@ -21,7 +21,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
-        android:label="Mochi"
+        android:label="Hina"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="true">
 
@@ -40,7 +40,7 @@
             android:name=".SummonActivity"
             android:exported="true"
             android:icon="@drawable/ic_launcher"
-            android:label="Call Mochi"
+            android:label="Call Hina"
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
@@ -63,7 +63,7 @@
             android:name=".SummonTileService"
             android:exported="true"
             android:icon="@drawable/ic_tile"
-            android:label="Call Mochi"
+            android:label="Call Hina"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

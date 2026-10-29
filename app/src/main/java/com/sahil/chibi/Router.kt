@@ -114,7 +114,7 @@ object Router {
         val lastUser = msgs.lastOrNull { it.role == "user" }?.content ?: ""
         val plan = plan(cfg, lastUser, voice, true)
         if (plan.order.isEmpty()) {
-            throw IllegalStateException("No providers set up yet. Open the Mochi app > Providers and add one with an API key.")
+            throw IllegalStateException("No providers set up yet. Open the Hina app > Providers and add one with an API key.")
         }
         val trace = ArrayList<String>()
         val attempts = 1 + cfg.router.retries.coerceIn(0, 3)

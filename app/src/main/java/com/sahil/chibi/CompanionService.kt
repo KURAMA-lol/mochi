@@ -190,7 +190,7 @@ class CompanionService : Service() {
     private fun createChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CH, "Mochi companion", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CH, "Hina companion", NotificationManager.IMPORTANCE_LOW)
         )
     }
 
@@ -700,7 +700,7 @@ class CompanionService : Service() {
 
     private fun startListening() {
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            addMsg("I need mic permission. Open the Mochi app and tap 'Grant mic'.", false, null); return
+            addMsg("I need mic permission. Open the Hina app and tap 'Grant mic'.", false, null); return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             addMsg("No speech recognizer found on this phone (needs the Google app).", false, null); return

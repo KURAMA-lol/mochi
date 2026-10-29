@@ -18,7 +18,7 @@ object Http {
             c.connectTimeout = minOf(timeoutMs, 15000)
             c.readTimeout = timeoutMs
             c.setRequestProperty("Accept", "application/json, text/plain, */*")
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Mochi/1.0")
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Hina/1.0")
             if (body != null) {
                 c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json")
