@@ -273,8 +273,6 @@ class ChibiView(ctx: Context) : View(ctx) {
         line(42, hy - 22, 40, hy - 8, HAIR_L, 1.0, 190)
         line(58, hy - 23, 59, hy - 10, HAIR_L, 0.8, 170)
         // Hinata's signature straight silhouette: no cat-ear accessories
-        cv.restore()
-        }
         // hair clip
         fillCircle(66, hy - 14, 2.6, LAV); strokeCircle(66, hy - 14, 2.6, INK, 0.9)
         fillCircle(66, hy - 14, 0.9, WHITE)
