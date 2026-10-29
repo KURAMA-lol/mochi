@@ -13,15 +13,15 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Draws Hina (pixel-art): an original chibi girl (pink hair, cat-ear hairband, cream hoodie) with Canvas.
- * Logical drawing box is 100 x 130 units. The drawing code mirrors design/draw.js 1:1.
+ * Draws Hina in a smooth, full-height Hinata-inspired anime style using Canvas.
+ * Logical drawing box is 100 x 130 units with full-body anime proportions.
  */
 class ChibiView(ctx: Context) : View(ctx) {
     var mood = "neutral"          // happy excited shy sad angry sleepy smug neutral
     var action = "idle"           // idle walk sit sleep wave drag
     var facingRight = true
     var talking = false
-    var pixel = true              // true = pixel-art, false = smooth
+    var pixel = false              // true = pixel-art, false = smooth
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
@@ -144,210 +144,136 @@ class ChibiView(ctx: Context) : View(ctx) {
         val walking = action == "walk"
         val sitting = action == "sit"
         val sleeping = action == "sleep"
-        val dragging = action == "drag"
-
+        val waving = action == "wave"
         if (now > nextBlink) { blinkUntil = now + 130; nextBlink = now + 2500 + (now % 2300) }
         val blink = now < blinkUntil
+        val bob = if (walking) -abs(sin(t * 9f)) * 1.2f else sin(t * 2.4f) * 0.25f
+        val top = 12f + bob
+        val sway = if (walking) sin(t * 9f) * 1.5f else 0f
 
-        val bob = when {
-            walking -> -abs(sin(t * 9)) * 3
-            sleeping -> sin(t * 1.5f) * 0.8f
-            sitting -> sin(t * 2) * 0.8f
-            dragging -> sin(t * 12) * 1.5f
-            else -> sin(t * 3) * 1.3f
-        }
-        val hy = 47 + bob + (if (sitting) 14 else if (sleeping) 16 else 0)
-        val swing = if (walking) sin(t * 9) * 5 else 0f
+        // Long, straight indigo hair forms a continuous silhouette behind the body.
+        beginPath(); moveTo(37, top + 3); cubicTo(36, top - 6, 43, top - 9, 50, top - 8)
+        cubicTo(61, top - 8, 66, top - 1, 66, top + 10); cubicTo(69, top + 29, 68 + sway, 57, 65 + sway, 77)
+        cubicTo(61, 81, 39, 81, 35 - sway, 76); cubicTo(32, 63, 31, top + 27, 33, top + 11)
+        cubicTo(34, top + 6, 35, top + 4, 37, top + 3); closePath(); fillPath(HAIR_D); strokePath(INK, 0.7f)
+        beginPath(); moveTo(39, top + 3); cubicTo(36, 25, 37, 55, 39, 74); cubicTo(40, 77, 41, 78, 42, 79); closePath(); fillPath(HAIR_L, 95)
+        beginPath(); moveTo(59, top + 2); cubicTo(63, 27, 62, 57, 60, 76); lineTo(58, 79); closePath(); fillPath(HAIR, 150)
+        line(43, top + 2, 41, 58, HAIR_L, 0.65f, 150); line(57, top + 2, 59, 58, HAIR_L, 0.65f, 150)
 
-        // --- long straight indigo hair behind the body ---
-        val sway = sin(t * 2.4f) * 1.8f + (if (walking) sin(t * 9) * 3.5f else 0f)
-        beginPath(); moveTo(20, hy - 20); cubicTo(12, hy - 34, 24, hy - 34, 34, hy - 32)
-        cubicTo(45, hy - 37, 58, hy - 36, 68, hy - 31); cubicTo(84, hy - 31, 89, hy - 16, 80, hy + 13)
-        lineTo(79 + sway, hy + 47); lineTo(69 + sway, hy + 44); lineTo(62, hy + 48)
-        lineTo(51, hy + 45); lineTo(39, hy + 48); lineTo(30 - sway, hy + 44); lineTo(21 - sway, hy + 47)
-        lineTo(20, hy + 13); cubicTo(12, hy - 2, 14, hy - 12, 20, hy - 20); closePath()
-        fillPath(HAIR_D); strokePath(INK, 1.2)
-        line(30, hy - 20, 31 - sway, hy + 39, HAIR, 2.1, 210)
-        line(69, hy - 20, 68 + sway, hy + 39, HAIR_L, 1.2, 180)
-
-        // --- legs ---
-        if (!sitting && !sleeping) {
-            for (s in intArrayOf(-1, 1)) {
-                val x0 = 44 + (if (s > 0) 12 else 0)
-                val x1 = x0 + (if (s > 0) -swing else swing)
-                line(x0, hy + 52, x1, 117, SKIN, 5.2)
-                line(x0, hy + 60, x1, 117, SOCK, 5.6)
-                line(x0, 113, x1, 117, LAV, 5.6)
-                fillOval(x1 - 6, 116, x1 + 6, 124, BOOT); fillOval(x1 - 6, 122, x1 + 6, 125, WHITE)
-            }
+        // Slender navy trousers, thigh bandage, utility pouch and open-toe sandals.
+        if (!sleeping) {
+            beginPath(); moveTo(40, 76); cubicTo(43, 75, 48, 76, 49, 79); lineTo(48, 98); lineTo(47, 114); lineTo(38, 114); cubicTo(37, 103, 38, 92, 37, 80); closePath(); fillPath(0xFF303958.toInt()); strokePath(INK, 0.65f)
+            beginPath(); moveTo(51, 79); cubicTo(53, 76, 59, 76, 61, 79); lineTo(62, 96); lineTo(60, 114); lineTo(51, 114); cubicTo(50, 103, 50, 91, 51, 79); closePath(); fillPath(0xFF303958.toInt()); strokePath(INK, 0.65f)
+            line(42, 96, 40, 108, 0xFF4A5273.toInt(), 0.7f, 180); line(56, 96, 58, 108, 0xFF4A5273.toInt(), 0.7f, 180)
+            fillRect(34, 84, 40, 92, 0xFF20263D.toInt()); fillRect(34.7f, 84.7f, 39.5f, 86.4f, 0xFFD9D9E2.toInt())
+            fillRect(34.7f, 87.4f, 39.5f, 89.1f, 0xFFD9D9E2.toInt()); fillRect(34.7f, 90f, 39.5f, 91.2f, 0xFFD9D9E2.toInt())
+            fillRect(31, 85, 36, 96, 0xFF252B40.toInt()); strokeP(INK, 0.65f); cv.drawRect(31f, 85f, 36f, 96f, p)
+            fillRect(39, 113, 46, 120, SKIN); fillRect(53, 113, 59, 120, SKIN)
+            beginPath(); moveTo(37, 118); cubicTo(40, 117, 45, 117, 47, 119); lineTo(48, 124); cubicTo(47, 127, 37, 127, 35, 124); closePath(); fillPath(0xFF171D30.toInt()); strokePath(INK, 0.7f)
+            beginPath(); moveTo(52, 119); cubicTo(54, 117, 59, 117, 61, 119); lineTo(63, 124); cubicTo(62, 127, 52, 127, 50, 124); closePath(); fillPath(0xFF171D30.toInt()); strokePath(INK, 0.7f)
+            line(37, 121, 46, 121, 0xFF737B97.toInt(), 1.4f); line(52, 121, 61, 121, 0xFF737B97.toInt(), 1.4f)
+            line(39, 119, 42, 123, 0xFF3E4561.toInt(), 1.5f); line(57, 119, 55, 123, 0xFF3E4561.toInt(), 1.5f)
+            for (i in 0..2) { fillCircle(39 + i * 2.1f, 124, 0.4f, SKIN); fillCircle(54 + i * 2.1f, 124, 0.4f, SKIN) }
         } else {
-            fillOval(32, 116, 46, 125, BOOT); fillOval(54, 116, 68, 125, BOOT)
-            line(40, hy + 50, 38, 119, SOCK, 5); line(60, hy + 50, 62, 119, SOCK, 5)
+            beginPath(); moveTo(39, 78); cubicTo(49, 78, 55, 84, 56, 91); cubicTo(58, 98, 51, 103, 43, 100); lineTo(34, 93); closePath(); fillPath(0xFF303958.toInt()); strokePath(INK, 0.7f)
+            beginPath(); moveTo(42, 94); cubicTo(51, 92, 58, 98, 58, 104); lineTo(49, 108); lineTo(36, 101); closePath(); fillPath(0xFF303958.toInt()); strokePath(INK, 0.7f)
+            fillOval(38, 101, 48, 106, BOOT); fillOval(49, 103, 60, 108, BOOT)
         }
 
-        // --- hoodie body ---
-        beginPath(); moveTo(38, hy + 24); lineTo(62, hy + 24)
-        cubicTo(68, hy + 34, 72, hy + 46, 71, hy + 55); quadTo(50, hy + 60, 29, hy + 55)
-        cubicTo(28, hy + 46, 32, hy + 34, 38, hy + 24); closePath()
-        fillPath(CREAM); strokePath(INK, 1.3)
-        beginPath(); moveTo(29.3, hy + 51); quadTo(50, hy + 57, 70.7, hy + 51); lineTo(71, hy + 55)
-        quadTo(50, hy + 60, 29, hy + 55); closePath()
-        fillPath(LAV)
-        // white jacket panels and center zip
-        beginPath(); moveTo(38, hy + 25); lineTo(45, hy + 29); lineTo(42, hy + 49); lineTo(31, hy + 51); closePath(); fillPath(CREAM)
-        beginPath(); moveTo(62, hy + 25); lineTo(55, hy + 29); lineTo(58, hy + 49); lineTo(69, hy + 51); closePath(); fillPath(CREAM)
-        line(50, hy + 27, 50, hy + 55, CREAM_SH, 1.2)
-        // small metal Leaf-style plate at the collar
-        fillRect(43, hy + 23, 57, hy + 30, 0xFF777487.toInt())
-        strokeP(INK, 0.7, 255); cv.drawRect(43f, hy + 23, 57f, hy + 30, p)
-        arc(46, hy + 24, 54, hy + 29, 185, 245, false, 0xFF24243A.toInt(), 0.8)
-        fillCircle(51.5, hy + 27, 0.7, 0xFF24243A.toInt())
-
-        // --- arms (sleeves) ---
-        val lax: Float; val lay: Float; val rax: Float; val ray: Float
-        when {
-            dragging -> { lax = 26f; lay = hy + 8; rax = 74f; ray = hy + 8 }
-            action == "wave" -> { lax = 31f; lay = hy + 46; rax = 76f; ray = hy + 4 + sin(t * 11) * 6 }
-            walking -> { lax = 32f; lay = hy + 44 + swing; rax = 68f; ray = hy + 44 - swing }
-            sleeping -> { lax = 35f; lay = hy + 47; rax = 65f; ray = hy + 47 }
-            else -> { lax = 32f; lay = hy + 45; rax = 68f; ray = hy + 45 }
+        // Fitted lavender jacket, pale sleeves, seams and folded hood.
+        beginPath(); moveTo(39, 41); cubicTo(34, 42, 32, 47, 32, 52); lineTo(29, 69); cubicTo(30, 74, 34, 77, 39, 78)
+        lineTo(61, 78); cubicTo(66, 77, 70, 74, 71, 69); lineTo(68, 52); cubicTo(68, 47, 66, 42, 61, 41); lineTo(56, 39); lineTo(44, 39); closePath(); fillPath(0xFFB7A7D8.toInt()); strokePath(INK, 0.75f)
+        beginPath(); moveTo(35, 47); cubicTo(33, 56, 33, 66, 34, 73); lineTo(41, 76); lineTo(43, 47); closePath(); fillPath(0xFFF0EDF4.toInt())
+        beginPath(); moveTo(65, 47); cubicTo(67, 56, 67, 66, 66, 73); lineTo(59, 76); lineTo(57, 47); closePath(); fillPath(0xFFECE8F2.toInt())
+        beginPath(); moveTo(43, 44); lineTo(50, 49); lineTo(57, 44); lineTo(60, 76); lineTo(40, 76); closePath(); fillPath(0xFF9B88C8.toInt())
+        line(50, 49, 50, 77, 0xFF5E527F.toInt(), 0.8f); line(43, 52, 42, 72, 0xFFDCD3EB.toInt(), 0.7f, 210); line(57, 52, 58, 72, 0xFFDCD3EB.toInt(), 0.7f, 210)
+        beginPath(); moveTo(39, 40); cubicTo(43, 39, 46, 43, 50, 47); cubicTo(54, 43, 58, 39, 61, 40); lineTo(57, 49); lineTo(50, 54); lineTo(43, 49); closePath(); fillPath(0xFFF5F2F7.toInt()); strokePath(0xFF6E687E.toInt(), 0.6f)
+        beginPath(); moveTo(43, 44); lineTo(50, 50); lineTo(57, 44); lineTo(54, 51); lineTo(50, 54); lineTo(46, 51); closePath(); fillPath(0xFFD4C8E8.toInt())
+        if (waving) {
+            beginPath(); moveTo(38, 44); cubicTo(32, 45, 31, 49, 32, 53); lineTo(27, 43); cubicTo(26, 39, 29, 37, 32, 39); lineTo(43, 48); closePath(); fillPath(0xFFF1EEF5.toInt()); strokePath(INK, 0.7f)
+            beginPath(); moveTo(61, 44); cubicTo(67, 45, 68, 50, 66, 55); lineTo(59, 68); lineTo(54, 65); lineTo(61, 51); closePath(); fillPath(0xFFE9E4F0.toInt()); strokePath(INK, 0.7f)
+            fillOval(24, 35 + sin(t * 11f) * 1.5f, 30, 42 + sin(t * 11f) * 1.5f, SKIN)
+        } else {
+            beginPath(); moveTo(36, 43); cubicTo(31, 44, 30, 49, 32, 55); lineTo(42, 72); cubicTo(44, 75, 47, 73, 47, 70); lineTo(41, 51); closePath(); fillPath(0xFFF1EEF5.toInt()); strokePath(INK, 0.7f)
+            beginPath(); moveTo(64, 43); cubicTo(69, 44, 70, 49, 68, 55); lineTo(58, 72); cubicTo(56, 75, 53, 73, 53, 70); lineTo(59, 51); closePath(); fillPath(0xFFE9E4F0.toInt()); strokePath(INK, 0.7f)
+            line(35, 49, 39, 62, 0xFFD4CEDF.toInt(), 0.8f); line(65, 49, 61, 62, 0xFFD4CEDF.toInt(), 0.8f)
+            fillOval(44, 68, 56, 76, SKIN); fillOval(45, 69, 55, 75, 0xFFFFD8C8.toInt())
+            line(50, 69, 50, 74, 0xFFE2A995.toInt(), 0.5f); line(47, 72, 49, 74, 0xFFE2A995.toInt(), 0.45f)
         }
-        line(38, hy + 30, lax, lay, INK, 8.4); line(62, hy + 30, rax, ray, INK, 8.4)
-        line(38, hy + 30, lax, lay, CREAM, 6.6); line(62, hy + 30, rax, ray, CREAM, 6.6)
-        fillCircle(lax, lay + 1, 3.2, SKIN); strokeCircle(lax, lay + 1, 3.2, INK, 1)
-        fillCircle(rax, ray + 1, 3.2, SKIN); strokeCircle(rax, ray + 1, 3.2, INK, 1)
+        // Dark collar plate and tiny Leaf-inspired emblem.
+        fillRect(41, 34, 59, 41, 0xFF24283A.toInt()); fillRect(42, 34, 58, 39, 0xFFBFC1D0.toInt()); strokeP(INK, 0.55f); cv.drawRect(42f, 34f, 58f, 39f, p)
+        beginPath(); moveTo(47, 35); cubicTo(44, 36, 44, 38, 47, 38); lineTo(53, 38); cubicTo(56, 38, 56, 36, 53, 35); lineTo(52, 36); lineTo(48, 36); closePath(); fillPath(0xFF44485B.toInt())
 
-        // --- head (tilts) ---
-        val tilt = (if (sleeping) 8f else if (mood == "shy") 3f else 0f) + sin(t * 2) * 1.1f
-        cv.save(); rot(tilt, 50, hy + 28)
-
-        // long face-framing locks
-        for (side in intArrayOf(-1, 1)) {
-            val x = 50 + side * 29
-            beginPath(); moveTo(x, hy - 13); quadTo(x + side * 4, hy + 10, x + side * 1, hy + 43)
-            quadTo(x - side * 4, hy + 34, x - side * 5, hy + 8); closePath()
-            fillPath(HAIR_D); strokePath(INK, 0.8)
-            line(x - side * 1.5, hy - 2, x - side * 2, hy + 32, HAIR_L, 0.9, 180)
-        }
-        // face
-        fillOval(20, hy - 28, 80, hy + 28, SKIN)
-        arc(20, hy - 28, 80, hy + 28, 25, 130, false, SKIN_SH, 5, 140)
-        strokeOval(20, hy - 28, 80, hy + 28, INK, 1.3)
-
-        // blush
-        val bl = if (mood == "shy" || mood == "happy" || mood == "excited") 190 else 95
-        fillOval(24, hy + 11, 36, hy + 19, BLUSH, bl); fillOval(64, hy + 11, 76, hy + 19, BLUSH, bl)
-        if (mood == "shy") {
-            for (i in 0..2) {
-                line(27 + i * 3, hy + 13, 26 + i * 3, hy + 17, WHITE, 0.9, 200)
-                line(67 + i * 3, hy + 13, 66 + i * 3, hy + 17, WHITE, 0.9, 200)
-            }
-        }
-
-        // eyes
-        val look = if (walking) 1.5f else if (mood == "shy") -2f else 0f
-        eye(37.5f, hy + 5, blink, look)
-        eye(62.5f, hy + 5, blink, look)
-        // brows
-        val by = hy - 9
-        if (mood == "sad") {
-            line(30, by + 3, 43, by, INK, 1.5); line(57, by, 70, by + 3, INK, 1.5)
-        } else if (mood == "angry") {
-            line(30, by, 43, by + 3.5, INK, 1.7); line(57, by + 3.5, 70, by, INK, 1.7)
-        } else if (mood == "excited") {
-            line(31, by + 1, 43, by - 1, INK, 1.3, 200); line(57, by - 1, 69, by + 1, INK, 1.3, 200)
-        }
-        fillCircle(50, hy + 14.5, 0.9, SKIN_SH)
-        mouth(t, hy)
-
-        // straight indigo cap and blunt, slightly separated bangs
-        beginPath(); moveTo(19, hy + 8); cubicTo(12, hy - 30, 88, hy - 30, 81, hy + 8)
-        lineTo(76, hy + 5); lineTo(72, hy + 10); lineTo(67, hy + 3); lineTo(62, hy + 10)
-        lineTo(57, hy + 4); lineTo(52, hy + 10); lineTo(47, hy + 4); lineTo(42, hy + 10)
-        lineTo(37, hy + 3); lineTo(32, hy + 10); lineTo(27, hy + 4); lineTo(23, hy + 10)
-        closePath(); fillPath(HAIR_D); strokePath(INK, 1.3)
-        beginPath(); moveTo(25, hy - 9); quadTo(34, hy - 25, 48, hy - 26)
-        quadTo(37, hy - 18, 34, hy - 8); closePath(); fillPath(HAIR_L, 175)
-        beginPath(); moveTo(70, hy - 13); quadTo(67, hy - 22, 61, hy - 25)
-        quadTo(70, hy - 20, 73, hy - 8); closePath(); fillPath(HAIR, 130)
-        line(42, hy - 22, 40, hy - 8, HAIR_L, 1.0, 190)
-        line(58, hy - 23, 59, hy - 10, HAIR_L, 0.8, 170)
-        // Hinata's signature straight silhouette: no cat-ear accessories
-        // hair clip
-        fillCircle(66, hy - 14, 2.6, LAV); strokeCircle(66, hy - 14, 2.6, INK, 0.9)
-        fillCircle(66, hy - 14, 0.9, WHITE)
-        // ahoge
-        beginPath(); moveTo(50, hy - 29); quadTo(46, hy - 38, 53, hy - 40)
-        strokePath(INK, 3.6); strokePath(HAIR, 2.2)
+        // Small face, pale lavender Byakugan eyes and blunt fringe.
+        val hy = top - 1f
+        cv.save(); rot(if (sleeping) 4f else if (mood == "shy") 1.2f else 0f, 50, hy + 12)
+        fillOval(38, hy + 7, 41, hy + 13, SKIN); fillOval(59, hy + 7, 62, hy + 13, SKIN)
+        beginPath(); moveTo(40, hy + 2); cubicTo(43, hy - 2, 57, hy - 2, 60, hy + 2)
+        cubicTo(62, hy + 7, 61, hy + 18, 57, hy + 22); cubicTo(54, hy + 25, 46, hy + 25, 43, hy + 22)
+        cubicTo(39, hy + 18, 38, hy + 7, 40, hy + 2); closePath(); fillPath(SKIN); strokePath(0xFFB77F7E.toInt(), 0.45f)
+        fillOval(40, hy + 14, 44, hy + 17, BLUSH, if (mood == "shy" || mood == "happy") 155 else 75)
+        fillOval(56, hy + 14, 60, hy + 17, BLUSH, if (mood == "shy" || mood == "happy") 155 else 75)
+        val by = hy + 7
+        if (mood == "angry") { line(42, by + 1, 47, by - 0.3f, HAIR_D, 0.8f); line(53, by - 0.3f, 58, by + 1, HAIR_D, 0.8f) }
+        else { line(42, by, 47, by - 0.2f, HAIR_D, 0.6f); line(53, by - 0.2f, 58, by, HAIR_D, 0.6f) }
+        eye(45, hy + 12, blink, if (mood == "shy") -0.5f else 0f); eye(55, hy + 12, blink, if (mood == "shy") -0.5f else 0f)
+        line(50, hy + 13, 49.5f, hy + 16, 0xFFD99E91.toInt(), 0.35f); mouth(t, hy)
+        // Smooth indigo cap and blunt, separated bangs.
+        beginPath(); moveTo(38, hy + 8); cubicTo(36, hy + 2, 39, hy - 5, 45, hy - 6)
+        cubicTo(51, hy - 8, 58, hy - 5, 61, hy + 1); lineTo(62, hy + 8)
+        cubicTo(59, hy + 5, 56, hy + 6, 54, hy + 9); lineTo(52, hy + 6); lineTo(50, hy + 9)
+        lineTo(48, hy + 6); lineTo(46, hy + 9); lineTo(44, hy + 6); lineTo(41, hy + 9); closePath(); fillPath(HAIR_D); strokePath(INK, 0.6f)
+        line(42, hy - 2, 44, hy, HAIR_L, 0.7f, 180); line(47, hy - 4, 48, hy, HAIR_L, 0.7f, 180)
+        line(52, hy - 4, 54, hy, HAIR_L, 0.7f, 180); line(57, hy - 2, 58, hy, HAIR_L, 0.7f, 180)
+        // Metal forehead plate and small Leaf-inspired emblem.
+        fillRect(43, hy + 0.5f, 57, hy + 4.5f, 0xFF272B3D.toInt()); fillRect(44, hy + 1f, 56, hy + 4f, 0xFFBFC1D0.toInt())
+        strokeP(0xFF676A80.toInt(), 0.4f); cv.drawRect(44f, hy + 1f, 56f, hy + 4f, p)
+        beginPath(); moveTo(47, hy + 2); cubicTo(45.5f, hy + 2, 45.5f, hy + 3.5f, 47, hy + 3.5f)
+        lineTo(52, hy + 3.5f); cubicTo(53.5f, hy + 3.5f, 53.5f, hy + 2, 52, hy + 2)
+        lineTo(51, hy + 2.5f); lineTo(48, hy + 2.5f); closePath(); fillPath(0xFF484B60.toInt())
+        // Long face-framing locks fall over the shoulders.
+        beginPath(); moveTo(39, hy + 5); cubicTo(37, hy + 17, 38, 34, 39 + sway, 51)
+        cubicTo(40, 56, 40, 59, 41, 61); cubicTo(40, 47, 41, 30, 43, hy + 8); closePath(); fillPath(HAIR_D); strokePath(INK, 0.5f)
+        beginPath(); moveTo(61, hy + 5); cubicTo(63, hy + 18, 62, 35, 61 + sway, 51)
+        cubicTo(60, 56, 60, 59, 59, 61); cubicTo(60, 47, 59, 30, 57, hy + 8); closePath(); fillPath(HAIR_D); strokePath(INK, 0.5f)
+        line(40, hy + 13, 40, 49, HAIR_L, 0.5f, 145); line(60, hy + 13, 60, 49, HAIR_L, 0.5f, 145)
         cv.restore()
-
-        // --- floating extras ---
-        if (sleeping) {
-            for (i in 0..2) {
-                val ph = (t * 0.6 + i * 0.33) % 1.0
-                text("z", 70 + ph * 10, hy - 14 - ph * 26, 8 + i * 3, 0xFF9FB4FF.toInt(), ((1 - ph) * 255).toInt())
-            }
-        } else if (talking && (mood == "happy" || mood == "excited")) {
-            val ph = (t * 0.9) % 1.0
-            text(if (mood == "happy") "♥" else "✦", 78 + ph * 6, hy - 22 - ph * 18, 11, PINK, ((1 - ph) * 255).toInt())
-        } else if (mood == "shy" || mood == "sad") {
-            fillOval(76, hy - 6, 81, hy + 4, 0xFF9FD8FF.toInt(), 210)
-        }
+        if (sleeping) { for (i in 0..1) { val ph = (t * 0.6f + i * 0.33f) % 1f; text("z", 68 + ph * 8, top - 4 - ph * 12, 5 + i * 2, 0xFF9F9BC4.toInt(), ((1 - ph) * 220).toInt()) } }
+        else if (talking && (mood == "happy" || mood == "excited")) { val ph = (t * 0.9f) % 1f; text(if (mood == "happy") "♪" else "♥", 73 + ph * 3, top - 2 - ph * 8, 6, 0xFFB7A3E8.toInt(), ((1 - ph) * 230).toInt()) }
         p.alpha = 255
     }
 
     private fun eye(cx: Float, cy: Float, blink: Boolean, look: Float) {
-        if (action == "sleep") { arc(cx - 5.5f, cy - 3, cx + 5.5f, cy + 5, 20, 140, false, INK, 1.9); return }
-        if (mood == "happy") { arc(cx - 6, cy - 3, cx + 6, cy + 8, 205, 130, false, INK, 2.3); return }
-        val rx = 6.4f
-        val ry = if (blink) 1.3f else if (mood == "sleepy") 4.6f else 8.2f
-        fillOval(cx - rx, cy - ry, cx + rx, cy + ry, INK)
+        if (action == "sleep") { line(cx - 3.8f, cy, cx + 3.8f, cy + 0.2f, INK, 1.15f); return }
+        val rx = 3.7f
+        val ry = if (blink) 0.65f else 4.4f
+        fillOval(cx - rx, cy - ry, cx + rx, cy + ry, 0xFFFFFDFE.toInt())
         if (!blink) {
-            val l = look * 0.35f
-            fillOval(cx - rx + 1 + l, cy - ry + 1.2f, cx + rx - 1 + l, cy + ry - 0.6f, IRIS)
-            fillOval(cx - rx + 1.8f + l, cy - ry * 0.15f, cx + rx - 1.8f + l, cy + ry - 0.8f, IRIS_L, 215)
-            fillOval(cx - 2.7f + l, cy - ry * 0.45f, cx + 2.7f + l, cy + ry * 0.35f, INK)
-            val big = if (mood == "excited") 2.7f else 2.1f
-            fillCircle(cx - 2.1f + look * 0.4f, cy - ry * 0.5f, big, WHITE)
-            fillCircle(cx + 2.4f + look * 0.4f, cy + ry * 0.35f, 1.0f, WHITE)
-            if (mood == "excited") fillCircle(cx + 2.8f, cy - ry * 0.3f, 0.8f, WHITE)
-            arc(cx - rx - 0.4f, cy - ry - 1, cx + rx + 0.4f, cy + ry * 0.6f, 195, 150, false, INK, 2.1)
-            val o = if (cx < 50f) -1 else 1
-            line(cx + o * rx, cy - ry * 0.55f, cx + o * (rx + 2.4f), cy - ry * 0.95f, INK, 1.4)
+            fillOval(cx - 2.6f + look, cy - 2.7f, cx + 2.6f + look, cy + 3.1f, 0xFFBDBBE8.toInt())
+            fillOval(cx - 1.45f + look, cy - 1.8f, cx + 1.45f + look, cy + 2.6f, 0xFF77779F.toInt())
+            fillOval(cx - 0.85f + look, cy - 1.1f, cx + 0.85f + look, cy + 2.1f, 0xFF37354C.toInt())
+            fillCircle(cx - 1.05f + look, cy - 1.8f, 0.95f, WHITE)
+            fillCircle(cx + 1.2f + look, cy + 0.5f, 0.42f, 0xFFDAD9F6.toInt())
         }
-        if (mood == "smug" || mood == "sleepy") {
-            fillRect(cx - rx - 1.5f, cy - ry - 1.5f, cx + rx + 1.5f, cy - ry * 0.05f, SKIN)
-            line(cx - rx - 0.5f, cy - ry * 0.05f, cx + rx + 0.5f, cy - ry * 0.05f, INK, 2.1)
-        }
+        strokeP(INK, 0.85f); cv.drawOval(RectF(cx - rx, cy - ry, cx + rx, cy + ry), p)
+        line(cx - 3.2f, cy - ry + 0.2f, cx - 1.5f, cy - ry - 0.8f, HAIR_D, 0.75f)
+        line(cx + 1.2f, cy - ry - 0.65f, cx + 3.1f, cy - ry + 0.1f, HAIR_D, 0.65f)
     }
 
     private fun mouth(t: Float, hy: Float) {
-        val my = hy + 19.5f
-        val dark = 0xFFB03060.toInt()
-        val tongue = 0xFFFF8FA3.toInt()
+        val my = hy + 18.5f
+        val dark = 0xFF9C626B.toInt()
         when {
-            action == "sleep" -> {
-                val r = 1.4f + (sin(t * 1.5f) + 1f) * 0.55f
-                fillOval(50 - r, my - r, 50 + r, my + r, dark)
-            }
-            talking -> {
-                val o = 1.6f + abs(sin(t * 12)) * 3.2f
-                fillOval(46.2, my - 1, 53.8, my - 1 + o * 1.6f, dark)
-                fillOval(47.6, my - 1 + o * 0.9f, 52.4, my - 1 + o * 1.55f, tongue)
-            }
-            mood == "excited" -> {
-                arc(43, my - 7, 57, my + 7, 0, 180, true, dark, 0)
-                fillOval(47, my + 1.5f, 53, my + 5.5f, tongue)
-            }
-            mood == "happy" -> arc(43.5, my - 6, 56.5, my + 3, 15, 150, false, INK, 1.9)
-            mood == "sad" -> arc(45, my, 55, my + 8, 200, 140, false, INK, 1.8)
-            mood == "angry" -> line(45, my + 1, 55, my + 1, INK, 1.9)
-            mood == "shy" -> {
-                arc(45.5, my - 3, 50, my + 2, 10, 160, false, INK, 1.6)
-                arc(50, my - 3, 54.5, my + 2, 10, 160, false, INK, 1.6)
-            }
-            mood == "smug" -> arc(43, my - 5, 58, my + 3, 10, 110, false, INK, 1.9)
-            else -> arc(45.5, my - 4, 54.5, my + 2, 20, 140, false, INK, 1.7)
+            action == "sleep" -> line(48.5f, my, 51.5f, my, dark, 0.7f)
+            talking -> { val o = 0.7f + abs(sin(t * 12f)) * 1.1f; fillOval(48.5f, my - 0.5f, 51.5f, my + o, dark); if (o > 1.2f) fillOval(49.2f, my + 0.3f, 50.8f, my + o, 0xFFFFB2B8.toInt()) }
+            mood == "excited" -> { fillOval(47.5f, my - 1.2f, 52.5f, my + 2.6f, dark); fillOval(48.5f, my + 0.8f, 51.5f, my + 2.1f, 0xFFFFB2B8.toInt()) }
+            mood == "happy" -> arc(47.5f, my - 1f, 52.5f, my + 2f, 15, 150, false, INK, 0.8f)
+            mood == "sad" -> arc(48f, my + 0.2f, 52f, my + 3.5f, 195, 145, false, INK, 0.75f)
+            mood == "angry" -> line(48.2f, my + 1f, 51.8f, my + 1f, INK, 0.8f)
+            mood == "shy" -> { arc(48f, my - 0.4f, 50f, my + 1.6f, 10, 150, false, INK, 0.7f); arc(50f, my - 0.4f, 52f, my + 1.6f, 10, 150, false, INK, 0.7f) }
+            else -> arc(48.5f, my - 0.2f, 51.5f, my + 1.8f, 15, 150, false, INK, 0.7f)
         }
     }
+
+
 }
