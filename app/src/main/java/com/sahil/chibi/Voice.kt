@@ -125,7 +125,7 @@ object Voice {
 
     private fun splitSentences(s: String): List<String> {
         val out = ArrayList<String>()
-        val parts = s.split(Regex("(?<=[.!?\u0964])\s+"))
+        val parts = s.split(Regex("(?<=[.!?\\u0964])\\s+"))
         var cur = StringBuilder()
         for (p in parts) {
             if (cur.isNotEmpty() && cur.length + p.length > 140) { out.add(cur.toString()); cur = StringBuilder() }
