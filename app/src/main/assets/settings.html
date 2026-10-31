@@ -168,6 +168,74 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <label>Voice pitch: <span id="pitchv"></span></label>
     <input type="range" min="0.8" max="2" step="0.05" id="pitch" oninput="document.getElementById('pitchv').textContent=this.value;Pz('pitch',+this.value)">
   </div>
+  <div class="card">
+    <label>Voice engine <span class="mut">(natural voices instead of the robotic phone voice)</span></label>
+    <select id="vEng" onchange="vSave()">
+      <option value="system">Phone default (robotic)</option>
+      <option value="openai">Natural: Kokoro / OpenAI-style API</option>
+      <option value="eleven">ElevenLabs (supports voice cloning)</option>
+    </select>
+    <div id="vOpenai" style="display:none">
+      <label>Preset</label>
+      <select id="vPreset" onchange="vPreset()">
+        <option value="">Choose a preset...</option>
+        <option value="di">Kokoro on DeepInfra (cheap, many voices)</option>
+        <option value="self">Kokoro on my own server</option>
+        <option value="oa">OpenAI voices</option>
+      </select>
+      <label>API URL</label><input id="oUrl" oninput="vSave()" placeholder="https://.../v1/audio/speech">
+      <label>API key</label><input id="oKey" type="password" oninput="vSave()">
+      <label>Model</label><input id="oModel" oninput="vSave()">
+      <label>Voice <span class="mut">(tap to pick, or type; Kokoro lets you mix: af_bella+af_sky)</span></label>
+      <input id="oVoice" list="vList" oninput="vSave()">
+      <datalist id="vList">
+        <option value="af_bella"><option value="af_heart"><option value="af_nicole"><option value="af_sarah"><option value="af_sky">
+        <option value="am_adam"><option value="am_michael"><option value="bf_emma"><option value="bf_isabella"><option value="bm_george"><option value="bm_lewis">
+        <option value="hf_alpha"><option value="hf_beta"><option value="hm_omega"><option value="hm_psi">
+        <option value="alloy"><option value="ash"><option value="coral"><option value="echo"><option value="fable"><option value="nova"><option value="onyx"><option value="sage"><option value="shimmer">
+      </datalist>
+      <label>Speed</label><input id="oSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
+    </div>
+    <div id="vEleven" style="display:none">
+      <label>ElevenLabs API key</label><input id="eKey" type="password" oninput="vSave()">
+      <label>Voice ID</label><input id="eId" oninput="vSave()">
+      <select id="eList" onchange="vg('eId').value=this.value;vSave()" style="margin-top:6px"><option value="">(tap "Load my voices")</option></select>
+      <div class="btns"><button class="b ghost" onclick="vLoadList()">Load my voices</button></div>
+      <label>Model</label><input id="eModel" oninput="vSave()">
+      <label>Clone a voice <span class="mut">(clean 30s+ audio of one speaker; needs a paid ElevenLabs plan)</span></label>
+      <input id="eName" placeholder="Name for the new voice">
+      <div class="btns"><button class="b" onclick="vClone()">Pick audio sample &amp; clone</button></div>
+    </div>
+    <div class="btns"><button class="b" onclick="vTest()">Test voice</button></div>
+    <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:6px"></div>
+  </div>
+  <script>
+  var VC={engine:'system',openai:{},eleven:{}};
+  function vg(i){return document.getElementById(i)}
+  var VP={di:['https://api.deepinfra.com/v1/openai/audio/speech','hexgrad/Kokoro-82M','af_bella'],
+          self:['http://192.168.1.10:8880/v1/audio/speech','kokoro','af_bella'],
+          oa:['https://api.openai.com/v1/audio/speech','gpt-4o-mini-tts','nova']};
+  function vShow(){vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
+  function vFill(){vg('vEng').value=VC.engine||'system';var o=VC.openai||{},e=VC.eleven||{};
+    vg('oUrl').value=o.url||'';vg('oKey').value=o.key||'';vg('oModel').value=o.model||'';vg('oVoice').value=o.voice||'';vg('oSpeed').value=o.speed||1;
+    vg('eKey').value=e.key||'';vg('eId').value=e.voiceId||'';vg('eModel').value=e.model||'eleven_multilingual_v2';vShow();}
+  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};vFill();}
+  function vSave(){VC.engine=vg('vEng').value;
+    VC.openai={url:vg('oUrl').value,key:vg('oKey').value,model:vg('oModel').value,voice:vg('oVoice').value,speed:+vg('oSpeed').value||1};
+    VC.eleven={key:vg('eKey').value,voiceId:vg('eId').value,model:vg('eModel').value||'eleven_multilingual_v2'};
+    vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
+  function vPreset(){var p=VP[vg('vPreset').value];if(!p)return;vg('oUrl').value=p[0];vg('oModel').value=p[1];vg('oVoice').value=p[2];vSave();}
+  function vTest(){vSave();vg('vStat').textContent='Generating...';Android.testVoice('Hi! This is my new voice. How do I sound?');}
+  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works!':'Error: '+m;};
+  function vLoadList(){vSave();vg('vStat').textContent='Loading voices...';Android.listVoices();}
+  window.onVoiceList=function(ok,a){if(!ok){vg('vStat').textContent='Error: '+a;return;}
+    var s=vg('eList');s.innerHTML='<option value="">Pick a voice...</option>';
+    a.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=v.name;s.appendChild(o);});vg('vStat').textContent=a.length+' voices loaded.';};
+  function vClone(){vSave();var n=vg('eName').value.trim();if(!n){vg('vStat').textContent='Give the new voice a name first.';return;}
+    vg('vStat').textContent='Pick an audio file...';Android.cloneVoice(n);}
+  window.onVoiceClone=function(ok,m){if(ok){vg('eId').value=m;vg('vStat').textContent='Voice cloned and selected! Tap Test voice.';VC.engine='eleven';vFill();}else vg('vStat').textContent='Clone failed: '+m;};
+  setTimeout(vLoad,300);
+  </script>
 </section>
 
 <!-- STATS -->

@@ -696,6 +696,15 @@ class CompanionService : Service() {
     }
 
     private fun speak(text: String) {
+        if (Voice.engine(this) != "system") {
+            try { tts?.stop() } catch (ex: Exception) {}
+            Voice.speak(this, text) { err -> if (err != null) main.post { speakSystem(text) } }
+            return
+        }
+        speakSystem(text)
+    }
+
+    private fun speakSystem(text: String) {
         if (!ttsReady) return
         applyTts()
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chibi")

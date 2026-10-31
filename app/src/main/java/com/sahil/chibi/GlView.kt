@@ -60,7 +60,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
         private val tgt = FloatArray(16)
         private val LAZ = 0; private val RAZ = 1; private val LAX = 2; private val RAX = 3; private val RLZ = 4
         private val LLX = 5; private val RLX = 6; private val HY = 7; private val HX = 8; private val HZ = 9
-        private val HYAW = 10; private val YAW = 11
+        private val HYAW = 10; private val YAW = 11; private val RTW = 12
 
         override fun run() {
             try {
@@ -169,7 +169,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
         private fun targets(t: Float) {
             val action = owner.action
             tgt[LAZ] = 45f; tgt[RAZ] = -45f; tgt[LAX] = 0f; tgt[RAX] = 0f; tgt[RLZ] = 0f
-            tgt[LLX] = 0f; tgt[RLX] = 0f; tgt[HY] = 0f; tgt[HX] = 0f; tgt[HZ] = 0f; tgt[HYAW] = 0f; tgt[YAW] = 0f
+            tgt[LLX] = 0f; tgt[RLX] = 0f; tgt[HY] = 0f; tgt[HX] = 0f; tgt[HZ] = 0f; tgt[HYAW] = 0f; tgt[YAW] = 0f; tgt[RTW] = 0f
             when (action) {
                 "walk" -> {
                     val ph = t * 6.2832f * 1.7f
@@ -188,7 +188,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 "wave" -> {
                     tgt[RAZ] = 35f + 8f * sin(t * 6.2832f * 2f)
                     tgt[RLZ] = -10f + 25f * sin(t * 6.2832f * 2.5f)
-                    tgt[HZ] = 5f
+                    tgt[HZ] = 5f; tgt[RTW] = 90f
                     tgt[HY] = 0.006f * sin(2.4f * t)
                 }
                 "sleep" -> {
@@ -277,11 +277,11 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
 
                 targets(t)
                 if (first) { for (i in cur.indices) cur[i] = tgt[i]; first = false }
-                else for (i in 0..11) approach(i, dt)
+                else for (i in 0..12) approach(i, dt)
 
                 rig.clear()
                 rig.setDelta("leftUpperArm", M3.mulNew(M3.rotX(cur[LAX]), M3.rotZ(cur[LAZ])))
-                rig.setDelta("rightUpperArm", M3.mulNew(M3.rotX(cur[RAX]), M3.rotZ(cur[RAZ])))
+                rig.setDelta("rightUpperArm", M3.mulNew(M3.mulNew(M3.rotX(cur[RAX]), M3.rotZ(cur[RAZ])), M3.rotX(cur[RTW])))
                 rig.setDelta("rightLowerArm", M3.rotZ(cur[RLZ]))
                 rig.setDelta("leftUpperLeg", M3.rotX(cur[LLX]))
                 rig.setDelta("rightUpperLeg", M3.rotX(cur[RLX]))
@@ -329,9 +329,9 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 val r = M3.rotY(cur[YAW] + 180f)
                 val rc = floatArrayOf(r[0], r[3], r[6], r[1], r[4], r[7], r[2], r[5], r[8])
                 GLES20.glUniformMatrix3fv(uRot, 1, false, rc, 0)
-                val hh = 0.62f
+                val hh = 0.68f
                 val hw = hh * w / h
-                GLES20.glUniform4f(uProj, 1f / hw, 1f / hh, 0.585f, 0.5f)
+                GLES20.glUniform4f(uProj, 1f / hw, 1f / hh, 0.56f, 0.5f)
                 fb.position(0); GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 32, fb)
                 fb.position(3); GLES20.glVertexAttribPointer(aNrm, 3, GLES20.GL_FLOAT, false, 32, fb)
                 fb.position(6); GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 32, fb)
