@@ -41,8 +41,3 @@ android {
         jvmTarget = "17"
     }
 }
-
-dependencies {
-    // unpacks the downloaded .tar.bz2 voice package on the phone
-    implementation("org.apache.commons:commons-compress:1.26.2")
-}

@@ -156,12 +156,6 @@ class MainActivity : Activity() {
             stopService(Intent(this@MainActivity, CompanionService::class.java))
         }
 
-        @JavascriptInterface fun localStatus(): String = LocalTts.status(this@MainActivity)
-
-        @JavascriptInterface fun localInstall() { LocalTts.install(this@MainActivity) }
-
-        @JavascriptInterface fun localRemove() { LocalTts.remove(this@MainActivity) }
-
         @JavascriptInterface fun getVoice(): String = Voice.raw(this@MainActivity)
 
         @JavascriptInterface fun saveVoice(json: String): Boolean = try { Voice.save(this@MainActivity, json); true } catch (e: Exception) { false }

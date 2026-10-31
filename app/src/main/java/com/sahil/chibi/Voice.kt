@@ -28,7 +28,7 @@ object Voice {
 
     fun cfg(ctx: Context): JSONObject = try { JSONObject(raw(ctx)) } catch (e: Exception) { JSONObject() }
 
-    fun engine(ctx: Context): String = cfg(ctx).optString("engine", "system")
+    fun engine(ctx: Context): String = cfg(ctx).optString("engine", "system").let { if (it == "local") "system" else it }
 
     private fun http(method: String, url: String, headers: Map<String, String>, body: ByteArray?, contentType: String?): ByteArray {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -55,7 +55,7 @@ object Voice {
 
     fun synth(ctx: Context, text: String): ByteArray {
         val c = cfg(ctx)
-        when (c.optString("engine", "system")) {
+        when (engine(ctx)) {
             "openai" -> {
                 val o = c.optJSONObject("openai") ?: JSONObject()
                 val url = o.optString("url")
@@ -75,10 +75,6 @@ object Voice {
                 val body = JSONObject().put("text", text).put("model_id", e.optString("model", "eleven_multilingual_v2"))
                 return http("POST", "https://api.elevenlabs.io/v1/text-to-speech/" + vid + "?output_format=mp3_44100_128",
                     mapOf("xi-api-key" to e.optString("key").trim()), body.toString().toByteArray(), "application/json")
-            }
-            "local" -> {
-                val l = c.optJSONObject("local") ?: JSONObject()
-                return LocalTts.synthWav(ctx, text, l.optInt("sid", 3), l.optDouble("speed", 1.0).toFloat())
             }
             else -> throw RuntimeException("no cloud voice engine selected")
         }
@@ -101,17 +97,6 @@ object Voice {
         val clean = clean(text)
         if (clean.isBlank()) { onDone(null); return }
         val my = ++gen
-        if (engine(ctx) == "local") {
-            Thread {
-                try {
-                    speakLocal(ctx, clean, my)
-                    onDone(null)
-                } catch (e: Throwable) {
-                    onDone((e.message ?: e.toString()).take(240))
-                }
-            }.start()
-            return
-        }
         Thread {
             try {
                 val audio = synth(ctx, clean)
@@ -121,40 +106,6 @@ object Voice {
                 onDone((e.message ?: e.toString()).take(240))
             }
         }.start()
-    }
-
-    private fun splitSentences(s: String): List<String> {
-        val out = ArrayList<String>()
-        val parts = s.split(Regex("(?<=[.!?\\u0964])\\s+"))
-        var cur = StringBuilder()
-        for (p in parts) {
-            if (cur.isNotEmpty() && cur.length + p.length > 140) { out.add(cur.toString()); cur = StringBuilder() }
-            if (cur.isNotEmpty()) cur.append(' ')
-            cur.append(p)
-        }
-        if (cur.isNotEmpty()) out.add(cur.toString())
-        return out
-    }
-
-    /** Synthesises sentence by sentence; the next one is generated while the current one plays. */
-    private fun speakLocal(ctx: Context, text: String, my: Int) {
-        val l = cfg(ctx).optJSONObject("local") ?: JSONObject()
-        val sid = l.optInt("sid", 3)
-        val speed = l.optDouble("speed", 1.0).toFloat()
-        val ex = java.util.concurrent.Executors.newSingleThreadExecutor()
-        try {
-            val futs = splitSentences(text).map { s ->
-                ex.submit(java.util.concurrent.Callable { LocalTts.synthWav(ctx, s, sid, speed) })
-            }
-            for (f in futs) {
-                if (my != gen) break
-                val audio = f.get()
-                if (my != gen) break
-                playAndWait(ctx, audio, my)
-            }
-        } finally {
-            ex.shutdownNow()
-        }
     }
 
     private fun playAndWait(ctx: Context, audio: ByteArray, myGen: Int) {
