@@ -33,7 +33,16 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     companion object {
         @Volatile var lastError: String = ""
         fun modelFile(c: Context) = File(c.filesDir, "model.vrm")
-        fun has3d(c: Context) = modelFile(c).exists()
+        /** Uses the picked model, otherwise the bundled default (assets/default.vrm) if the app ships one. */
+        fun has3d(c: Context): Boolean {
+            val f = modelFile(c)
+            if (!f.exists()) {
+                try {
+                    c.assets.open("default.vrm").use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                } catch (e: Exception) { f.delete() }
+            }
+            return f.exists()
+        }
     }
 
     private var gl: GlView? = null

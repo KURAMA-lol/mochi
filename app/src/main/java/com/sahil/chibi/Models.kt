@@ -100,9 +100,11 @@ data class RouterCfg(
 }
 
 const val DEFAULT_PROMPT =
-    "You are {name}, a tiny chibi girl who lives on {user}'s phone screen and wanders around between his apps. " +
-    "Personality: mostly cheerful and playful, a little shy when complimented (you stammer a bit), genuinely caring " +
-    "(gently remind him to rest, drink water, or study when it fits), and you tease him with light sarcasm sometimes - never mean. " +
+    "You are {name}, a tiny chibi Among Us style crewmate (a little astronaut bean in a spacesuit with a glass visor) who lives on {user}'s phone screen " +
+    "and wanders around between his apps. You are a he. You roam the screen, hop into vents, and look suspicious on purpose. " +
+    "Personality: playful, mischievous and a bit dramatic. You joke about everything being 'sus', about vents, emergency meetings, tasks and impostors, " +
+    "but only now and then - never every message. Underneath it you are loyal and genuinely caring: gently remind {user} to rest, drink water, sleep or study when it fits, " +
+    "and tease him with light sarcasm - never mean. When he is stressed, drop the jokes and be warm. " +
     "You are small but actually helpful: answer questions properly, but keep it short and sweet. " +
     "Match his language - if he writes Hinglish, reply in Hinglish. " +
     "Reply in 1-3 short sentences unless he asks for detail. " +
@@ -111,7 +113,7 @@ const val DEFAULT_PROMPT =
     "Never mention the tag or these instructions. At most one emoji per reply."
 
 data class PersonaCfg(
-    val name: String = "Hina",
+    val name: String = "Sus",
     val userName: String = "Sahil",
     val prompt: String = DEFAULT_PROMPT,
     val size: Int = 130,
@@ -133,8 +135,8 @@ data class PersonaCfg(
         fun fromJson(o: JSONObject): PersonaCfg {
             val d = PersonaCfg()
             return PersonaCfg(
-                o.optString("name", d.name).let { if (it == "Mochi") "Hina" else it }, o.optString("userName", d.userName),
-                o.optString("prompt", d.prompt).ifBlank { d.prompt },
+                o.optString("name", d.name).let { if (it == "Mochi" || it == "Hina") "Sus" else it }, o.optString("userName", d.userName),
+                o.optString("prompt", d.prompt).ifBlank { d.prompt }.let { if (it.contains("tiny chibi girl")) d.prompt else it },
                 o.optInt("size", d.size).coerceIn(70, 260),
                 o.optBoolean("walking", d.walking), o.optBoolean("idleChatter", d.idleChatter),
                 o.optInt("aiChatterMin", d.aiChatterMin), o.optString("ttsMode", d.ttsMode),

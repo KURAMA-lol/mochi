@@ -217,7 +217,7 @@ class CompanionService : Service() {
         return Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("${cfg.persona.name} is on your phone")
-            .setContentText(if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
+            .setContentText(if (hidden) "Hidden - tap Show to bring him back" else "Tap him to chat")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(act("Call", actionPi(1, ACT_SUMMON)))

@@ -59,12 +59,12 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     </div>
     <div class="btns">
       <button class="b pink" onclick="Android.start()">Start Hina</button>
-      <button class="b" onclick="Android.summon()">Call her</button>
+      <button class="b" onclick="Android.summon()">Call him</button>
       <button class="b red" onclick="Android.stop()">Stop</button>
     </div>
-    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap Hina on screen to chat; drag her anywhere; long-press to pat her.</p>
+    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap him on screen to chat; drag him anywhere; long-press to poke him.</p>
   </div>
-  <h2>Other ways to call her</h2>
+  <h2>Other ways to call him</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
     • Quick Settings tile: edit your tiles and add <b>Call Hina</b><br>
@@ -145,7 +145,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <label>3D character (VRM model)</label>
     <div id="mdlInfo" style="color:var(--mut);font-size:13px;margin:4px 0 8px">Using the default sprite.</div>
     <button onclick="Android.pickModel()" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--ac2);color:#fff;font:inherit">Pick a .vrm file</button>
-    <button onclick="Android.removeModel();setTimeout(mdl,400)" style="width:100%;padding:10px;margin-top:8px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--mut);font:inherit">Back to sprite</button>
+    <button onclick="Android.removeModel();setTimeout(mdl,400)" style="width:100%;padding:10px;margin-top:8px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--mut);font:inherit">Reset to default model</button>
   </div>
   <script>
   function mdl(){try{var i=JSON.parse(Android.modelInfo());var e=document.getElementById('mdlInfo');
