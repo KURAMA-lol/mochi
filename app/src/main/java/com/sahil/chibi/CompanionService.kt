@@ -115,6 +115,14 @@ class CompanionService : Service() {
     private var talkUntil = 0L
     private var lastInteract = 0L
     private var dir = 1
+    private var tx = 0f
+    private var ty = 0f
+    private var fx = 0f
+    private var fy = 0f
+    private var ventStart = 0L
+    private var ventMoved = false
+    private var ventX = 0
+    private var ventY = 0
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -391,12 +399,30 @@ class CompanionService : Service() {
         if (moodResetAt in 1..now) { c.mood = "neutral"; moodResetAt = 0 }
         if (dragging || panelOpen) return
 
-        if (c.action == "walk") {
-            val (sw, _) = screen()
-            lp.x += (dir * dp(46) * dt).toInt()
-            val maxX = sw - lp.width + dp(10)
-            if (lp.x <= -dp(10)) { lp.x = -dp(10); dir = 1; c.facingRight = true }
-            if (lp.x >= maxX) { lp.x = maxX; dir = -1; c.facingRight = false }
+        if (ventStart != 0L) {
+            updateVent(now, c)
+            return
+        }
+        if (c.action == "walk" || c.action == "run") {
+            val speed = dp(if (c.action == "run") 170 else 75) * dt
+            val dx = tx - fx
+            val dy = ty - fy
+            val dist = kotlin.math.hypot(dx, dy)
+            if (dist > dp(3)) {
+                val ang = Math.toDegrees(kotlin.math.atan2(dx.toDouble(), dy.toDouble())).toFloat()
+                val a = kotlin.math.abs(ang)
+                val sg = if (ang > 0) 1f else -1f
+                c.yaw = if (a <= 90f) ang * (55f / 90f) else sg * (55f + (a - 90f) * (125f / 90f))
+                if (kotlin.math.abs(dx) > dp(2)) c.facingRight = dx > 0
+            }
+            if (dist <= speed + 1f) {
+                fx = tx; fy = ty
+                c.action = "idle"; c.yaw = 0f
+                nextDecision = now + Random.nextLong(600, 2200)
+            } else {
+                fx += dx / dist * speed; fy += dy / dist * speed
+            }
+            lp.x = fx.toInt(); lp.y = fy.toInt()
             updateChibiPos()
         }
         if (now >= nextDecision) decide(now, c)
@@ -412,21 +438,88 @@ class CompanionService : Service() {
         }
     }
 
+    private fun randomSpot(): Pair<Float, Float> {
+        val (sw, sh) = screen()
+        val minX = -dp(10).toFloat()
+        val maxX = (sw - lp.width + dp(10)).coerceAtLeast(-dp(10)).toFloat()
+        val minY = 0f
+        val maxY = (sh - lp.height).coerceAtLeast(0).toFloat()
+        val r = Random.nextFloat()
+        return when {
+            r < 0.3f -> (if (Random.nextBoolean()) minX else maxX) to (if (Random.nextBoolean()) minY else maxY)
+            r < 0.5f -> (if (Random.nextBoolean()) minX else maxX) to (minY + Random.nextFloat() * (maxY - minY))
+            r < 0.65f -> (minX + Random.nextFloat() * (maxX - minX)) to (if (Random.nextBoolean()) minY else maxY)
+            else -> (minX + Random.nextFloat() * (maxX - minX)) to (minY + Random.nextFloat() * (maxY - minY))
+        }
+    }
+
+    private fun easeOutBack(x: Float): Float {
+        val c1 = 1.70158f
+        val c3 = c1 + 1f
+        val t = x - 1f
+        return 1f + c3 * t * t * t + c1 * t * t
+    }
+
+    private fun startVent(now: Long, c: ChibiView) {
+        val (sw, sh) = screen()
+        val minX = -dp(10)
+        val maxX = (sw - lp.width + dp(10)).coerceAtLeast(minX)
+        val maxY = (sh - lp.height).coerceAtLeast(0)
+        ventX = Random.nextInt(minX, maxX + 1)
+        ventY = Random.nextInt(0, maxY + 1)
+        ventMoved = false
+        ventStart = now
+        c.action = "vent"
+        hideBubble()
+    }
+
+    private fun updateVent(now: Long, c: ChibiView) {
+        val t = (now - ventStart).toInt()
+        when {
+            t < 400 -> { val e = t / 400f; c.vsy = 1f - e * e; c.vsx = 1f + 0.3f * e }
+            t < 800 -> {
+                c.vsy = 0f; c.vsx = 1f
+                if (!ventMoved) {
+                    ventMoved = true
+                    lp.x = ventX; lp.y = ventY
+                    fx = lp.x.toFloat(); fy = lp.y.toFloat()
+                    updateChibiPos()
+                }
+            }
+            t < 1300 -> {
+                val s = easeOutBack((t - 800) / 500f)
+                c.vsy = s.coerceAtLeast(0f); c.vsx = 1f - (s - 1f) * 0.6f
+            }
+            else -> {
+                c.vsx = 1f; c.vsy = 1f; c.action = "idle"; ventStart = 0L
+                nextDecision = now + 1200
+            }
+        }
+    }
+
     private fun decide(now: Long, c: ChibiView) {
         c.pixel = cfg.persona.style != "smooth"
         val r = Random.nextFloat()
-        val (sw, _) = screen()
         var dur = Random.nextLong(2500, 5500)
+        val walking = cfg.persona.walking
         when {
-            !cfg.persona.walking || r < 0.2f -> c.action = "idle"
-            r < 0.62f -> {
-                dir = if (lp.x < sw / 4) 1 else if (lp.x > sw * 0.6f) -1 else if (Random.nextBoolean()) 1 else -1
-                c.facingRight = dir > 0
-                c.action = "walk"
-                dur = Random.nextLong(2500, 6500)
+            !walking && r < 0.7f -> c.action = "idle"
+            r < 0.10f -> c.action = "idle"
+            r < 0.58f -> {
+                val (x, y) = randomSpot()
+                tx = x; ty = y
+                fx = lp.x.toFloat(); fy = lp.y.toFloat()
+                val far = kotlin.math.hypot(tx - fx, ty - fy) > screen().first * 0.6f
+                c.action = if (far) "run" else "walk"
+                dur = 20_000
             }
-            r < 0.80f -> { c.action = "sit"; dur = Random.nextLong(4000, 9000) }
-            r < 0.88f -> { c.action = "wave"; dur = 2200 }
+            r < 0.68f -> { c.action = "sit"; dur = Random.nextLong(4000, 9000) }
+            r < 0.76f -> { c.action = "wave"; dur = 2200 }
+            r < 0.86f -> {
+                c.action = "sus"; dur = Random.nextLong(3000, 5000)
+                if (Random.nextBoolean()) say("...sus", "neutral")
+            }
+            r < 0.93f && walking -> { startVent(now, c); dur = 1500 }
             else -> {
                 if (now - lastInteract > 90_000) { c.action = "sleep"; dur = Random.nextLong(12_000, 25_000) }
                 else c.action = "idle"

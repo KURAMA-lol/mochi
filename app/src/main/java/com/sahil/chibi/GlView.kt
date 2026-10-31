@@ -178,7 +178,21 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                     tgt[LAX] = -14f * s; tgt[RAX] = 14f * s
                     tgt[HY] = 0.015f * abs(s); tgt[HZ] = 3f * s
                     tgt[LAZ] = 47f; tgt[RAZ] = -47f
-                    tgt[YAW] = if (owner.facingRight) 40f else -40f
+                    tgt[YAW] = owner.yaw
+                }
+                "run" -> {
+                    val ph = t * 6.2832f * 2.8f
+                    val s = sin(ph)
+                    tgt[LLX] = 40f * s; tgt[RLX] = -40f * s
+                    tgt[LAX] = -30f * s; tgt[RAX] = 30f * s
+                    tgt[HY] = 0.035f * abs(s); tgt[HZ] = 4f * s
+                    tgt[LAZ] = 50f; tgt[RAZ] = -50f
+                    tgt[YAW] = owner.yaw
+                }
+                "sus" -> {
+                    tgt[HYAW] = if (sin(t * 1.9f) > 0f) 50f else -50f
+                    tgt[HZ] = 4f
+                    tgt[HY] = 0.004f * sin(2.4f * t)
                 }
                 "sit" -> {
                     tgt[HY] = -0.10f; tgt[LLX] = -80f; tgt[RLX] = -80f
@@ -216,10 +230,10 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             val prog = GLES20.glCreateProgram()
             GLES20.glAttachShader(prog, compile(GLES20.GL_VERTEX_SHADER, """
                 attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;
-                uniform mat3 uRot; uniform vec4 uProj;
+                uniform mat3 uRot; uniform vec4 uProj; uniform vec2 uSc;
                 varying vec2 vUv; varying vec3 vN;
                 void main() {
-                    vec3 p = uRot * aPos;
+                    vec3 p = uRot * aPos; p.xy *= uSc;
                     vUv = aUv; vN = uRot * aNrm;
                     gl_Position = vec4(p.x * uProj.x, (p.y - uProj.z) * uProj.y, -p.z * uProj.w, 1.0);
                 }
@@ -245,6 +259,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             val uRot = GLES20.glGetUniformLocation(prog, "uRot")
             val uProj = GLES20.glGetUniformLocation(prog, "uProj")
             val uTex = GLES20.glGetUniformLocation(prog, "uTex")
+            val uSc = GLES20.glGetUniformLocation(prog, "uSc")
 
             val texIds = IntArray(m.indices.size) { makeTex(m.texData[it]) }
             val idxBufs = m.indices.map {
@@ -332,6 +347,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 val hh = 0.68f
                 val hw = hh * w / h
                 GLES20.glUniform4f(uProj, 1f / hw, 1f / hh, 0.56f, 0.5f)
+                GLES20.glUniform2f(uSc, owner.vsx, owner.vsy)
                 fb.position(0); GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 32, fb)
                 fb.position(3); GLES20.glVertexAttribPointer(aNrm, 3, GLES20.GL_FLOAT, false, 32, fb)
                 fb.position(6); GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 32, fb)

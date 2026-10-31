@@ -24,6 +24,9 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     @Volatile var facingRight = true
     @Volatile var talking = false
     @Volatile var pixel = false
+    @Volatile var yaw = 0f      // body turn (deg) while moving, set by the service
+    @Volatile var vsx = 1f      // vent squash/stretch scale
+    @Volatile var vsy = 1f
 
     companion object {
         @Volatile var lastError: String = ""
@@ -86,6 +89,7 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         val y = (height - h) / 2f
         dst.set(x, y, x + w, y + h)
         c.save()
+        c.scale(vsx, vsy, width / 2f, height.toFloat())
         if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
         c.drawBitmap(bm, null, dst, bp)
         c.restore()
