@@ -242,7 +242,7 @@ class CompanionService : Service() {
         cfg = ConfigStore.load(this)
         val c = ChibiView(this)
         c.pixel = cfg.persona.style != "smooth"
-        val w = dp((cfg.persona.size * (if (ChibiView.has3d(this)) 1.1f else 0.8f)).toInt())
+        val w = dp((cfg.persona.size * (if (ChibiView.has3d(this)) 1.7f else 0.8f)).toInt())
         val h = dp(cfg.persona.size)
         lp = overlayLp(
             w, h,

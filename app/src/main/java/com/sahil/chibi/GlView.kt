@@ -168,7 +168,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
 
         private fun targets(t: Float) {
             val action = owner.action
-            tgt[LAZ] = 70f; tgt[RAZ] = -70f; tgt[LAX] = 0f; tgt[RAX] = 0f; tgt[RLZ] = 0f
+            tgt[LAZ] = 45f; tgt[RAZ] = -45f; tgt[LAX] = 0f; tgt[RAX] = 0f; tgt[RLZ] = 0f
             tgt[LLX] = 0f; tgt[RLX] = 0f; tgt[HY] = 0f; tgt[HX] = 0f; tgt[HZ] = 0f; tgt[HYAW] = 0f; tgt[YAW] = 0f
             when (action) {
                 "walk" -> {
@@ -177,12 +177,12 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                     tgt[LLX] = 28f * s; tgt[RLX] = -28f * s
                     tgt[LAX] = -14f * s; tgt[RAX] = 14f * s
                     tgt[HY] = 0.015f * abs(s); tgt[HZ] = 3f * s
-                    tgt[LAZ] = 72f; tgt[RAZ] = -72f
+                    tgt[LAZ] = 47f; tgt[RAZ] = -47f
                     tgt[YAW] = if (owner.facingRight) 40f else -40f
                 }
                 "sit" -> {
                     tgt[HY] = -0.10f; tgt[LLX] = -80f; tgt[RLX] = -80f
-                    tgt[LAZ] = 72f; tgt[RAZ] = -72f
+                    tgt[LAZ] = 47f; tgt[RAZ] = -47f
                     idleHead(t)
                 }
                 "wave" -> {
@@ -193,14 +193,14 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 }
                 "sleep" -> {
                     tgt[HX] = 24f; tgt[HY] = -0.04f + 0.004f * sin(1.2f * t)
-                    tgt[LAZ] = 72f; tgt[RAZ] = -72f
+                    tgt[LAZ] = 47f; tgt[RAZ] = -47f
                 }
                 "drag" -> {
-                    tgt[LAZ] = 20f + 8f * sin(7f * t); tgt[RAZ] = -(20f + 8f * sin(7f * t + 1f))
+                    tgt[LAZ] = 15f + 8f * sin(7f * t); tgt[RAZ] = -(15f + 8f * sin(7f * t + 1f))
                     tgt[LLX] = 12f * sin(6f * t); tgt[RLX] = -12f * sin(6f * t)
                 }
                 else -> {
-                    tgt[LAZ] = 70f + 3f * sin(1.3f * t); tgt[RAZ] = -(70f + 3f * sin(1.3f * t + 1.2f))
+                    tgt[LAZ] = 45f + 3f * sin(1.3f * t); tgt[RAZ] = -(45f + 3f * sin(1.3f * t + 1.2f))
                     tgt[HY] = 0.006f * sin(2.4f * t)
                     idleHead(t)
                 }
