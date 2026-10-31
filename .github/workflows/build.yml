@@ -23,6 +23,19 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - name: Fetch sherpa-onnx native libs
+        run: |
+          set -e
+          mkdir -p /tmp/sherpa && cd /tmp/sherpa
+          curl -fL --retry 3 -o android.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-android.tar.bz2
+          tar xjf android.tar.bz2
+          for abi in arm64-v8a armeabi-v7a; do
+            mkdir -p "$GITHUB_WORKSPACE/app/src/main/jniLibs/$abi"
+            find . -path "*/$abi/*" -name "*.so" -exec cp {} "$GITHUB_WORKSPACE/app/src/main/jniLibs/$abi/" \;
+          done
+          test -f "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/libsherpa-onnx-jni.so"
+          ls -lR "$GITHUB_WORKSPACE/app/src/main/jniLibs"
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
