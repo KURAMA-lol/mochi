@@ -27,6 +27,8 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     @Volatile var yaw = 0f      // body turn (deg) while moving, set by the service
     @Volatile var vsx = 1f      // vent squash/stretch scale
     @Volatile var vsy = 1f
+    @Volatile var vopen = 0f    // vent opening 0..1
+    @Volatile var vdy = 0f      // character vertical offset in px (down = into the vent)
 
     companion object {
         @Volatile var lastError: String = ""
@@ -64,6 +66,34 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         gl?.let { removeView(it) }
         gl = null
         invalidate()
+    }
+
+    private val ventRim = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF7A8494.toInt() }
+    private val ventHole = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF0B0D12.toInt() }
+    private val ventSlat = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF3A4150.toInt(); strokeWidth = 2f }
+    private val ventRect = RectF()
+
+    override fun draw(c: Canvas) {
+        val o = vopen
+        val dy = vdy
+        if (o <= 0f && dy == 0f) { super.draw(c); return }
+        val d = resources.displayMetrics.density
+        val line = height - 6f * d
+        val cx = width / 2f
+        val rx = min(width * 0.3f, 36f * d) * o
+        val ry = 9f * d * o
+        if (o > 0f) {
+            ventRect.set(cx - rx - 3f * d, line - ry - 2f * d, cx + rx + 3f * d, line + ry + 2f * d)
+            c.drawOval(ventRect, ventRim)
+            ventRect.set(cx - rx, line - ry, cx + rx, line + ry)
+            c.drawOval(ventRect, ventHole)
+            if (o > 0.6f) for (i in -1..1) c.drawLine(cx + i * rx * 0.45f, line - ry * 0.7f, cx + i * rx * 0.45f, line + ry * 0.7f, ventSlat)
+        }
+        c.save()
+        c.clipRect(0f, 0f, width.toFloat(), line)
+        c.translate(0f, dy)
+        super.draw(c)
+        c.restore()
     }
 
     override fun onDraw(c: Canvas) {

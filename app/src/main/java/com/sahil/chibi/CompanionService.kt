@@ -475,26 +475,34 @@ class CompanionService : Service() {
 
     private fun updateVent(now: Long, c: ChibiView) {
         val t = (now - ventStart).toInt()
+        val h = c.height.toFloat().coerceAtLeast(1f)
+        val hop = h * 0.05f
+        c.vsx = 1f; c.vsy = 1f
         when {
-            t < 400 -> { val e = t / 400f; c.vsy = 1f - e * e; c.vsx = 1f + 0.3f * e }
-            t < 800 -> {
-                c.vsy = 0f; c.vsx = 1f
+            t < 300 -> { c.vopen = t / 300f; c.vdy = 0f; c.vsy = 1f - 0.08f * (t / 300f) }
+            t < 500 -> { c.vopen = 1f; c.vdy = -hop * kotlin.math.sin(Math.PI.toFloat() * (t - 300) / 200f) }
+            t < 900 -> { val k = (t - 500) / 400f; c.vopen = 1f; c.vdy = h * 1.1f * k * k }
+            t < 1150 -> { c.vopen = 1f - (t - 900) / 250f; c.vdy = h * 1.1f }
+            t < 1450 -> {
+                c.vdy = h * 1.1f
                 if (!ventMoved) {
                     ventMoved = true
+                    c.vopen = 0f
                     lp.x = ventX; lp.y = ventY
                     fx = lp.x.toFloat(); fy = lp.y.toFloat()
                     updateChibiPos()
                 }
+                if (t >= 1200) c.vopen = ((t - 1200) / 250f).coerceAtMost(1f)
             }
-            t < 1300 -> {
-                val s = easeOutBack((t - 800) / 500f)
-                c.vsy = s.coerceAtLeast(0f); c.vsx = 1f - (s - 1f) * 0.6f
-            }
+            t < 1850 -> { val k = (t - 1450) / 400f; c.vopen = 1f; c.vdy = h * 1.1f * (1f - (1f - (1f - k) * (1f - k))) }
+            t < 2150 -> { c.vopen = 1f; c.vdy = -hop * kotlin.math.sin(Math.PI.toFloat() * (t - 1850) / 300f) }
+            t < 2450 -> { c.vopen = 1f - (t - 2150) / 300f; c.vdy = 0f }
             else -> {
-                c.vsx = 1f; c.vsy = 1f; c.action = "idle"; ventStart = 0L
+                c.vopen = 0f; c.vdy = 0f; c.action = "idle"; ventStart = 0L
                 nextDecision = now + 1200
             }
         }
+        c.invalidate()
     }
 
     private fun decide(now: Long, c: ChibiView) {
@@ -519,7 +527,7 @@ class CompanionService : Service() {
                 c.action = "sus"; dur = Random.nextLong(3000, 5000)
                 if (Random.nextBoolean()) say("...sus", "neutral")
             }
-            r < 0.93f && walking -> { startVent(now, c); dur = 1500 }
+            r < 0.93f && walking -> { startVent(now, c); dur = 2600 }
             else -> {
                 if (now - lastInteract > 90_000) { c.action = "sleep"; dur = Random.nextLong(12_000, 25_000) }
                 else c.action = "idle"
