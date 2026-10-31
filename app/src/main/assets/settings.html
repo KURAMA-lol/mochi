@@ -172,9 +172,18 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <label>Voice engine <span class="mut">(natural voices instead of the robotic phone voice)</span></label>
     <select id="vEng" onchange="vSave()">
       <option value="system">Phone default (robotic)</option>
-      <option value="openai">Natural: Kokoro / OpenAI-style API</option>
-      <option value="eleven">ElevenLabs (supports voice cloning)</option>
+      <option value="local">Natural voice ON PHONE (free, offline, no key)</option>
+      <option value="openai">Natural: Kokoro / OpenAI-style API (needs key)</option>
+      <option value="eleven">ElevenLabs (voice cloning, needs key)</option>
     </select>
+    <div id="vLocal" style="display:none">
+      <div id="lStat" style="color:var(--mut);font-size:13px;margin:8px 0">Not downloaded yet.</div>
+      <div class="btns"><button class="b" onclick="Android.localInstall();lPoll()">Download voice (about 132 MB, once)</button>
+        <button class="b ghost" onclick="if(confirm('Delete the voice files?')){Android.localRemove();lPoll()}">Delete</button></div>
+      <label>Voice</label><select id="lSid" onchange="vSave()"></select>
+      <label>Speed</label><input id="lSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
+      <p class="mu">Runs fully on your phone: free, no internet after the download. On slower phones the first sentence can take a few seconds.</p>
+    </div>
     <div id="vOpenai" style="display:none">
       <label>Preset</label>
       <select id="vPreset" onchange="vPreset()">
@@ -186,7 +195,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
       <label>API URL</label><input id="oUrl" oninput="vSave()" placeholder="https://.../v1/audio/speech">
       <label>API key</label><input id="oKey" type="password" oninput="vSave()">
       <label>Model</label><input id="oModel" oninput="vSave()">
-      <label>Voice <span class="mut">(tap to pick, or type; Kokoro lets you mix: af_bella+af_sky)</span></label>
+      <label>Voice</label>
       <input id="oVoice" list="vList" oninput="vSave()">
       <datalist id="vList">
         <option value="af_bella"><option value="af_heart"><option value="af_nicole"><option value="af_sarah"><option value="af_sky">
@@ -210,23 +219,34 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:6px"></div>
   </div>
   <script>
-  var VC={engine:'system',openai:{},eleven:{}};
+  var VC={engine:'system',local:{sid:3,speed:1},openai:{},eleven:{}};
+  var LV=[["Female - warm (af_heart)",3],["Female - bella",2],["Female - nicole (soft)",6],["Female - sarah",9],["Female - sky",10],["Female - nova",7],["Female - jessica",4],["Female - alloy",0],["Female - aoede",1],["Female - kore",5],["Female - river",8],["Male - adam",11],["Male - michael",16],["Male - puck",18],["Male - echo",12],["Male - liam",15],["Male - onyx",17],["Male - fenrir",14],["British F - emma",21],["British F - isabella",22],["British F - alice",20],["British F - lily",23],["British M - george",26],["British M - lewis",27],["British M - daniel",24],["British M - fable",25],["Hindi F - alpha",31],["Hindi F - beta",32],["Hindi M - omega",33],["Hindi M - psi",34]];
   function vg(i){return document.getElementById(i)}
   var VP={di:['https://api.deepinfra.com/v1/openai/audio/speech','hexgrad/Kokoro-82M','af_bella'],
           self:['http://192.168.1.10:8880/v1/audio/speech','kokoro','af_bella'],
           oa:['https://api.openai.com/v1/audio/speech','gpt-4o-mini-tts','nova']};
-  function vShow(){vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
-  function vFill(){vg('vEng').value=VC.engine||'system';var o=VC.openai||{},e=VC.eleven||{};
+  var lTimer=null;
+  function lTick(){try{var s=JSON.parse(Android.localStatus());
+    var t=s.busy?s.msg:(s.disabled?'Turned off because it crashed on this phone. Delete and download again, or use another engine.':(s.installed?'Installed and ready.':(s.msg||'Not downloaded yet.')));
+    vg('lStat').textContent=t;if(!s.busy&&lTimer){clearInterval(lTimer);lTimer=null;}}catch(x){}}
+  function lPoll(){if(lTimer)clearInterval(lTimer);lTimer=setInterval(lTick,800);lTick();}
+  function vShow(){vg('vLocal').style.display=VC.engine=='local'?'block':'none';
+    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';
+    if(VC.engine=='local')lPoll();}
+  function vFill(){vg('vEng').value=VC.engine||'system';var o=VC.openai||{},e=VC.eleven||{},l=VC.local||{};
+    var s=vg('lSid');if(!s.options.length)LV.forEach(function(v){var op=document.createElement('option');op.value=v[1];op.textContent=v[0];s.appendChild(op);});
+    s.value=(l.sid===undefined?3:l.sid);vg('lSpeed').value=l.speed||1;
     vg('oUrl').value=o.url||'';vg('oKey').value=o.key||'';vg('oModel').value=o.model||'';vg('oVoice').value=o.voice||'';vg('oSpeed').value=o.speed||1;
     vg('eKey').value=e.key||'';vg('eId').value=e.voiceId||'';vg('eModel').value=e.model||'eleven_multilingual_v2';vShow();}
-  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};vFill();}
+  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};VC.local=VC.local||{sid:3,speed:1};vFill();}
   function vSave(){VC.engine=vg('vEng').value;
+    VC.local={sid:+vg('lSid').value,speed:+vg('lSpeed').value||1};
     VC.openai={url:vg('oUrl').value,key:vg('oKey').value,model:vg('oModel').value,voice:vg('oVoice').value,speed:+vg('oSpeed').value||1};
     VC.eleven={key:vg('eKey').value,voiceId:vg('eId').value,model:vg('eModel').value||'eleven_multilingual_v2'};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
   function vPreset(){var p=VP[vg('vPreset').value];if(!p)return;vg('oUrl').value=p[0];vg('oModel').value=p[1];vg('oVoice').value=p[2];vSave();}
   function vTest(){vSave();vg('vStat').textContent='Generating...';Android.testVoice('Hi! This is my new voice. How do I sound?');}
-  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works!':'Error: '+m;};
+  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Done. If you heard it, it works!':'Error: '+m;};
   function vLoadList(){vSave();vg('vStat').textContent='Loading voices...';Android.listVoices();}
   window.onVoiceList=function(ok,a){if(!ok){vg('vStat').textContent='Error: '+a;return;}
     var s=vg('eList');s.innerHTML='<option value="">Pick a voice...</option>';

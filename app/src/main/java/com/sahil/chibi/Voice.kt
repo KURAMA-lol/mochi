@@ -76,6 +76,10 @@ object Voice {
                 return http("POST", "https://api.elevenlabs.io/v1/text-to-speech/" + vid + "?output_format=mp3_44100_128",
                     mapOf("xi-api-key" to e.optString("key").trim()), body.toString().toByteArray(), "application/json")
             }
+            "local" -> {
+                val l = c.optJSONObject("local") ?: JSONObject()
+                return LocalTts.synthWav(ctx, text, l.optInt("sid", 3), l.optDouble("speed", 1.0).toFloat())
+            }
             else -> throw RuntimeException("no cloud voice engine selected")
         }
     }
@@ -97,6 +101,17 @@ object Voice {
         val clean = clean(text)
         if (clean.isBlank()) { onDone(null); return }
         val my = ++gen
+        if (engine(ctx) == "local") {
+            Thread {
+                try {
+                    speakLocal(ctx, clean, my)
+                    onDone(null)
+                } catch (e: Throwable) {
+                    onDone((e.message ?: e.toString()).take(240))
+                }
+            }.start()
+            return
+        }
         Thread {
             try {
                 val audio = synth(ctx, clean)
@@ -106,6 +121,67 @@ object Voice {
                 onDone((e.message ?: e.toString()).take(240))
             }
         }.start()
+    }
+
+    private fun splitSentences(s: String): List<String> {
+        val out = ArrayList<String>()
+        val parts = s.split(Regex("(?<=[.!?\u0964])\s+"))
+        var cur = StringBuilder()
+        for (p in parts) {
+            if (cur.isNotEmpty() && cur.length + p.length > 140) { out.add(cur.toString()); cur = StringBuilder() }
+            if (cur.isNotEmpty()) cur.append(' ')
+            cur.append(p)
+        }
+        if (cur.isNotEmpty()) out.add(cur.toString())
+        return out
+    }
+
+    /** Synthesises sentence by sentence; the next one is generated while the current one plays. */
+    private fun speakLocal(ctx: Context, text: String, my: Int) {
+        val l = cfg(ctx).optJSONObject("local") ?: JSONObject()
+        val sid = l.optInt("sid", 3)
+        val speed = l.optDouble("speed", 1.0).toFloat()
+        val ex = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            val futs = splitSentences(text).map { s ->
+                ex.submit(java.util.concurrent.Callable { LocalTts.synthWav(ctx, s, sid, speed) })
+            }
+            for (f in futs) {
+                if (my != gen) break
+                val audio = f.get()
+                if (my != gen) break
+                playAndWait(ctx, audio, my)
+            }
+        } finally {
+            ex.shutdownNow()
+        }
+    }
+
+    private fun playAndWait(ctx: Context, audio: ByteArray, myGen: Int) {
+        val f = File(ctx.cacheDir, "tts_" + System.nanoTime() + ".wav")
+        f.writeBytes(audio)
+        val latch = java.util.concurrent.CountDownLatch(1)
+        main.post {
+            if (myGen != gen) { f.delete(); latch.countDown(); return@post }
+            stopPlayer()
+            val mp = MediaPlayer()
+            try {
+                mp.setDataSource(f.absolutePath)
+                mp.setOnCompletionListener { m -> m.release(); if (player === m) player = null; latch.countDown() }
+                mp.setOnErrorListener { m, _, _ -> m.release(); if (player === m) player = null; latch.countDown(); true }
+                mp.setOnPreparedListener { m -> m.start() }
+                player = mp
+                mp.prepareAsync()
+            } catch (e: Exception) {
+                mp.release(); latch.countDown()
+            }
+        }
+        var waited = 0
+        while (!latch.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            waited += 200
+            if (myGen != gen || waited > 90000) break
+        }
+        f.delete()
     }
 
     fun stop() { gen++; main.post { stopPlayer() } }
