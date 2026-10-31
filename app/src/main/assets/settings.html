@@ -142,6 +142,17 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <input type="number" min="2" max="40" id="history" onchange="Pz('history',+this.value)">
   </div>
   <div class="card">
+    <label>3D character (VRM model)</label>
+    <div id="mdlInfo" style="color:var(--mut);font-size:13px;margin:4px 0 8px">Using the default sprite.</div>
+    <button onclick="Android.pickModel()" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--ac2);color:#fff;font:inherit">Pick a .vrm file</button>
+    <button onclick="Android.removeModel();setTimeout(mdl,400)" style="width:100%;padding:10px;margin-top:8px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--mut);font:inherit">Back to sprite</button>
+  </div>
+  <script>
+  function mdl(){try{var i=JSON.parse(Android.modelInfo());var e=document.getElementById('mdlInfo');
+   e.textContent=i.has?('3D model active ('+i.sizeKb+' KB)'+(i.error?(' - failed, using sprite: '+i.error):'')):'Using the default sprite.';}catch(x){}}
+  window.onModel=mdl;setTimeout(mdl,300);
+  </script>
+  <div class="card" style="display:none">
     <label>Character style</label>
     <select id="style" onchange="Pz('style',this.value)">
       <option value="pixel">Pixel art</option><option value="smooth">Original (smooth)</option>

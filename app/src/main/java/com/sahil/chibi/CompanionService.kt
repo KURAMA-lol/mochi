@@ -242,13 +242,14 @@ class CompanionService : Service() {
         cfg = ConfigStore.load(this)
         val c = ChibiView(this)
         c.pixel = cfg.persona.style != "smooth"
-        val w = dp((cfg.persona.size * 0.8f).toInt())
+        val w = dp((cfg.persona.size * (if (ChibiView.has3d(this)) 1.1f else 0.8f)).toInt())
         val h = dp(cfg.persona.size)
         lp = overlayLp(
             w, h,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
         val (sw, sh) = screen()
         val st = getSharedPreferences("chibi_state", MODE_PRIVATE)

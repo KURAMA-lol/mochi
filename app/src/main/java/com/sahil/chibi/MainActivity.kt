@@ -11,6 +11,10 @@ import android.os.Bundle
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -40,6 +44,39 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         web.evaluateJavascript("window.refreshStatus && refreshStatus()", null)
+    }
+
+    private fun restartCompanion() {
+        if (!CompanionService.running) return
+        stopService(Intent(this, CompanionService::class.java))
+        Handler(Looper.getMainLooper()).postDelayed({ CompanionService.send(this, CompanionService.ACT_START) }, 900)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 77 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        Thread {
+            var msg: String
+            try {
+                val tmp = File(filesDir, "model.tmp")
+                contentResolver.openInputStream(uri)!!.use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
+                val m = VrmLoader.load(tmp)
+                val dst = ChibiView.modelFile(this)
+                dst.delete()
+                tmp.renameTo(dst)
+                ChibiView.lastError = ""
+                msg = "3D model loaded (" + m.vertexCount + " vertices)"
+                runOnUiThread { restartCompanion() }
+            } catch (e: Throwable) {
+                File(filesDir, "model.tmp").delete()
+                msg = "Could not use that file: " + (e.message ?: e.toString())
+            }
+            runOnUiThread {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                web.evaluateJavascript("window.onModel && onModel()", null)
+            }
+        }.start()
     }
 
     private fun askRuntimePerms() {
@@ -94,6 +131,25 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun stop() {
             stopService(Intent(this@MainActivity, CompanionService::class.java))
+        }
+
+        @JavascriptInterface fun pickModel() {
+            runOnUiThread {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
+                startActivityForResult(i, 77)
+            }
+        }
+
+        @JavascriptInterface fun removeModel() {
+            ChibiView.modelFile(this@MainActivity).delete()
+            ChibiView.lastError = ""
+            runOnUiThread { restartCompanion() }
+        }
+
+        @JavascriptInterface fun modelInfo(): String {
+            val f = ChibiView.modelFile(this@MainActivity)
+            return JSONObject().put("has", f.exists()).put("sizeKb", f.length() / 1024)
+                .put("error", ChibiView.lastError).toString()
         }
 
         @JavascriptInterface fun getStats(): String {
