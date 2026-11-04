@@ -26,7 +26,8 @@
   textarea{width:100%;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4;white-space:pre;tab-size:2}
   .cv{image-rendering:pixelated;touch-action:none;border-radius:8px;background-color:#1f2140;background-image:conic-gradient(#2a2d4a 25%,#1f2140 0 50%,#2a2d4a 0 75%,#1f2140 0);background-size:16px 16px}
   #preview{width:320px;max-width:100%;aspect-ratio:16/9;display:block;margin:0 auto;image-rendering:pixelated}
-  #error{color:#ff8a9a;font-size:13px;margin-top:8px;white-space:pre-wrap;min-height:1em;word-break:break-word}
+  #error{color:#ffd6dc;background:#3a1018;border:1px solid #c2334d;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,monospace}
+  #error:empty{display:none}
   .mut{color:#8a8db5;font-size:13px}
   .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
   .sw{width:28px;height:28px;border-radius:8px;border:2px solid rgba(0,0,0,.45)}
@@ -42,7 +43,7 @@
   </header>
 
   <!-- shared preview + error panel + actions -->
-  <div class="card">
+  <div class="card" style="position:sticky;top:0;z-index:5">
     <canvas id="preview" class="cv" width="320" height="180"></canvas>
     <div id="error"></div>
     <div class="row">
@@ -182,10 +183,19 @@ const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
    LAYER 4  compile()/runCode  (auto-detects ACT mode vs function/module mode)
    No `new ImageData` anywhere: canvases + getContext('2d') only.
    =================================================================== */
+function setFill(ctx, c) {
+  ctx.fillStyle = '#010203'; ctx.fillStyle = c;
+  if (ctx.fillStyle === '#010203' && String(c).replace(/\s/g, '').toLowerCase() !== '#010203') throw new Error('Invalid color: ' + c + '   (use "#ff0000" or "red")');
+}
+function errMsg(e) {
+  let m = String(e && e.message ? e.message : e);
+  if (e instanceof SyntaxError) m += '\nTip: write it as   function(ctx,t,x,y){ ctx.r(0,0,128,128,"#ff0000"); }   (quotes around colors, commas between arguments)';
+  return m;
+}
 function wrapForPx(ctx, ps) {
   ps = ps || 3;
-  ctx.px = function (x, y, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x) * ps, Math.floor(y) * ps, ps, ps); };
-  ctx.r = function (x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); };
+  ctx.px = function (x, y, c) { setFill(ctx, c); ctx.fillRect(Math.floor(x) * ps, Math.floor(y) * ps, ps, ps); };
+  ctx.r = function (x, y, w, h, c) { setFill(ctx, c); ctx.fillRect(Math.floor(x), Math.floor(y), w, h); };
   ctx.P = ps;
   return ctx;
 }
@@ -204,7 +214,7 @@ function composite(frame, target) {
   x.imageSmoothingEnabled = false;
   x.clearRect(0, 0, target.width, target.height);
   let s = Math.min(target.width / frame.w, target.height / frame.h);
-  if (s >= 1) s = Math.floor(s);
+  if (s >= 2) s = Math.floor(s);
   const dw = frame.w * s, dh = frame.h * s;
   const ox = Math.floor((target.width - dw) / 2), oy = Math.floor((target.height - dh) / 2);
   x.drawImage(frame.canvas, ox, oy, dw, dh);
@@ -275,6 +285,13 @@ function compile(code) {
     const e = clean.replace(/;\s*$/, '');
     const fn = new Function('return (' + e + ')')();
     if (typeof fn !== 'function') throw new Error('That is not a function');
+    return { kind: 'fn', fn: fn, expr: e, wrap: '(' + e + ')', raw: t };
+  }
+
+  /* body only: statements that use ctx, e.g.  ctx.r(0,0,128,128,"#f00")  */
+  if (/\bctx\b/.test(clean) && !/\bfunction\b/.test(clean) && !/=>/.test(clean) && !/\bexport\b/.test(clean) && !/\bcreateCompanion\b/.test(clean)) {
+    const fn = new Function('ctx', 't', 'x', 'y', 'W', 'H', 'S', clean);
+    const e = 'function(ctx,t,x,y,W,H,S){\n' + clean + '\n}';
     return { kind: 'fn', fn: fn, expr: e, wrap: '(' + e + ')', raw: t };
   }
 
@@ -594,7 +611,7 @@ if (!RUN) {
       const sz = frameSizeFor(r);
       P[w].frame = r.kind === 'actmode' ? r.frame : createFrame(sz[0], sz[1]);
       P[w].r = r; setErr(w, ''); P[w].t0 = performance.now(); if (w === 'anim') P.anim.t = 0;
-    } catch (e) { P[w].r = null; setErr(w, String(e && e.message ? e.message : e)); }
+    } catch (e) { P[w].r = null; setErr(w, errMsg(e)); }
     saveDraft();
   }
   function schedule(w) { clearTimeout(P[w].tm); P[w].tm = setTimeout(function () { rebuild(w); }, 350); }
@@ -616,7 +633,7 @@ if (!RUN) {
       try {
         runFrame(pw.r, pw.frame, t, dt, pw.ptr, S, art, w === 'code' ? $('#showArt').checked : false, scrub, 3);
         comp = composite(pw.frame, preview);
-      } catch (e) { pw.r.broken = true; setErr(w, String(e && e.message ? e.message : e)); }
+      } catch (e) { pw.r.broken = true; setErr(w, errMsg(e)); }
     } else {
       /* nothing running: show the ART frame */
       const fr = createFrame(W, H); fr.ctx.drawImage(F[cur], 0, 0);
@@ -771,7 +788,7 @@ if (!RUN) {
     };
 
     /* top action bar */
-    $('#runBtn').onclick = function () { const w = which(); P[w].r && (P[w].r.broken = false); rebuild(w); setUI(); };
+    $('#runBtn').onclick = function () { if (tab === 'import') { $('#impLoad').click(); return; } const w = which(); P[w].r && (P[w].r.broken = false); rebuild(w); setUI(); };
     $('#pngBtn').onclick = function () {
       const fr = currentFrame();
       if (fr) exportCanvasPng(fr.canvas, 4, (theName('frame') || 'frame').replace(/\s+/g, '-'));
