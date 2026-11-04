@@ -142,12 +142,23 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     <input type="number" min="2" max="40" id="history" onchange="Pz('history',+this.value)">
   </div>
   <div class="card">
+    <label>Character</label>
+    <div class="btns" id="chrBtns">
+      <button class="b" data-id="amongus" onclick="chrSet('amongus')">Among Us (3D)</button>
+      <button class="b" data-id="lumi" onclick="chrSet('lumi')">Lumi (jellyfish)</button>
+      <button class="b" data-id="webb" onclick="chrSet('webb')">Webb (spider hero)</button>
+    </div>
+  </div>
+  <div class="card">
     <label>3D character (VRM model)</label>
     <div id="mdlInfo" style="color:var(--mut);font-size:13px;margin:4px 0 8px">Using the default sprite.</div>
     <button onclick="Android.pickModel()" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--ac2);color:#fff;font:inherit">Pick a .vrm file</button>
     <button onclick="Android.removeModel();setTimeout(mdl,400)" style="width:100%;padding:10px;margin-top:8px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--mut);font:inherit">Reset to default model</button>
   </div>
   <script>
+  function chrShow(id){document.querySelectorAll('#chrBtns button').forEach(function(b){b.style.outline=b.getAttribute('data-id')==id?'2px solid #fff':'none';});}
+  function chrSet(id){try{Android.setChar(id);}catch(x){} chrShow(id);}
+  setTimeout(function(){try{chrShow(Android.getChar());}catch(x){}},300);
   function mdl(){try{var i=JSON.parse(Android.modelInfo());var e=document.getElementById('mdlInfo');
    e.textContent=i.has?('3D model active ('+i.sizeKb+' KB)'+(i.error?(' - failed, using sprite: '+i.error):'')):'Using the default sprite.';}catch(x){}}
   window.onModel=mdl;setTimeout(mdl,300);

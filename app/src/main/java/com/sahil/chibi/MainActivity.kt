@@ -185,6 +185,13 @@ class MainActivity : Activity() {
             }
         }
 
+        @JavascriptInterface fun getChar(): String = ChibiView.charId(this@MainActivity)
+
+        @JavascriptInterface fun setChar(id: String) {
+            getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", id).apply()
+            runOnUiThread { restartCompanion() }
+        }
+
         @JavascriptInterface fun pickModel() {
             runOnUiThread {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }

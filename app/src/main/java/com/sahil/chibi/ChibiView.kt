@@ -34,7 +34,11 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         @Volatile var lastError: String = ""
         fun modelFile(c: Context) = File(c.filesDir, "model.vrm")
         /** Uses the picked model, otherwise the bundled default (assets/default.vrm) if the app ships one. */
+        fun charId(c: Context): String =
+            c.getSharedPreferences("char_cfg", Context.MODE_PRIVATE).getString("id", "amongus") ?: "amongus"
+
         fun has3d(c: Context): Boolean {
+            if (charId(c) != "amongus") return false
             val f = modelFile(c)
             if (!f.exists()) {
                 try {
@@ -61,8 +65,11 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     private var blinkUntil = 0L
     private var pendingDouble = false
 
+    private var pc: PixelChar? = null
+
     init {
         setWillNotDraw(false)
+        pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); else -> null }
         if (has3d(ctx)) {
             val g = GlView(ctx, this, modelFile(ctx))
             gl = g
@@ -107,6 +114,20 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
 
     override fun onDraw(c: Canvas) {
         if (gl != null) return
+        val pcl = pc
+        if (pcl != null) {
+            val s = minOf(width / pcl.w, height / pcl.h)
+            if (s >= 1) {
+                c.save()
+                if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
+                c.translate((width - pcl.w * s) / 2f, (height - pcl.h * s).toFloat())
+                c.scale(s.toFloat(), s.toFloat())
+                pcl.draw(Px(c), SystemClock.uptimeMillis() / 1000f, action, talking)
+                c.restore()
+            }
+            postInvalidateDelayed(40)
+            return
+        }
         val base = open ?: return
         val now = SystemClock.uptimeMillis()
         if (now >= nextBlink && now >= blinkUntil) {
