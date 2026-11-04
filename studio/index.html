@@ -4,24 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pixel Studio</title>
-<script>if (location.hash.indexOf('run') < 0) document.write('<script src="https://cdn.tailwindcss.com"><\/script>');</script>
 <style>
+  *{box-sizing:border-box}
   html,body{margin:0;background:#0f1020;color:#d7d9f5;font-family:system-ui,-apple-system,sans-serif}
   html.run,html.run body{background:transparent;overflow:hidden;height:100%}
   html.run #ui{display:none}
   #stage{display:none}
   html.run #stage{display:block;position:fixed;inset:0}
   #runCv{position:absolute;image-rendering:pixelated;transform-origin:50% 100%}
+  .wrap{max-width:36rem;margin:0 auto;padding:12px 12px 96px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  h1{font-size:18px;margin:0}
+  #back{color:#9aa2ff;font-size:14px;display:none;text-decoration:none}
   .btn{padding:8px 12px;border-radius:10px;border:1px solid #3a3d6b;background:#1a1c36;color:#d7d9f5;font:inherit;font-size:14px}
   .btn.on{outline:2px solid #fff}
   .btn.pri{background:#5b5bd6;border-color:#5b5bd6;color:#fff}
   .btn.red{border-color:#7a2a3a;color:#ff9aa8}
   .tabpane{display:none}.tabpane.on{display:block}
   .card{background:#15172e;border:1px solid #2a2d52;border-radius:14px;padding:12px;margin-bottom:12px}
-  textarea,input[type=text],input[type=number],select{background:#0c0d1c;color:#d7d9f5;border:1px solid #2a2d52;border-radius:10px;padding:8px;font:inherit;font-size:14px;box-sizing:border-box}
-  textarea{width:100%;min-height:210px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4;white-space:pre;tab-size:2}
+  textarea,input[type=text],input[type=number],select{background:#0c0d1c;color:#d7d9f5;border:1px solid #2a2d52;border-radius:10px;padding:8px;font:inherit;font-size:14px}
+  textarea{width:100%;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4;white-space:pre;tab-size:2}
   .cv{image-rendering:pixelated;touch-action:none;border-radius:8px;background-color:#1f2140;background-image:conic-gradient(#2a2d4a 25%,#1f2140 0 50%,#2a2d4a 0 75%,#1f2140 0);background-size:16px 16px}
-  .err{color:#ff8a9a;font-size:13px;margin-top:6px;white-space:pre-wrap}
+  #preview{width:320px;max-width:100%;aspect-ratio:16/9;display:block;margin:0 auto;image-rendering:pixelated}
+  #error{color:#ff8a9a;font-size:13px;margin-top:8px;white-space:pre-wrap;min-height:1em;word-break:break-word}
   .mut{color:#8a8db5;font-size:13px}
   .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
   .sw{width:28px;height:28px;border-radius:8px;border:2px solid rgba(0,0,0,.45)}
@@ -29,24 +34,43 @@
 </style>
 </head>
 <body>
-<div id="ui" class="max-w-xl mx-auto p-3 pb-24">
-  <header class="flex items-center justify-between mb-3">
-    <a id="back" href="settings.html" class="text-sm" style="color:#9aa2ff;display:none">&larr; App</a>
-    <h1 class="font-bold text-lg">Pixel Studio</h1>
+<div id="ui" class="wrap">
+  <header>
+    <a id="back" href="settings.html">&larr; App</a>
+    <h1>Pixel Studio</h1>
     <span id="mode" class="mut"></span>
   </header>
+
+  <!-- shared preview + error panel + actions -->
+  <div class="card">
+    <canvas id="preview" class="cv" width="320" height="180"></canvas>
+    <div id="error"></div>
+    <div class="row">
+      <button class="btn pri" id="runBtn">RUN</button>
+      <button class="btn" id="pngBtn">SAVE PNG</button>
+      <button class="btn" id="jsBtn">EXPORT JS</button>
+      <select id="actSel"><option>idle</option><option>walk</option><option>run</option><option>sit</option><option>sleep</option><option>wave</option><option>sus</option></select>
+    </div>
+    <div class="row">
+      <input type="text" id="fxName" placeholder="name (for save / export)" style="flex:1;min-width:140px">
+      <span class="mut" id="tLabel">0.00s</span>
+    </div>
+  </div>
+
   <nav class="row" id="tabs">
-    <button class="btn" data-tab="import">Import</button>
-    <button class="btn" data-tab="code">Code</button>
-    <button class="btn" data-tab="anim">Animator</button>
-    <button class="btn" data-tab="lib">Library</button>
+    <button class="btn" data-tab="art">ART</button>
+    <button class="btn" data-tab="code">CODE</button>
+    <button class="btn" data-tab="import">IMPORT</button>
+    <button class="btn" data-tab="anim">ANIM</button>
+    <button class="btn" data-tab="lib">LIBRARY</button>
   </nav>
 
-  <!-- IMPORT / PIXEL EDITOR -->
-  <section id="t-import" class="tabpane">
+  <!-- ART: preset mascot, image -> pixel art, editor -->
+  <section id="t-art" class="tabpane">
     <div class="card">
       <div class="row">
-        <input type="file" id="impFile" accept="image/*" class="text-sm" style="max-width:100%">
+        <button class="btn pri" id="presetBtn">Preset mascot</button>
+        <input type="file" id="impFile" accept="image/*" style="max-width:100%;font-size:13px">
       </div>
       <div class="row">
         <label class="mut">Size</label>
@@ -54,9 +78,9 @@
         <label class="mut">Colors</label>
         <select id="impColors"><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option><option value="64">64</option><option value="0">all</option></select>
         <select id="impFit"><option value="contain">fit</option><option value="cover">fill</option></select>
-        <button class="btn pri" id="impGo">Convert</button>
+        <button class="btn" id="impGo">Pick image</button>
       </div>
-      <div class="mut">Converts the picture to pixel art into the frame you are editing. Then fix it by hand below.</div>
+      <div class="mut">Picking an image converts it to pixel art in the frame you are editing. Fix it by hand below.</div>
     </div>
     <div class="card">
       <div class="row">
@@ -84,50 +108,45 @@
           <div id="gridLines" style="position:absolute;inset:0;pointer-events:none"></div>
         </div>
       </div>
-      <div class="row">
-        <button class="btn" id="expArt1">Export PNG x1</button>
-        <button class="btn" id="expArt8">Export PNG x8</button>
-      </div>
     </div>
   </section>
 
-  <!-- CODE -->
+  <!-- CODE: starts empty -->
   <section id="t-code" class="tabpane">
     <div class="card">
-      <div class="mut" style="margin-bottom:6px">Paste <b>function(ctx,t,x,y){...}</b>. <b>t</b> = seconds, <b>x,y</b> = pointer position in pixels, <b>ctx.art</b> = your grid drawing, helpers <b>ctx.px(x,y,color)</b> and <b>ctx.r(x,y,w,h,color)</b>. A full module with <b>createCompanion()</b> (like Lumi) works too.</div>
-      <textarea id="codeTa" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-      <div class="err" id="codeErr"></div>
+      <div class="mut" style="margin-bottom:6px">JavaScript only, never HTML. Write <b>function(ctx,t,x,y){...}</b>. Buffer is 128&times;128. <b>ctx.px(x,y,color)</b> = 3&times;3 block, <b>ctx.r(x,y,w,h,color)</b> = raw rect, <b>ctx.art</b> / <b>ctx.drawArt(x,y,scale)</b> = your ART tab drawing. Code with <b>createFrame</b> runs in ACT mode and must <b>return {frame, fx}</b>.</div>
+      <textarea id="codeTa" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="function(ctx,t,x,y){&#10;  // empty - write or paste your code, then press RUN&#10;}"></textarea>
       <div class="row">
-        <label class="mut"><input type="checkbox" id="showArt"> draw my grid art under the code</label>
-        <select id="actSel"><option>idle</option><option>walk</option><option>run</option><option>sit</option><option>sleep</option><option>wave</option><option>sus</option></select>
+        <label class="mut"><input type="checkbox" id="showArt"> draw my ART under the code</label>
+        <button class="btn" id="exampleBtn">Insert example</button>
       </div>
-      <div style="text-align:center"><canvas id="liveC" class="cv"></canvas></div>
-      <div class="row">
-        <input type="text" id="codeName" placeholder="name" style="flex:1;min-width:120px">
-        <button class="btn pri" id="codeSave">Save</button>
-        <button class="btn" id="codePng">Export PNG</button>
-      </div>
-      <div class="mut">Save keeps it in your library and downloads <b>name.js</b> &mdash; put it in <b>src/fx/custom/</b>.</div>
     </div>
   </section>
 
-  <!-- ANIMATOR -->
+  <!-- IMPORT: paste pixelfx code -->
+  <section id="t-import" class="tabpane">
+    <div class="card">
+      <div class="mut" style="margin-bottom:6px">Paste pixelfx code (a function, a module with <b>createCompanion</b> / <b>createAct</b> / <b>arrowShot.act</b>, or an ACT script). <b>import</b> lines are removed and <b>export</b> is handled for you.</div>
+      <textarea id="impTa" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="paste code here"></textarea>
+      <div class="row">
+        <button class="btn pri" id="impLoad">Load into CODE and RUN</button>
+        <input type="file" id="jsFile" accept=".js,.mjs,text/javascript" style="max-width:100%;font-size:13px">
+      </div>
+    </div>
+  </section>
+
+  <!-- ANIM -->
   <section id="t-anim" class="tabpane">
     <div class="card">
-      <div class="mut" style="margin-bottom:6px">Full animation code. Same format as the Code tab; <b>t</b> loops every <b>Loop</b> seconds. Use the slider to scrub.</div>
+      <div class="mut" style="margin-bottom:6px">Full animation code (same format). <b>t</b> loops every <b>Loop</b> seconds; use the slider to scrub.</div>
       <textarea id="animTa" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-      <div class="err" id="animErr"></div>
-      <div style="text-align:center;margin-top:8px"><canvas id="liveA" class="cv"></canvas></div>
       <div class="row">
         <button class="btn pri" id="playBtn">Pause</button>
         <input type="range" id="scrub" min="0" max="600" value="0" style="flex:1;min-width:120px">
-        <span class="mut" id="tLabel">0.00s</span>
       </div>
       <div class="row">
         <label class="mut">Loop (s)</label><input type="number" id="loopIn" value="6" min="1" max="60" step="1" style="width:70px">
-        <input type="text" id="animName" placeholder="name" style="flex:1;min-width:120px">
         <button class="btn pri" id="animSave">Save effect</button>
-        <button class="btn" id="animPng">Export PNG</button>
       </div>
     </div>
   </section>
@@ -135,14 +154,13 @@
   <!-- LIBRARY -->
   <section id="t-lib" class="tabpane">
     <div class="card">
-      <div class="mut" style="margin-bottom:6px">Save what you are working on as a named mascot.</div>
-      <div class="row"><input type="text" id="mName" placeholder="mascot name" style="flex:1;min-width:140px"></div>
+      <div class="mut" style="margin-bottom:6px">Save what you are working on as a named mascot (uses the name box above).</div>
       <div class="row">
         <button class="btn pri" id="saveMascotPx">Save pixel mascot</button>
-        <button class="btn pri" id="saveMascotCode">Save from Code tab</button>
-        <button class="btn pri" id="saveMascotAnim">Save from Animator</button>
+        <button class="btn pri" id="saveMascotCode">Save from CODE</button>
+        <button class="btn pri" id="saveMascotAnim">Save from ANIM</button>
       </div>
-      <div class="row"><label class="mut">Restore a downloaded mascot (.json)</label><input type="file" id="jsonIn" accept=".json,application/json" class="text-sm"></div>
+      <div class="row"><label class="mut">Restore a downloaded mascot (.json)</label><input type="file" id="jsonIn" accept=".json,application/json" style="max-width:100%;font-size:13px"></div>
     </div>
     <div id="libList"></div>
   </section>
@@ -157,53 +175,158 @@ const hasApp = !!(window.Android && Android.listMascots);
 const $ = s => document.querySelector(s);
 const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
 
-/* ================= ENGINE (shared by the editor previews and the in-app overlay) ================= */
-function stripExports(src) {
-  return src.replace(/^\s*export\s+default\s+/m, 'const __default = ')
-            .replace(/^\s*export\s+(?=(async\s+)?(function|const|let|var|class)\b)/gm, '');
+/* ===================================================================
+   LAYER 1  createFrame(w,h) -> {w,h,canvas,ctx}     (falls back to 128 if NaN / 0)
+   LAYER 2  wrapForPx(ctx)   -> adds ctx.px / ctx.r
+   LAYER 3  createAct(mod,opts) + composite(frame,target)
+   LAYER 4  compile()/runCode  (auto-detects ACT mode vs function/module mode)
+   No `new ImageData` anywhere: canvases + getContext('2d') only.
+   =================================================================== */
+function wrapForPx(ctx, ps) {
+  ps = ps || 3;
+  ctx.px = function (x, y, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x) * ps, Math.floor(y) * ps, ps, ps); };
+  ctx.r = function (x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); };
+  ctx.P = ps;
+  return ctx;
+}
+function createFrame(w, h) {
+  w = Math.floor(+w); h = Math.floor(+h);
+  if (!isFinite(w) || !(w > 0)) w = 128;
+  if (!isFinite(h) || !(h > 0)) h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = wrapForPx(canvas.getContext('2d'), 3);
+  ctx.imageSmoothingEnabled = false;
+  return { w: w, h: h, canvas: canvas, ctx: ctx };
+}
+function composite(frame, target) {
+  const x = target.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  x.clearRect(0, 0, target.width, target.height);
+  let s = Math.min(target.width / frame.w, target.height / frame.h);
+  if (s >= 1) s = Math.floor(s);
+  const dw = frame.w * s, dh = frame.h * s;
+  const ox = Math.floor((target.width - dw) / 2), oy = Math.floor((target.height - dh) / 2);
+  x.drawImage(frame.canvas, ox, oy, dw, dh);
+  return { ox: ox, oy: oy, s: s };
+}
+function findAct(mod) {
+  if (!mod) return null;
+  if (mod.act !== undefined && mod.act !== null) return mod.act;
+  for (const k in mod) { const v = mod[k]; if (v && typeof v === 'object' && v.act !== undefined && v.act !== null) return v.act; }
+  return null;
+}
+function createAct(mod, opts) {
+  opts = opts || {};
+  const call = function (f, ctx, t, x, y, S) { return f(ctx, t, x, y, opts.w, opts.h, S); };
+  if (typeof mod === 'function') return { draw: function (ctx, t, x, y, S) { call(mod, ctx, t, x, y, S); } };
+  const a = findAct(mod);
+  if (typeof a === 'function') return { draw: function (ctx, t, x, y, S) { call(a, ctx, t, x, y, S); } };
+  if (a && a.poses) {
+    const poses = Array.isArray(a.poses) ? a.poses : Object.keys(a.poses).map(function (k) { const v = a.poses[k]; return typeof v === 'function' ? { name: k, draw: v } : Object.assign({ name: k }, v); });
+    if (poses.length) {
+      return {
+        draw: function (ctx, t, x, y, S) {
+          const want = S && S.action;
+          let p = poses.find(function (q) { return q && q.name === want; }) || poses[0];
+          const f = typeof p === 'function' ? p : (p.draw || p.fn || p.render);
+          if (typeof f !== 'function') throw new Error('pose has no draw function');
+          call(f, ctx, t, x, y, S);
+        }
+      };
+    }
+  }
+  if (a && typeof a.draw === 'function') return { draw: function (ctx, t, x, y, S) { call(a.draw.bind(a), ctx, t, x, y, S); } };
+  throw new Error('createAct: nothing to run (expected act.poses[] or a function)');
+}
+
+const RE_IMPORT_FROM = /^\s*import\b[\s\S]*?\bfrom\s*['"][^'"]*['"]\s*;?/gm;
+const RE_IMPORT_BARE = /^\s*import\s*['"][^'"]*['"]\s*;?/gm;
+function stripImports(code) { return code.replace(RE_IMPORT_FROM, '').replace(RE_IMPORT_BARE, ''); }
+function exportedNames(src) {
+  const names = ['createCompanion', 'createAct', 'act', 'arrowShot', 'draw'];
+  let m; const re = /export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/g;
+  while ((m = re.exec(src))) if (names.indexOf(m[1]) < 0) names.push(m[1]);
+  const re2 = /export\s*\{([^}]*)\}/g;
+  while ((m = re2.exec(src))) m[1].split(',').forEach(function (p) {
+    const q = p.trim().split(/\s+as\s+/)[0].trim(); if (q && /^[A-Za-z_$][\w$]*$/.test(q) && names.indexOf(q) < 0) names.push(q);
+  });
+  return names;
 }
 function compile(code) {
-  const t = code.trim();
+  const t = (code || '').trim();
   if (!t) throw new Error('Code is empty');
-  if (/^\s*import\s/m.test(t)) throw new Error('import is not supported - paste a single file');
-  const isExpr = /^(async\s+)?function\s*\(/.test(t) || /^\([^)]*\)\s*=>/.test(t) || /^[A-Za-z_$][\w$]*\s*=>/.test(t);
+  if (t.charAt(0) === '<') throw new Error('That looks like HTML, not JavaScript. Paste only the JS code (for example function(ctx,t,x,y){...}).');
+  const clean = stripImports(t);
+
+  /* ACT mode: code that uses createFrame, returns {frame, fx} */
+  if (/\bcreateFrame\b/.test(clean)) {
+    const body = clean.replace(/export\s+default/g, 'return').replace(/export\s+/g, '');
+    const out = new Function('createFrame', 'wrapForPx', 'createAct', 'composite', body)(createFrame, wrapForPx, createAct, composite);
+    if (!out || !out.frame || !out.frame.canvas) throw new Error('ACT mode: your code must  return { frame, fx }  where frame comes from createFrame(w,h)');
+    const fx = out.fx || out.draw;
+    if (typeof fx !== 'function') throw new Error('ACT mode: missing fx function in the returned object');
+    return { kind: 'actmode', frame: out.frame, fx: fx, raw: t };
+  }
+
+  /* simple function: function(ctx,t,x,y){...}  or  (ctx,t)=>{...} */
+  const isExpr = /^(async\s+)?function\s*\(/.test(clean) || /^\([^)]*\)\s*=>/.test(clean) || /^[A-Za-z_$][\w$]*\s*=>/.test(clean);
   if (isExpr) {
-    const e = t.replace(/;\s*$/, '');
+    const e = clean.replace(/;\s*$/, '');
     const fn = new Function('return (' + e + ')')();
     if (typeof fn !== 'function') throw new Error('That is not a function');
-    return { kind: 'fn', fn: fn, wrap: '(' + e + ')' };
+    return { kind: 'fn', fn: fn, expr: e, wrap: '(' + e + ')', raw: t };
   }
-  const body = stripExports(t);
-  const m = /function\s+([A-Za-z_$][\w$]*)\s*\(/.exec(body);
-  const o = new Function(body + '\n;return {d: typeof __default!=="undefined"?__default:null, cc: typeof createCompanion!=="undefined"?createCompanion:null, dr: typeof draw!=="undefined"?draw:null, first: ' + (m ? m[1] : 'null') + '};')();
-  if (o.d && typeof o.d.create === 'function') return { kind: 'sim', make: o.d.create, raw: t };
-  if (o.cc) return { kind: 'sim', make: o.cc, raw: t };
-  const fn = (o.d && typeof o.d.draw === 'function') ? o.d.draw : (o.dr || o.first);
-  if (typeof fn !== 'function') throw new Error('Define function(ctx,t,x,y){ ... }');
-  const nm = o.dr ? 'draw' : (m ? m[1] : 'draw');
-  return { kind: 'fn', fn: fn, wrap: '(()=>{' + body + '\nreturn ' + nm + ';})()' };
+
+  /* module style: export default / export function createCompanion / createAct / arrowShot.act / Lumi */
+  const body = clean.replace(/^\s*export\s+default\s+/m, 'const __default = ').replace(/^\s*export\s+(?=(async\s+)?(function|const|let|var|class)\b)/gm, '').replace(/^\s*export\s*\{[^}]*\}\s*;?/gm, '');
+  const first = /function\s+([A-Za-z_$][\w$]*)\s*\(/.exec(body);
+  const names = exportedNames(clean);
+  const grab = names.map(function (n) { return JSON.stringify(n) + ': typeof ' + n + ' !== "undefined" ? ' + n + ' : undefined'; }).join(', ');
+  const ex = new Function('createFrame', 'wrapForPx', 'createAct', 'composite',
+    body + '\n;return { __default: typeof __default !== "undefined" ? __default : undefined, __first: ' + (first ? first[1] : 'undefined') + ', ' + grab + ' };')(createFrame, wrapForPx, createAct, composite);
+  const d = ex.__default;
+  if (d && typeof d.create === 'function') return { kind: 'sim', make: d.create, raw: t };
+  if (typeof ex.createCompanion === 'function') return { kind: 'sim', make: ex.createCompanion, raw: t };
+  if (typeof d === 'function') return { kind: 'fn', fn: d, raw: t };
+  let act = null;
+  try { act = findAct(ex) || findAct(d); } catch (e) { act = null; }
+  if (act) { const a = createAct(ex.act !== undefined ? ex : (d && d.act !== undefined ? d : ex)); return { kind: 'fn', fn: function (ctx, tt, x, y, W, H, S) { a.draw(ctx, tt, x, y, S); }, raw: t }; }
+  if (d && typeof d.draw === 'function') return { kind: 'fn', fn: d.draw.bind(d), raw: t };
+  const fn = ex.draw || ex.__first;
+  if (typeof fn === 'function') return { kind: 'fn', fn: fn, raw: t };
+  throw new Error('Nothing to run. Use function(ctx,t,x,y){...}, createCompanion(), createAct() or arrowShot.act');
 }
-function makeRunner(code) {
-  const c = compile(code);
-  c.sim = null; c.broken = false;
-  return c;
+function makeRunner(code) { const c = compile(code); c.sim = null; c.broken = false; return c; }
+
+/* one animation tick -> draws into frame.canvas */
+function drawArtFit(ctx, art, fw, fh) {
+  if (!art || !art.width) return;
+  let s = Math.floor(Math.min(fw / art.width, fh / art.height)); if (s < 1) s = 1;
+  ctx.drawImage(art, Math.floor((fw - art.width * s) / 2), Math.floor((fh - art.height * s) / 2), art.width * s, art.height * s);
 }
-function renderFrame(r, ctx, cv, t, dt, ptr, S, art, showArt, scrub) {
+function runFrame(r, frame, t, dt, ptr, S, art, showArt, scrub, ps) {
+  const ctx = wrapForPx(frame.ctx, ps || 3);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.clearRect(0, 0, frame.w, frame.h);
   ctx.imageSmoothingEnabled = false;
-  ctx.px = function (x, y, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1); };
-  ctx.r = function (x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); };
   ctx.art = art;
-  if (showArt && art) ctx.drawImage(art, 0, 0);
+  ctx.drawArt = function (x, y, s) { if (art) ctx.drawImage(art, x, y, art.width * (s || 1), art.height * (s || 1)); };
+  if (showArt) drawArtFit(ctx, art, frame.w, frame.h);
   if (r.kind === 'sim') {
-    if (!r.sim || scrub) { r.sim = r.make({ seed: 7 }); if (scrub) { r.sim.step && r.sim.step(t); } }
-    else r.sim.step && r.sim.step(dt);
-    if (r.sim.w && r.sim.h && (cv.width !== r.sim.w || cv.height !== r.sim.h)) { cv.width = r.sim.w; cv.height = r.sim.h; ctx.imageSmoothingEnabled = false; }
+    if (!r.sim || scrub) { r.sim = r.make({ seed: 7 }); if (scrub && r.sim.step) r.sim.step(t); }
+    else if (r.sim.step) r.sim.step(dt);
     r.sim.draw(ctx, S);
+  } else if (r.kind === 'actmode') {
+    r.fx(ctx, t, ptr.x, ptr.y, S, frame);
   } else {
-    r.fn(ctx, t, ptr.x, ptr.y, cv.width, cv.height, S);
+    r.fn(ctx, t, ptr.x, ptr.y, frame.w, frame.h, S);
   }
+}
+function frameSizeFor(r) {
+  if (r.kind === 'actmode') return [r.frame.w, r.frame.h];
+  if (r.kind === 'sim') { if (!r.sim) r.sim = r.make({ seed: 7 }); if (r.sim.w > 0 && r.sim.h > 0) return [r.sim.w, r.sim.h]; }
+  return [128, 128];
 }
 function loadImg(src) {
   return new Promise(function (res) { const i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; });
@@ -212,7 +335,7 @@ function loadImg(src) {
 /* ================= IN-APP OVERLAY RUNNER (#run) ================= */
 if (RUN) {
   document.documentElement.classList.add('run');
-  let M = null, R = null, art = null, ctx2 = null, cv = $('#runCv'), t0 = performance.now(), last = performance.now();
+  let M = null, R = null, art = null, frame = null, cv = $('#runCv'), t0 = performance.now(), last = performance.now();
   const S = { action: 'idle', facing: true, talking: false, mood: 'neutral' };
   function fit() {
     if (!M) return;
@@ -224,10 +347,13 @@ if (RUN) {
   window.PX_S = function (a, f, tk) { S.action = a; S.facing = f; S.talking = tk; cv.style.transform = f ? 'none' : 'scaleX(-1)'; };
   window.PX_RUN = async function (js) {
     M = JSON.parse(js);
-    cv.width = M.w || 64; cv.height = M.h || 64;
-    ctx2 = cv.getContext('2d');
     if (M.art) art = await loadImg(M.art);
-    try { R = makeRunner(M.code); } catch (e) { R = null; }
+    try {
+      R = makeRunner(M.code);
+      const sz = (M.w > 0 && M.h > 0) ? [M.w, M.h] : frameSizeFor(R);
+      frame = R.kind === 'actmode' ? R.frame : createFrame(sz[0], sz[1]);
+    } catch (e) { R = null; frame = createFrame(M.w || 64, M.h || 64); }
+    cv.width = frame.w; cv.height = frame.h;
     fit();
     requestAnimationFrame(loop);
   };
@@ -236,8 +362,12 @@ if (RUN) {
     if (R && !R.broken) {
       let t = (now - t0) / 1000;
       if (M.loop > 0) t = t % M.loop;
-      try { renderFrame(R, ctx2, cv, t, dt, { x: cv.width / 2, y: cv.height / 2 }, S, art, M.base, false); fit(); }
-      catch (e) { R.broken = true; ctx2.clearRect(0, 0, cv.width, cv.height); ctx2.fillStyle = '#f33'; ctx2.fillRect(1, 1, 3, 3); }
+      try {
+        runFrame(R, frame, t, dt, { x: frame.w / 2, y: frame.h / 2 }, S, art, M.base, false, M.ps || 1);
+        const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(frame.canvas, 0, 0);
+      } catch (e) {
+        R.broken = true; const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.fillStyle = '#f33'; x.fillRect(1, 1, 3, 3);
+      }
     }
     requestAnimationFrame(loop);
   }
@@ -245,10 +375,12 @@ if (RUN) {
 
 /* ================= STUDIO UI ================= */
 if (!RUN) {
-  let W = 32, H = 32, zoom = 8, cur = 0, tool = 'pencil', color = '#ff4d6d', mirror = false, tab = 'import';
-  const F = [mk(W, H), mk(W, H)];
+  let W = 32, H = 32, zoom = 8, cur = 0, tool = 'pencil', color = '#ff4d6d', mirror = false, tab = 'art';
+  const F = [mkCanvas(W, H), mkCanvas(W, H)];
   let undo = [], redo = [];
-  function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  const preview = $('#preview');
+  let comp = { ox: 0, oy: 0, s: 1 };
+  function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   function ctxOf(i) { return F[i].getContext('2d'); }
   function isEmpty(c) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return false; return true; }
   function toast(m) { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = 'none'; }, 2200); }
@@ -289,27 +421,35 @@ if (!RUN) {
     a.href = dataUrl || URL.createObjectURL(new Blob([text], { type: mime }));
     a.download = name; document.body.appendChild(a); a.click(); a.remove();
   }
-  function exportPng(canvas, scale, name) {
-    const o = mk(canvas.width * scale, canvas.height * scale), x = o.getContext('2d');
+  function exportCanvasPng(canvas, scale, name) {
+    const o = mkCanvas(canvas.width * scale, canvas.height * scale), x = o.getContext('2d');
     x.imageSmoothingEnabled = false; x.drawImage(canvas, 0, 0, o.width, o.height);
     download(name + '.png', 'image/png', null, o.toDataURL('image/png'));
   }
-  function effectModule(code, loop, name) {
+  function effectModule(code, loop, name, fw, fh) {
     const c = compile(code);
-    if (c.kind === 'sim') return c.raw;
+    if (c.kind === 'sim' || c.kind === 'actmode') return c.raw;
+    if (c.expr) return '// Pixel Studio effect: ' + name + '\n// Put this file in src/fx/custom/\nexport default ' + c.expr + ';\n';
     return '// Pixel Studio effect: ' + name + '\n// Put this file in src/fx/custom/\n' +
-      'export const LOOP = ' + loop + ';\nexport const W = ' + W + ', H = ' + H + ';\n\n' +
-      'const fx = ' + c.wrap + ';\n\n' +
+      'export const LOOP = ' + loop + ';\nexport const W = ' + fw + ', H = ' + fh + ';\n\n' +
+      'const fx = ' + (c.wrap || 'null') + ';\n\n' +
       'export function createCompanion(opts = {}) {\n  const state = { t: 0, action: "idle" };\n  return {\n    w: W, h: H, state,\n' +
       '    step(dt) { state.t = (state.t + dt) % LOOP; },\n' +
       '    draw(ctx, S, ptr = { x: W / 2, y: H / 2 }) {\n      ctx.clearRect(0, 0, W, H);\n      fx(ctx, state.t, ptr.x, ptr.y, W, H, S || { action: state.action, facing: true, talking: false });\n    },\n' +
       '    poke() {}\n  };\n}\n\nexport default { name: "custom/' + slugify(name) + '", w: W, h: H, loop: LOOP, create: createCompanion };\n';
   }
+  function sim_wrapModule(code, loop, name, fw, fh) {   // sim-style wrapper for the ANIM "Save effect" button
+    const c = compile(code);
+    if (c.kind === 'sim' || c.kind === 'actmode') return c.raw;
+    const w = c.wrap || (c.expr ? '(' + c.expr + ')' : null);
+    if (!w) return c.raw;
+    return effectModule('function(){}', loop, name, fw, fh).replace('(function(){})', w);
+  }
 
   /* ---- pixel editor ---- */
   function resizeFrames(n) {
     for (let i = 0; i < 2; i++) {
-      const o = mk(n, n), x = o.getContext('2d'); x.imageSmoothingEnabled = false;
+      const o = mkCanvas(n, n), x = o.getContext('2d'); x.imageSmoothingEnabled = false;
       x.drawImage(F[i], 0, 0, n, n); F[i] = o;
     }
     W = H = n; undo = []; redo = [];
@@ -328,6 +468,7 @@ if (!RUN) {
     $('#mirrorBtn').classList.toggle('on', mirror);
     $$('#tabs [data-tab]').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     $$('.tabpane').forEach(function (p) { p.classList.toggle('on', p.id === 't-' + tab); });
+    $('#error').textContent = P[which()].err;
   }
   function snap() { undo.push([cur, ctxOf(cur).getImageData(0, 0, W, H)]); if (undo.length > 40) undo.shift(); redo = []; }
   function doUndo() { const u = undo.pop(); if (!u) return; redo.push([u[0], ctxOf(u[0]).getImageData(0, 0, W, H)]); ctxOf(u[0]).putImageData(u[1], 0, 0); cur = u[0]; renderGrid(); setUI(); }
@@ -372,6 +513,18 @@ if (!RUN) {
     });
   }
   const DEFAULT_PAL = ['#000000', '#ffffff', '#ff4d6d', '#ff9f1c', '#ffd166', '#06d6a0', '#118ab2', '#7b5cff', '#8d5524', '#f1c27d', '#3a2f7a', '#9aa0b4', '#e63946', '#1d3557', '#a8dadc', '#2b2d42'];
+  function presetArt() {
+    const x = ctxOf(cur), k = W / 32;
+    x.clearRect(0, 0, W, H);
+    function R(a, b, c, d, col) { x.fillStyle = col; x.fillRect(Math.round(a * k), Math.round(b * k), Math.round(c * k), Math.round(d * k)); }
+    for (let y = 6; y <= 27; y++) {
+      const dy = (y - 18) / 12;
+      const hw = y <= 18 ? Math.round(11 * Math.sqrt(Math.max(0, 1 - dy * dy))) : 11 - Math.round((y - 18) * 0.15);
+      R(16 - hw, y, hw * 2, 1, y < 12 ? '#7be0ff' : (y < 19 ? '#58b8ff' : '#7c8cff'));
+    }
+    R(11, 16, 3, 4, '#150f33'); R(18, 16, 3, 4, '#150f33'); R(12, 16, 1, 1, '#ffffff'); R(19, 16, 1, 1, '#ffffff');
+    R(14, 22, 4, 1, '#150f33'); R(8, 27, 5, 2, '#5a5ad8'); R(19, 27, 5, 2, '#5a5ad8'); R(9, 10, 3, 1, '#e9fbff');
+  }
 
   /* ---- image import: downscale + median-cut quantize ---- */
   function quantize(d, k) {
@@ -410,7 +563,7 @@ if (!RUN) {
     const n = +$('#impSize').value, k = +$('#impColors').value, fit = $('#impFit').value;
     if (n !== W) { resizeFrames(n); }
     snap();
-    const tmp = mk(n, n), tx = tmp.getContext('2d');
+    const tmp = mkCanvas(n, n), tx = tmp.getContext('2d');
     tx.imageSmoothingEnabled = true; tx.imageSmoothingQuality = 'high';
     const s = fit === 'cover' ? Math.max(n / img.width, n / img.height) : Math.min(n / img.width, n / img.height);
     const dw = img.width * s, dh = img.height * s;
@@ -422,66 +575,83 @@ if (!RUN) {
     toast('Converted to ' + n + 'x' + n);
   }
 
-  /* ---- live code previews ---- */
-  const DEF_CODE = 'function(ctx,t,x,y){\n  // t = seconds, x,y = pointer, ctx.art = your grid drawing\n  const bob = Math.sin(t*3)*1.5;\n  ctx.drawImage(ctx.art, 0, Math.round(bob));\n  ctx.px(x, y, "#ffd166");   // follows your finger\n}\n';
-  const DEF_ANIM = 'function(ctx,t,x,y,W,H,S){\n  const ph=(t%4)/4, br=Math.sin(ph*Math.PI*2);\n  const cx=W/2, base=H-4, rw=9+br*0.8, rh=8-br*0.8;\n  for(let yy=-Math.round(rh); yy<=0; yy++){\n    const w=Math.round(rw*Math.sqrt(1-(yy/rh)*(yy/rh)));\n    ctx.r(cx-w, base+yy, w*2, 1, yy<-rh*0.5 ? "#7be0ff" : "#58b8ff");\n  }\n  const blink = ph>0.7 && ph<0.74;\n  ctx.r(cx-4, base-6, 2, blink?1:3, "#150f33");\n  ctx.r(cx+2, base-6, 2, blink?1:3, "#150f33");\n  if (S.action==="wave") ctx.r(cx+rw, base-8+Math.sin(t*9)*2, 2, 5, "#58b8ff");\n}\n';
+  /* ---- runner state + preview loop ---- */
+  const EXAMPLE = 'function(ctx,t,x,y){\n  // buffer 128x128 | ctx.px = 3x3 block | ctx.r = raw rect | ctx.drawArt(x,y,scale) = your ART tab\n  const bob = Math.round(Math.sin(t*3)*2);\n  ctx.drawArt(16, 16+bob, 3);\n  ctx.px(Math.floor(x/3), Math.floor(y/3), "#ffd166");   // follows your finger\n}\n';
+  const DEF_ANIM = 'function(ctx,t,x,y,W,H,S){\n  const ph=(t%4)/4, br=Math.sin(ph*Math.PI*2);\n  const cx=21, base=36, rw=9+br*0.8, rh=8-br*0.8;\n  for(let yy=-Math.round(rh); yy<=0; yy++){\n    const w=Math.round(rw*Math.sqrt(1-(yy/rh)*(yy/rh)));\n    for(let xx=-w; xx<w; xx++) ctx.px(cx+xx, base+yy, yy<-rh*0.5 ? "#7be0ff" : "#58b8ff");\n  }\n  const blink = ph>0.7 && ph<0.74, n = blink ? 1 : 3;\n  for(let k=0;k<n;k++){ ctx.px(cx-4, base-6+k, "#150f33"); ctx.px(cx+3, base-6+k, "#150f33"); }\n  if (S.action==="wave") for(let k=0;k<5;k++) ctx.px(cx+rw+1, base-8+k+Math.round(Math.sin(t*9)*2), "#58b8ff");\n}\n';
   const P = {
-    code: { r: null, err: '', t0: performance.now(), ptr: { x: 16, y: 16 }, tm: 0 },
-    anim: { r: null, err: '', t: 0, play: true, ptr: { x: 16, y: 16 }, tm: 0 }
+    code: { r: null, frame: null, err: '', t0: performance.now(), ptr: { x: 64, y: 64 }, tm: 0 },
+    anim: { r: null, frame: null, err: '', t: 0, play: true, ptr: { x: 64, y: 64 }, tm: 0 }
   };
-  function setErr(which, msg) { P[which].err = msg; $(which === 'code' ? '#codeErr' : '#animErr').textContent = msg; }
-  function rebuild(which) {
-    const ta = $(which === 'code' ? '#codeTa' : '#animTa');
-    try { P[which].r = makeRunner(ta.value); setErr(which, ''); P[which].t0 = performance.now(); if (which === 'anim') P.anim.t = 0; }
-    catch (e) { P[which].r = null; setErr(which, String(e.message || e)); }
+  function which() { return tab === 'anim' ? 'anim' : 'code'; }
+  function setErr(w, msg) { P[w].err = msg; if (which() === w) $('#error').textContent = msg; }
+  function textOf(w) { return $(w === 'code' ? '#codeTa' : '#animTa').value; }
+  function rebuild(w) {
+    const txt = textOf(w);
+    P[w].frame = null;
+    if (!txt.trim()) { P[w].r = null; setErr(w, ''); saveDraft(); return; }
+    try {
+      const r = makeRunner(txt);
+      const sz = frameSizeFor(r);
+      P[w].frame = r.kind === 'actmode' ? r.frame : createFrame(sz[0], sz[1]);
+      P[w].r = r; setErr(w, ''); P[w].t0 = performance.now(); if (w === 'anim') P.anim.t = 0;
+    } catch (e) { P[w].r = null; setErr(w, String(e && e.message ? e.message : e)); }
     saveDraft();
   }
-  function schedule(which) { clearTimeout(P[which].tm); P[which].tm = setTimeout(function () { rebuild(which); }, 300); }
+  function schedule(w) { clearTimeout(P[w].tm); P[w].tm = setTimeout(function () { rebuild(w); }, 350); }
+  function currentFrame() { const w = which(); return P[w].r && P[w].frame ? P[w].frame : null; }
   let last = performance.now();
-  function frame(now) {
+  function tick(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const w = which(), pw = P[w];
     const S = { action: $('#actSel').value, facing: true, talking: false, mood: 'neutral' };
-    if (tab === 'code' && P.code.r && !P.code.r.broken) {
-      const cv = $('#liveC'); setLive(cv);
-      try { renderFrame(P.code.r, cv.getContext('2d'), cv, (now - P.code.t0) / 1000, dt, P.code.ptr, S, F[0], $('#showArt').checked, false); }
-      catch (e) { P.code.r.broken = true; setErr('code', String(e.message || e)); }
+    const art = F[0];
+    if (pw.r && pw.frame && !pw.r.broken) {
+      let t, scrub = false;
+      if (w === 'anim') {
+        const loop = Math.max(1, +$('#loopIn').value || 6), sc = $('#scrub');
+        if (pw.play) { pw.t = (pw.t + dt) % loop; sc.value = Math.round(pw.t * 100); } else { pw.t = (+sc.value) / 100; scrub = true; }
+        t = pw.t;
+      } else t = (now - pw.t0) / 1000;
+      $('#tLabel').textContent = t.toFixed(2) + 's';
+      try {
+        runFrame(pw.r, pw.frame, t, dt, pw.ptr, S, art, w === 'code' ? $('#showArt').checked : false, scrub, 3);
+        comp = composite(pw.frame, preview);
+      } catch (e) { pw.r.broken = true; setErr(w, String(e && e.message ? e.message : e)); }
+    } else {
+      /* nothing running: show the ART frame */
+      const fr = createFrame(W, H); fr.ctx.drawImage(F[cur], 0, 0);
+      comp = composite(fr, preview);
+      $('#tLabel').textContent = '';
     }
-    if (tab === 'anim' && P.anim.r && !P.anim.r.broken) {
-      const cv = $('#liveA'); setLive(cv);
-      const loop = Math.max(1, +$('#loopIn').value || 6), sc = $('#scrub');
-      let scrub = false;
-      if (P.anim.play) { P.anim.t = (P.anim.t + dt) % loop; sc.value = Math.round(P.anim.t * 100); }
-      else { P.anim.t = (+sc.value) / 100; scrub = true; }
-      $('#tLabel').textContent = P.anim.t.toFixed(2) + 's';
-      try { renderFrame(P.anim.r, cv.getContext('2d'), cv, P.anim.t, dt, P.anim.ptr, S, F[0], true, scrub); }
-      catch (e) { P.anim.r.broken = true; setErr('anim', String(e.message || e)); }
+    requestAnimationFrame(tick);
+  }
+  function bindPtr() {
+    function mv(e) {
+      const r = preview.getBoundingClientRect(), pw = P[which()];
+      const px = (e.clientX - r.left) / r.width * preview.width, py = (e.clientY - r.top) / r.height * preview.height;
+      pw.ptr = { x: Math.floor((px - comp.ox) / comp.s), y: Math.floor((py - comp.oy) / comp.s) };
     }
-    requestAnimationFrame(frame);
-  }
-  function setLive(cv) {
-    if (cv.width !== W && !(P.code.r && P.code.r.sim) && !(P.anim.r && P.anim.r.sim)) { cv.width = W; cv.height = H; }
-    const target = Math.min(320, Math.floor(Math.min(innerWidth - 40, 320) / cv.width) * cv.width) || 256;
-    cv.style.width = target + 'px'; cv.style.height = (target * cv.height / cv.width) + 'px';
-  }
-  function bindPtr(el, which) {
-    function mv(e) { const r = el.getBoundingClientRect(); P[which].ptr = { x: Math.floor((e.clientX - r.left) / r.width * el.width), y: Math.floor((e.clientY - r.top) / r.height * el.height) }; }
-    el.addEventListener('pointerdown', mv); el.addEventListener('pointermove', mv);
+    preview.addEventListener('pointerdown', mv); preview.addEventListener('pointermove', mv);
   }
 
   /* ---- library ---- */
   function currentLoop() { return Math.max(1, +$('#loopIn').value || 6); }
+  function theName(fallback) { return ($('#fxName').value || fallback || '').trim(); }
   async function saveMascot(kind) {
-    const name = ($('#mName').value || (kind === 'code' ? $('#codeName').value : kind === 'anim' ? $('#animName').value : '')).trim();
-    if (!name) { toast('Give it a name first'); return ''; }
+    const name = theName();
+    if (!name) { toast('Give it a name first (name box)'); return ''; }
     const o = { name: name, type: kind === 'pixel' ? 'pixel' : 'code', src: kind, w: W, h: H, created: Date.now() };
     if (kind === 'pixel') {
       if (isEmpty(F[0])) { toast('Frame 1 is empty'); return ''; }
       o.f1 = F[0].toDataURL(); o.f2 = isEmpty(F[1]) ? '' : F[1].toDataURL();
     } else {
-      const code = $(kind === 'code' ? '#codeTa' : '#animTa').value;
-      try { compile(code); } catch (e) { toast('Fix the code first: ' + (e.message || e)); return ''; }
+      const w = kind === 'code' ? 'code' : 'anim', code = textOf(w);
+      if (!code.trim()) { toast('That code box is empty'); return ''; }
+      if (!P[w].r || !P[w].frame) { rebuild(w); }
+      if (!P[w].r || !P[w].frame) { toast('Fix the code first: ' + P[w].err); return ''; }
       o.code = code; o.loop = kind === 'anim' ? currentLoop() : 0;
-      o.art = isEmpty(F[0]) ? '' : F[0].toDataURL(); o.base = kind === 'code' ? $('#showArt').checked : true;
+      o.w = P[w].frame.w; o.h = P[w].frame.h; o.ps = 3;
+      o.art = isEmpty(F[0]) ? '' : F[0].toDataURL(); o.base = kind === 'code' ? $('#showArt').checked : false;
     }
     const slug = Store.save(o);
     if (slug) { toast('Saved "' + name + '"'); renderLib(); }
@@ -489,15 +659,15 @@ if (!RUN) {
   }
   async function loadMascot(slug) {
     const o = Store.get(slug); if (!o) { toast('Could not load'); return; }
-    $('#mName').value = o.name;
+    $('#fxName').value = o.name;
     if (o.type === 'pixel') {
       const n = o.w || 32; if (n !== W) resizeFrames(n);
       for (let i = 0; i < 2; i++) { ctxOf(i).clearRect(0, 0, W, H); const im = o['f' + (i + 1)] ? await loadImg(o['f' + (i + 1)]) : null; if (im) ctxOf(i).drawImage(im, 0, 0); }
-      cur = 0; tab = 'import'; renderGrid(); setUI();
+      cur = 0; tab = 'art'; renderGrid(); setUI();
     } else {
-      if (o.art) { const im = await loadImg(o.art); if (im) { if ((o.w || W) !== W) resizeFrames(o.w || W); ctxOf(0).clearRect(0, 0, W, H); ctxOf(0).drawImage(im, 0, 0); } }
-      if (o.src === 'anim' || o.loop > 0) { $('#animTa').value = o.code; $('#loopIn').value = o.loop || 6; $('#animName').value = o.name; tab = 'anim'; rebuild('anim'); }
-      else { $('#codeTa').value = o.code; $('#codeName').value = o.name; $('#showArt').checked = !!o.base; tab = 'code'; rebuild('code'); }
+      if (o.art) { const im = await loadImg(o.art); if (im) { const n = im.width; if (n !== W && (n === 32 || n === 64)) resizeFrames(n); ctxOf(0).clearRect(0, 0, W, H); ctxOf(0).drawImage(im, 0, 0); } }
+      if (o.src === 'anim' || o.loop > 0) { $('#animTa').value = o.code; $('#loopIn').value = o.loop || 6; tab = 'anim'; rebuild('anim'); }
+      else { $('#codeTa').value = o.code; $('#showArt').checked = !!o.base; tab = 'code'; rebuild('code'); }
       renderGrid(); setUI();
     }
     toast('Loaded "' + o.name + '"');
@@ -524,8 +694,8 @@ if (!RUN) {
   /* ---- drafts ---- */
   function saveDraft() {
     try {
-      localStorage.setItem('pxs_draft', JSON.stringify({
-        code: $('#codeTa').value, anim: $('#animTa').value, loop: $('#loopIn').value, n: W,
+      localStorage.setItem('pxs_draft2', JSON.stringify({
+        code: $('#codeTa').value, anim: $('#animTa').value, imp: $('#impTa').value, loop: $('#loopIn').value, n: W, name: $('#fxName').value,
         f1: F[0].toDataURL(), f2: F[1].toDataURL(), show: $('#showArt').checked
       }));
     } catch (e) { }
@@ -536,18 +706,22 @@ if (!RUN) {
   async function init() {
     $('#mode').textContent = hasApp ? 'in Hina' : 'browser';
     if (hasApp) $('#back').style.display = 'inline';
-    $('#codeTa').value = DEF_CODE; $('#animTa').value = DEF_ANIM;
+    $('#animTa').value = DEF_ANIM;
+    let hadDraft = false;
     try {
-      const d = JSON.parse(localStorage.getItem('pxs_draft') || 'null');
+      const d = JSON.parse(localStorage.getItem('pxs_draft2') || 'null');
       if (d) {
+        hadDraft = true;
         if (d.n && d.n !== W) resizeFrames(d.n);
-        $('#codeTa').value = d.code || DEF_CODE; $('#animTa').value = d.anim || DEF_ANIM; $('#loopIn').value = d.loop || 6; $('#showArt').checked = !!d.show;
+        $('#codeTa').value = d.code || ''; $('#animTa').value = d.anim || DEF_ANIM; $('#impTa').value = d.imp || '';
+        $('#loopIn').value = d.loop || 6; $('#showArt').checked = !!d.show; $('#fxName').value = d.name || '';
         $('#impSize').value = String(W);
         for (let i = 0; i < 2; i++) { const u = i ? d.f2 : d.f1; if (u) { const im = await loadImg(u); if (im) ctxOf(i).drawImage(im, 0, 0); } }
       }
     } catch (e) { }
+    if (!hadDraft || isEmpty(F[0])) presetArt();
     setPalette(DEFAULT_PAL);
-    renderGrid(); setUI(); renderLib(); rebuild('code'); rebuild('anim');
+    renderGrid(); renderLib(); rebuild('code'); rebuild('anim'); setUI();
     $$('#tabs [data-tab]').forEach(function (b) { b.onclick = function () { tab = b.dataset.tab; setUI(); if (tab === 'lib') renderLib(); }; });
     $$('[data-tool]').forEach(function (b) { b.onclick = function () { tool = b.dataset.tool; setUI(); }; });
     $$('[data-frame]').forEach(function (b) { b.onclick = function () { cur = +b.dataset.frame; renderGrid(); setUI(); }; });
@@ -556,12 +730,11 @@ if (!RUN) {
     $('#undoBtn').onclick = doUndo; $('#redoBtn').onclick = doRedo;
     $('#clearBtn').onclick = function () { snap(); ctxOf(cur).clearRect(0, 0, W, H); renderGrid(); draftSoon(); };
     $('#copy12').onclick = function () { snap(); ctxOf(1).clearRect(0, 0, W, H); ctxOf(1).drawImage(F[0], 0, 0); cur = 1; renderGrid(); setUI(); draftSoon(); };
+    $('#presetBtn').onclick = function () { snap(); presetArt(); renderGrid(); draftSoon(); toast('Preset mascot drawn'); };
     $('#zoomSel').onchange = function (e) { zoom = +e.target.value; renderGrid(); };
     $('#impFile').onchange = function (e) { if (e.target.files[0]) convert(e.target.files[0]).then(draftSoon); e.target.value = ''; };
     $('#impGo').onclick = function () { $('#impFile').click(); };
     $('#impSize').onchange = function (e) { const n = +e.target.value; if (n !== W) { resizeFrames(n); renderGrid(); draftSoon(); } };
-    $('#expArt1').onclick = function () { exportPng(F[cur], 1, 'pixel-art'); };
-    $('#expArt8').onclick = function () { exportPng(F[cur], 8, 'pixel-art-x8'); };
     let down = false;
     const g = $('#grid');
     g.addEventListener('pointerdown', function (e) {
@@ -574,25 +747,51 @@ if (!RUN) {
     g.addEventListener('pointermove', function (e) { if (!down) return; const c = cell(e); paint(c[0], c[1]); renderGrid(); });
     const up = function () { if (down) { down = false; draftSoon(); } };
     g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+
     $('#codeTa').addEventListener('input', function () { schedule('code'); });
     $('#animTa').addEventListener('input', function () { schedule('anim'); });
-    $('#showArt').onchange = draftSoon; $('#loopIn').onchange = function () { $('#scrub').max = currentLoop() * 100; draftSoon(); };
+    $('#impTa').addEventListener('input', draftSoon);
+    $('#fxName').addEventListener('input', draftSoon);
+    $('#exampleBtn').onclick = function () { $('#codeTa').value = EXAMPLE; rebuild('code'); };
+    $('#showArt').onchange = draftSoon;
+    $('#loopIn').onchange = function () { $('#scrub').max = currentLoop() * 100; draftSoon(); };
     $('#scrub').max = currentLoop() * 100;
     $('#playBtn').onclick = function () { P.anim.play = !P.anim.play; $('#playBtn').textContent = P.anim.play ? 'Pause' : 'Play'; };
     $('#scrub').addEventListener('input', function () { P.anim.play = false; $('#playBtn').textContent = 'Play'; });
-    bindPtr($('#liveC'), 'code'); bindPtr($('#liveA'), 'anim');
-    $('#codeSave').onclick = async function () {
-      const n = $('#codeName').value.trim(); if (!n) { toast('Give it a name first'); return; }
-      $('#mName').value = n; const s = await saveMascot('code'); if (!s) return;
-      download(slugify(n) + '.js', 'text/javascript', effectModule($('#codeTa').value, 6, n));
+    bindPtr();
+
+    $('#impLoad').onclick = function () {
+      const txt = $('#impTa').value;
+      if (!txt.trim()) { setErr('code', 'Paste some JavaScript first.'); tab = 'code'; setUI(); return; }
+      $('#codeTa').value = txt; tab = 'code'; rebuild('code'); setUI();
+    };
+    $('#jsFile').onchange = function (e) {
+      const f = e.target.files[0]; if (!f) return;
+      const rd = new FileReader(); rd.onload = function () { $('#impTa').value = String(rd.result); draftSoon(); }; rd.readAsText(f); e.target.value = '';
+    };
+
+    /* top action bar */
+    $('#runBtn').onclick = function () { const w = which(); P[w].r && (P[w].r.broken = false); rebuild(w); setUI(); };
+    $('#pngBtn').onclick = function () {
+      const fr = currentFrame();
+      if (fr) exportCanvasPng(fr.canvas, 4, (theName('frame') || 'frame').replace(/\s+/g, '-'));
+      else exportCanvasPng(F[cur], 8, (theName('pixel-art') || 'pixel-art').replace(/\s+/g, '-'));
+    };
+    $('#jsBtn').onclick = function () {
+      const w = which(), name = theName('effect');
+      try {
+        const fr = P[w].frame, txt = textOf(w);
+        if (!txt.trim()) { setErr(w, 'Nothing to export - the code box is empty.'); return; }
+        download(slugify(name) + '.js', 'text/javascript', effectModule(txt, currentLoop(), name, fr ? fr.w : 128, fr ? fr.h : 128));
+        toast('Exported ' + slugify(name) + '.js - put it in src/fx/custom/');
+      } catch (e) { setErr(w, String(e && e.message ? e.message : e)); }
     };
     $('#animSave').onclick = async function () {
-      const n = $('#animName').value.trim(); if (!n) { toast('Give it a name first'); return; }
-      $('#mName').value = n; const s = await saveMascot('anim'); if (!s) return;
-      download(slugify(n) + '.js', 'text/javascript', effectModule($('#animTa').value, currentLoop(), n));
+      const name = theName('effect');
+      if (!theName()) { toast('Give it a name first (name box)'); return; }
+      const s = await saveMascot('anim'); if (!s) return;
+      try { const fr = P.anim.frame; download(slugify(name) + '.js', 'text/javascript', sim_wrapModule($('#animTa').value, currentLoop(), name, fr ? fr.w : 128, fr ? fr.h : 128)); } catch (e) { setErr('anim', String(e && e.message ? e.message : e)); }
     };
-    $('#codePng').onclick = function () { exportPng($('#liveC'), 8, 'frame'); };
-    $('#animPng').onclick = function () { exportPng($('#liveA'), 8, 'frame'); };
     $('#saveMascotPx').onclick = function () { saveMascot('pixel'); };
     $('#saveMascotCode').onclick = function () { saveMascot('code'); };
     $('#saveMascotAnim').onclick = function () { saveMascot('anim'); };
@@ -602,8 +801,8 @@ if (!RUN) {
       rd.onload = function () { try { const o = JSON.parse(rd.result); if (!o.name) throw 0; Store.save(o); renderLib(); toast('Restored ' + o.name); } catch (x) { toast('Not a mascot file'); } };
       rd.readAsText(f); e.target.value = '';
     };
-    requestAnimationFrame(frame);
-    window.__studio = { F: F, compile: compile, effectModule: effectModule, get W() { return W; }, Store: Store, saveMascot: saveMascot };
+    requestAnimationFrame(tick);
+    window.__studio = { F: F, compile: compile, createFrame: createFrame, createAct: createAct, composite: composite, wrapForPx: wrapForPx, effectModule: effectModule, Store: Store, saveMascot: saveMascot, P: P, setTab: function (t) { tab = t; setUI(); } };
   }
   init();
 }
