@@ -69,7 +69,7 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
 
     init {
         setWillNotDraw(false)
-        pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); else -> null }
+        pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); "custom" -> Custom(ctx).takeIf { it.ok() }; else -> null }
         if (has3d(ctx)) {
             val g = GlView(ctx, this, modelFile(ctx))
             gl = g

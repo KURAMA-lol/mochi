@@ -1,14 +1,18 @@
 package com.sahil.chibi
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import java.io.File
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Tiny pixel-art painter: every call draws one crisp rectangle in logical pixels. */
-class Px(private val c: Canvas) {
+class Px(val c: Canvas) {
     private val p = Paint().apply { isAntiAlias = false; isFilterBitmap = false }
     fun r(x: Int, y: Int, w: Int, h: Int, col: Int) {
         p.color = col
@@ -273,5 +277,42 @@ class Webb : PixelChar() {
         if (sleeping && ((t * 1.5f).toInt() % 2 == 0)) {
             g.r(bx + 9, by - 12, 3, 1, hi); g.r(bx + 10, by - 11, 1, 1, hi); g.r(bx + 9, by - 10, 3, 1, hi)
         }
+    }
+}
+
+/** The user's own mascot: one or two 32x32 frames drawn in the settings editor (frame 2 = blink / talking). */
+class Custom(ctx: Context) : PixelChar() {
+    override val w = 32
+    override val h = 32
+    private val f1: Bitmap? = load(ctx, "mascot_user1.png")
+    private val f2: Bitmap? = load(ctx, "mascot_user2.png")
+    private val p = Paint().apply { isAntiAlias = false; isFilterBitmap = false }
+
+    fun ok(): Boolean = f1 != null
+
+    private fun load(ctx: Context, n: String): Bitmap? = try {
+        val f = File(ctx.filesDir, n)
+        if (f.exists()) BitmapFactory.decodeFile(f.path) else null
+    } catch (e: Throwable) { null }
+
+    override fun draw(g: Px, t: Float, act: String, talking: Boolean) {
+        val b = f1 ?: return
+        val sleeping = act == "sleep"
+        val moving = act == "walk" || act == "run"
+        val ph = (t % 4f) / 4f
+        val breath = sin(ph * TAU)
+        val hop = if (moving) abs(sin(t * (if (act == "run") 12f else 7f))) * 2f else 0f
+        val sy = 1f + (if (sleeping) 0.05f else 0.03f) * breath
+        val sx = 1f - 0.02f * breath
+        val rot = if (act == "wave") 10f * sin(t * 9f) else if (act == "sus") 6f * sin(t * 2f) else 0f
+        val alt = f2 != null && (sleeping || (ph > 0.60f && ph < 0.64f) || (talking && ((t * 8f).toInt() % 2 == 0)))
+        val c = g.c
+        c.save()
+        c.translate(w / 2f, h.toFloat() - hop)
+        c.rotate(rot)
+        c.scale(sx, sy)
+        c.translate(-w / 2f, -h.toFloat())
+        c.drawBitmap(if (alt) f2!! else b, 0f, 0f, p)
+        c.restore()
     }
 }

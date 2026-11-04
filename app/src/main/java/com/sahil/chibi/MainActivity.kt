@@ -77,6 +77,33 @@ class MainActivity : Activity() {
             }.start()
             return
         }
+        if (requestCode == 79) {
+            val u = if (resultCode == RESULT_OK) data?.data else null
+            if (u == null) return
+            Thread {
+                try {
+                    val bo = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    contentResolver.openInputStream(u)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, bo) }
+                    var ss = 1
+                    while (bo.outWidth / ss > 256 && bo.outHeight / ss > 256) ss *= 2
+                    val o2 = android.graphics.BitmapFactory.Options().apply { inSampleSize = ss }
+                    val src = contentResolver.openInputStream(u)!!.use { android.graphics.BitmapFactory.decodeStream(it, null, o2) }!!
+                    val sc = minOf(32f / src.width, 32f / src.height)
+                    val tw = maxOf(1, (src.width * sc).toInt())
+                    val th = maxOf(1, (src.height * sc).toInt())
+                    val small = android.graphics.Bitmap.createScaledBitmap(src, tw, th, true)
+                    val out = android.graphics.Bitmap.createBitmap(32, 32, android.graphics.Bitmap.Config.ARGB_8888)
+                    android.graphics.Canvas(out).drawBitmap(small, ((32 - tw) / 2).toFloat(), (32 - th).toFloat(), null)
+                    val bos = java.io.ByteArrayOutputStream()
+                    out.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bos)
+                    val b64 = android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
+                    js("window.onMascotImg && onMascotImg('data:image/png;base64," + b64 + "')")
+                } catch (e: Throwable) {
+                    runOnUiThread { Toast.makeText(this, "Could not read that image", Toast.LENGTH_LONG).show() }
+                }
+            }.start()
+            return
+        }
         if (requestCode != 77 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         Thread {
@@ -183,6 +210,37 @@ class MainActivity : Activity() {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*" }
                 startActivityForResult(i, 78)
             }
+        }
+
+        @JavascriptInterface fun pickMascotImage() {
+            val i = Intent(Intent.ACTION_GET_CONTENT)
+            i.type = "image/*"
+            i.addCategory(Intent.CATEGORY_OPENABLE)
+            startActivityForResult(i, 79)
+        }
+
+        @JavascriptInterface fun saveMascot(f1: String, f2: String) {
+            try {
+                File(filesDir, "mascot_user1.png").writeBytes(android.util.Base64.decode(f1, android.util.Base64.DEFAULT))
+                val p2 = File(filesDir, "mascot_user2.png")
+                if (f2.isNotBlank()) p2.writeBytes(android.util.Base64.decode(f2, android.util.Base64.DEFAULT)) else p2.delete()
+                getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", "custom").apply()
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Mascot saved", Toast.LENGTH_SHORT).show()
+                    restartCompanion()
+                }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this@MainActivity, "Could not save: " + (e.message ?: e.toString()), Toast.LENGTH_LONG).show() }
+            }
+        }
+
+        @JavascriptInterface fun loadMascot(): String {
+            val o = JSONObject()
+            val a = File(filesDir, "mascot_user1.png")
+            val b = File(filesDir, "mascot_user2.png")
+            if (a.exists()) o.put("f1", "data:image/png;base64," + android.util.Base64.encodeToString(a.readBytes(), android.util.Base64.NO_WRAP))
+            if (b.exists()) o.put("f2", "data:image/png;base64," + android.util.Base64.encodeToString(b.readBytes(), android.util.Base64.NO_WRAP))
+            return o.toString()
         }
 
         @JavascriptInterface fun getChar(): String = ChibiView.charId(this@MainActivity)
