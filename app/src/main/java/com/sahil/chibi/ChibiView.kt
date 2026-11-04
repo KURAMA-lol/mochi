@@ -66,10 +66,24 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     private var pendingDouble = false
 
     private var pc: PixelChar? = null
+    private var wv: android.webkit.WebView? = null
+    private var lastS = ""
+    private val stateTick: Runnable = object : Runnable {
+        override fun run() {
+            val w = wv ?: return
+            val s = action + "|" + facingRight + "|" + talking
+            if (s != lastS) {
+                lastS = s
+                w.evaluateJavascript("window.PX_S && PX_S('" + action + "'," + facingRight + "," + talking + ")", null)
+            }
+            postDelayed(this, 150)
+        }
+    }
 
     init {
         setWillNotDraw(false)
         pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); "custom" -> Custom(ctx).takeIf { it.ok() }; else -> null }
+        loadMascot(ctx)
         if (has3d(ctx)) {
             val g = GlView(ctx, this, modelFile(ctx))
             gl = g
@@ -112,8 +126,51 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         c.restore()
     }
 
+    /** Named mascots from Pixel Studio ("mascot:<slug>"): pixel frames are drawn natively, code mascots run in a transparent WebView. */
+    private fun loadMascot(ctx: Context) {
+        val id = charId(ctx)
+        if (!id.startsWith("mascot:")) return
+        val json = try { Mascots.get(ctx, id.substring(7)) } catch (e: Throwable) { null } ?: return
+        val o = try { org.json.JSONObject(json) } catch (e: Throwable) { return }
+        if (o.optString("type") == "pixel") {
+            pc = Custom(Mascots.bitmap(o.optString("f1")), Mascots.bitmap(o.optString("f2"))).takeIf { it.ok() }
+        } else if (o.optString("type") == "code") {
+            startCode(json)
+        }
+    }
+
+    private fun startCode(json: String) {
+        try {
+            val w = android.webkit.WebView(context)
+            w.setBackgroundColor(0)
+            w.isVerticalScrollBarEnabled = false
+            w.isHorizontalScrollBarEnabled = false
+            w.settings.javaScriptEnabled = true
+            w.webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(v: android.webkit.WebView, u: String) {
+                    v.evaluateJavascript("window.PX_RUN && PX_RUN(" + org.json.JSONObject.quote(json) + ")", null)
+                }
+            }
+            addView(w, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            w.loadUrl("file:///android_asset/studio.html#run")
+            wv = w
+            postDelayed(stateTick, 300)
+        } catch (e: Throwable) {
+            wv = null
+        }
+    }
+
+    override fun onInterceptTouchEvent(ev: android.view.MotionEvent): Boolean = wv != null
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(stateTick)
+        wv?.destroy()
+        wv = null
+        super.onDetachedFromWindow()
+    }
+
     override fun onDraw(c: Canvas) {
-        if (gl != null) return
+        if (gl != null || wv != null) return
         val pcl = pc
         if (pcl != null) {
             val s = minOf(width / pcl.w, height / pcl.h)

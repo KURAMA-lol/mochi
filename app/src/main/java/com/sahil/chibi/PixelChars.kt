@@ -280,20 +280,20 @@ class Webb : PixelChar() {
     }
 }
 
-/** The user's own mascot: one or two 32x32 frames drawn in the settings editor (frame 2 = blink / talking). */
-class Custom(ctx: Context) : PixelChar() {
-    override val w = 32
-    override val h = 32
-    private val f1: Bitmap? = load(ctx, "mascot_user1.png")
-    private val f2: Bitmap? = load(ctx, "mascot_user2.png")
+private fun loadMascotFile(ctx: Context, n: String): Bitmap? = try {
+    val f = File(ctx.filesDir, n)
+    if (f.exists()) BitmapFactory.decodeFile(f.path) else null
+} catch (e: Throwable) { null }
+
+/** A pixel mascot: one or two frames drawn in Pixel Studio (frame 2 = blink / talking). */
+class Custom(private val f1: Bitmap?, private val f2: Bitmap?) : PixelChar() {
+    constructor(ctx: Context) : this(loadMascotFile(ctx, "mascot_user1.png"), loadMascotFile(ctx, "mascot_user2.png"))
+
+    override val w = f1?.width ?: 32
+    override val h = f1?.height ?: 32
     private val p = Paint().apply { isAntiAlias = false; isFilterBitmap = false }
 
     fun ok(): Boolean = f1 != null
-
-    private fun load(ctx: Context, n: String): Bitmap? = try {
-        val f = File(ctx.filesDir, n)
-        if (f.exists()) BitmapFactory.decodeFile(f.path) else null
-    } catch (e: Throwable) { null }
 
     override fun draw(g: Px, t: Float, act: String, talking: Boolean) {
         val b = f1 ?: return

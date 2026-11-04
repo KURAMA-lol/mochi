@@ -243,6 +243,38 @@ class MainActivity : Activity() {
             return o.toString()
         }
 
+        @JavascriptInterface fun listMascots(): String = Mascots.list(this@MainActivity).toString()
+
+        @JavascriptInterface fun getMascot(slug: String): String = Mascots.get(this@MainActivity, slug) ?: ""
+
+        @JavascriptInterface fun saveMascotJson(json: String): String =
+            try { Mascots.save(this@MainActivity, json) } catch (e: Throwable) { "" }
+
+        @JavascriptInterface fun deleteMascot(slug: String) { Mascots.delete(this@MainActivity, slug) }
+
+        @JavascriptInterface fun useMascot(slug: String) {
+            getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", "mascot:" + slug).apply()
+            runOnUiThread { restartCompanion() }
+        }
+
+        @JavascriptInterface fun saveToDownloads(name: String, mime: String, b64: String): Boolean {
+            return try {
+                if (Build.VERSION.SDK_INT < 29) throw RuntimeException("needs Android 10 or newer")
+                val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                val cv = android.content.ContentValues()
+                cv.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                cv.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+                cv.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)!!
+                contentResolver.openOutputStream(uri)!!.use { it.write(bytes) }
+                runOnUiThread { Toast.makeText(this@MainActivity, "Saved to Downloads: " + name, Toast.LENGTH_LONG).show() }
+                true
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this@MainActivity, "Could not save: " + (e.message ?: e.toString()), Toast.LENGTH_LONG).show() }
+                false
+            }
+        }
+
         @JavascriptInterface fun getChar(): String = ChibiView.charId(this@MainActivity)
 
         @JavascriptInterface fun setChar(id: String) {

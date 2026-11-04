@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pixel Studio</title>
+<script>if (location.hash.indexOf('run') < 0) document.write('<script src="https://cdn.tailwindcss.com"><\/script>');</script>
+<style>
+  html,body{margin:0;background:#0f1020;color:#d7d9f5;font-family:system-ui,-apple-system,sans-serif}
+  html.run,html.run body{background:transparent;overflow:hidden;height:100%}
+  html.run #ui{display:none}
+  #stage{display:none}
+  html.run #stage{display:block;position:fixed;inset:0}
+  #runCv{position:absolute;image-rendering:pixelated;transform-origin:50% 100%}
+  .btn{padding:8px 12px;border-radius:10px;border:1px solid #3a3d6b;background:#1a1c36;color:#d7d9f5;font:inherit;font-size:14px}
+  .btn.on{outline:2px solid #fff}
+  .btn.pri{background:#5b5bd6;border-color:#5b5bd6;color:#fff}
+  .btn.red{border-color:#7a2a3a;color:#ff9aa8}
+  .tabpane{display:none}.tabpane.on{display:block}
+  .card{background:#15172e;border:1px solid #2a2d52;border-radius:14px;padding:12px;margin-bottom:12px}
+  textarea,input[type=text],input[type=number],select{background:#0c0d1c;color:#d7d9f5;border:1px solid #2a2d52;border-radius:10px;padding:8px;font:inherit;font-size:14px;box-sizing:border-box}
+  textarea{width:100%;min-height:210px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4;white-space:pre;tab-size:2}
+  .cv{image-rendering:pixelated;touch-action:none;border-radius:8px;background-color:#1f2140;background-image:conic-gradient(#2a2d4a 25%,#1f2140 0 50%,#2a2d4a 0 75%,#1f2140 0);background-size:16px 16px}
+  .err{color:#ff8a9a;font-size:13px;margin-top:6px;white-space:pre-wrap}
+  .mut{color:#8a8db5;font-size:13px}
+  .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+  .sw{width:28px;height:28px;border-radius:8px;border:2px solid rgba(0,0,0,.45)}
+  #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#5b5bd6;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;display:none;z-index:50}
+</style>
+</head>
+<body>
+<div id="ui" class="max-w-xl mx-auto p-3 pb-24">
+  <header class="flex items-center justify-between mb-3">
+    <a id="back" href="settings.html" class="text-sm" style="color:#9aa2ff;display:none">&larr; App</a>
+    <h1 class="font-bold text-lg">Pixel Studio</h1>
+    <span id="mode" class="mut"></span>
+  </header>
+  <nav class="row" id="tabs">
+    <button class="btn" data-tab="import">Import</button>
+    <button class="btn" data-tab="code">Code</button>
+    <button class="btn" data-tab="anim">Animator</button>
+    <button class="btn" data-tab="lib">Library</button>
+  </nav>
+
+  <!-- IMPORT / PIXEL EDITOR -->
+  <section id="t-import" class="tabpane">
+    <div class="card">
+      <div class="row">
+        <input type="file" id="impFile" accept="image/*" class="text-sm" style="max-width:100%">
+      </div>
+      <div class="row">
+        <label class="mut">Size</label>
+        <select id="impSize"><option value="32">32x32</option><option value="64">64x64</option></select>
+        <label class="mut">Colors</label>
+        <select id="impColors"><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option><option value="64">64</option><option value="0">all</option></select>
+        <select id="impFit"><option value="contain">fit</option><option value="cover">fill</option></select>
+        <button class="btn pri" id="impGo">Convert</button>
+      </div>
+      <div class="mut">Converts the picture to pixel art into the frame you are editing. Then fix it by hand below.</div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button class="btn" data-tool="pencil">Pencil</button>
+        <button class="btn" data-tool="eraser">Eraser</button>
+        <button class="btn" data-tool="picker">Picker</button>
+        <button class="btn" data-tool="fill">Fill</button>
+        <button class="btn" id="mirrorBtn">Mirror</button>
+        <input type="color" id="colorIn" value="#ff4d6d" style="width:44px;height:38px;border:0;background:none">
+      </div>
+      <div class="row" id="pal"></div>
+      <div class="row">
+        <button class="btn" data-frame="0">Frame 1</button>
+        <button class="btn" data-frame="1">Frame 2</button>
+        <button class="btn" id="copy12">Copy 1&rarr;2</button>
+        <button class="btn" id="undoBtn">Undo</button>
+        <button class="btn" id="redoBtn">Redo</button>
+        <button class="btn red" id="clearBtn">Clear</button>
+        <label class="mut">Zoom</label>
+        <select id="zoomSel"><option>4</option><option>6</option><option selected>8</option><option>10</option><option>12</option></select>
+      </div>
+      <div style="overflow:auto;max-height:70vh">
+        <div style="position:relative;display:inline-block;line-height:0">
+          <canvas id="grid" class="cv"></canvas>
+          <div id="gridLines" style="position:absolute;inset:0;pointer-events:none"></div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" id="expArt1">Export PNG x1</button>
+        <button class="btn" id="expArt8">Export PNG x8</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE -->
+  <section id="t-code" class="tabpane">
+    <div class="card">
+      <div class="mut" style="margin-bottom:6px">Paste <b>function(ctx,t,x,y){...}</b>. <b>t</b> = seconds, <b>x,y</b> = pointer position in pixels, <b>ctx.art</b> = your grid drawing, helpers <b>ctx.px(x,y,color)</b> and <b>ctx.r(x,y,w,h,color)</b>. A full module with <b>createCompanion()</b> (like Lumi) works too.</div>
+      <textarea id="codeTa" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+      <div class="err" id="codeErr"></div>
+      <div class="row">
+        <label class="mut"><input type="checkbox" id="showArt"> draw my grid art under the code</label>
+        <select id="actSel"><option>idle</option><option>walk</option><option>run</option><option>sit</option><option>sleep</option><option>wave</option><option>sus</option></select>
+      </div>
+      <div style="text-align:center"><canvas id="liveC" class="cv"></canvas></div>
+      <div class="row">
+        <input type="text" id="codeName" placeholder="name" style="flex:1;min-width:120px">
+        <button class="btn pri" id="codeSave">Save</button>
+        <button class="btn" id="codePng">Export PNG</button>
+      </div>
+      <div class="mut">Save keeps it in your library and downloads <b>name.js</b> &mdash; put it in <b>src/fx/custom/</b>.</div>
+    </div>
+  </section>
+
+  <!-- ANIMATOR -->
+  <section id="t-anim" class="tabpane">
+    <div class="card">
+      <div class="mut" style="margin-bottom:6px">Full animation code. Same format as the Code tab; <b>t</b> loops every <b>Loop</b> seconds. Use the slider to scrub.</div>
+      <textarea id="animTa" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+      <div class="err" id="animErr"></div>
+      <div style="text-align:center;margin-top:8px"><canvas id="liveA" class="cv"></canvas></div>
+      <div class="row">
+        <button class="btn pri" id="playBtn">Pause</button>
+        <input type="range" id="scrub" min="0" max="600" value="0" style="flex:1;min-width:120px">
+        <span class="mut" id="tLabel">0.00s</span>
+      </div>
+      <div class="row">
+        <label class="mut">Loop (s)</label><input type="number" id="loopIn" value="6" min="1" max="60" step="1" style="width:70px">
+        <input type="text" id="animName" placeholder="name" style="flex:1;min-width:120px">
+        <button class="btn pri" id="animSave">Save effect</button>
+        <button class="btn" id="animPng">Export PNG</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIBRARY -->
+  <section id="t-lib" class="tabpane">
+    <div class="card">
+      <div class="mut" style="margin-bottom:6px">Save what you are working on as a named mascot.</div>
+      <div class="row"><input type="text" id="mName" placeholder="mascot name" style="flex:1;min-width:140px"></div>
+      <div class="row">
+        <button class="btn pri" id="saveMascotPx">Save pixel mascot</button>
+        <button class="btn pri" id="saveMascotCode">Save from Code tab</button>
+        <button class="btn pri" id="saveMascotAnim">Save from Animator</button>
+      </div>
+      <div class="row"><label class="mut">Restore a downloaded mascot (.json)</label><input type="file" id="jsonIn" accept=".json,application/json" class="text-sm"></div>
+    </div>
+    <div id="libList"></div>
+  </section>
+</div>
+<div id="toast"></div>
+<div id="stage"><canvas id="runCv"></canvas></div>
+
+<script>
+'use strict';
+const RUN = location.hash.indexOf('run') >= 0;
+const hasApp = !!(window.Android && Android.listMascots);
+const $ = s => document.querySelector(s);
+const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
+
+/* ================= ENGINE (shared by the editor previews and the in-app overlay) ================= */
+function stripExports(src) {
+  return src.replace(/^\s*export\s+default\s+/m, 'const __default = ')
+            .replace(/^\s*export\s+(?=(async\s+)?(function|const|let|var|class)\b)/gm, '');
+}
+function compile(code) {
+  const t = code.trim();
+  if (!t) throw new Error('Code is empty');
+  if (/^\s*import\s/m.test(t)) throw new Error('import is not supported - paste a single file');
+  const isExpr = /^(async\s+)?function\s*\(/.test(t) || /^\([^)]*\)\s*=>/.test(t) || /^[A-Za-z_$][\w$]*\s*=>/.test(t);
+  if (isExpr) {
+    const e = t.replace(/;\s*$/, '');
+    const fn = new Function('return (' + e + ')')();
+    if (typeof fn !== 'function') throw new Error('That is not a function');
+    return { kind: 'fn', fn: fn, wrap: '(' + e + ')' };
+  }
+  const body = stripExports(t);
+  const m = /function\s+([A-Za-z_$][\w$]*)\s*\(/.exec(body);
+  const o = new Function(body + '\n;return {d: typeof __default!=="undefined"?__default:null, cc: typeof createCompanion!=="undefined"?createCompanion:null, dr: typeof draw!=="undefined"?draw:null, first: ' + (m ? m[1] : 'null') + '};')();
+  if (o.d && typeof o.d.create === 'function') return { kind: 'sim', make: o.d.create, raw: t };
+  if (o.cc) return { kind: 'sim', make: o.cc, raw: t };
+  const fn = (o.d && typeof o.d.draw === 'function') ? o.d.draw : (o.dr || o.first);
+  if (typeof fn !== 'function') throw new Error('Define function(ctx,t,x,y){ ... }');
+  const nm = o.dr ? 'draw' : (m ? m[1] : 'draw');
+  return { kind: 'fn', fn: fn, wrap: '(()=>{' + body + '\nreturn ' + nm + ';})()' };
+}
+function makeRunner(code) {
+  const c = compile(code);
+  c.sim = null; c.broken = false;
+  return c;
+}
+function renderFrame(r, ctx, cv, t, dt, ptr, S, art, showArt, scrub) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.px = function (x, y, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1); };
+  ctx.r = function (x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); };
+  ctx.art = art;
+  if (showArt && art) ctx.drawImage(art, 0, 0);
+  if (r.kind === 'sim') {
+    if (!r.sim || scrub) { r.sim = r.make({ seed: 7 }); if (scrub) { r.sim.step && r.sim.step(t); } }
+    else r.sim.step && r.sim.step(dt);
+    if (r.sim.w && r.sim.h && (cv.width !== r.sim.w || cv.height !== r.sim.h)) { cv.width = r.sim.w; cv.height = r.sim.h; ctx.imageSmoothingEnabled = false; }
+    r.sim.draw(ctx, S);
+  } else {
+    r.fn(ctx, t, ptr.x, ptr.y, cv.width, cv.height, S);
+  }
+}
+function loadImg(src) {
+  return new Promise(function (res) { const i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { res(null); }; i.src = src; });
+}
+
+/* ================= IN-APP OVERLAY RUNNER (#run) ================= */
+if (RUN) {
+  document.documentElement.classList.add('run');
+  let M = null, R = null, art = null, ctx2 = null, cv = $('#runCv'), t0 = performance.now(), last = performance.now();
+  const S = { action: 'idle', facing: true, talking: false, mood: 'neutral' };
+  function fit() {
+    if (!M) return;
+    const s = Math.max(1, Math.floor(Math.min(innerWidth / cv.width, innerHeight / cv.height)));
+    cv.style.width = (cv.width * s) + 'px'; cv.style.height = (cv.height * s) + 'px';
+    cv.style.left = ((innerWidth - cv.width * s) / 2) + 'px'; cv.style.bottom = '0px';
+  }
+  addEventListener('resize', fit);
+  window.PX_S = function (a, f, tk) { S.action = a; S.facing = f; S.talking = tk; cv.style.transform = f ? 'none' : 'scaleX(-1)'; };
+  window.PX_RUN = async function (js) {
+    M = JSON.parse(js);
+    cv.width = M.w || 64; cv.height = M.h || 64;
+    ctx2 = cv.getContext('2d');
+    if (M.art) art = await loadImg(M.art);
+    try { R = makeRunner(M.code); } catch (e) { R = null; }
+    fit();
+    requestAnimationFrame(loop);
+  };
+  function loop(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (R && !R.broken) {
+      let t = (now - t0) / 1000;
+      if (M.loop > 0) t = t % M.loop;
+      try { renderFrame(R, ctx2, cv, t, dt, { x: cv.width / 2, y: cv.height / 2 }, S, art, M.base, false); fit(); }
+      catch (e) { R.broken = true; ctx2.clearRect(0, 0, cv.width, cv.height); ctx2.fillStyle = '#f33'; ctx2.fillRect(1, 1, 3, 3); }
+    }
+    requestAnimationFrame(loop);
+  }
+}
+
+/* ================= STUDIO UI ================= */
+if (!RUN) {
+  let W = 32, H = 32, zoom = 8, cur = 0, tool = 'pencil', color = '#ff4d6d', mirror = false, tab = 'import';
+  const F = [mk(W, H), mk(W, H)];
+  let undo = [], redo = [];
+  function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function ctxOf(i) { return F[i].getContext('2d'); }
+  function isEmpty(c) { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return false; return true; }
+  function toast(m) { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.display = 'none'; }, 2200); }
+  function slugify(n) { const s = n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); return (s || 'mascot').slice(0, 40); }
+
+  /* ---- storage: native app library when inside Hina, localStorage otherwise ---- */
+  const LK = 'pxs_lib';
+  const lsGet = function () { try { return JSON.parse(localStorage.getItem(LK) || '{}'); } catch (e) { return {}; } };
+  const Store = {
+    list: function () {
+      if (hasApp) { try { return JSON.parse(Android.listMascots()); } catch (e) { return []; } }
+      const l = lsGet();
+      return Object.keys(l).map(function (k) { return { slug: k, name: l[k].name, type: l[k].type, thumb: l[k].f1 || l[k].art || '' }; });
+    },
+    get: function (slug) {
+      if (hasApp) { try { return JSON.parse(Android.getMascot(slug)); } catch (e) { return null; } }
+      return lsGet()[slug] || null;
+    },
+    save: function (o) {
+      if (hasApp) return Android.saveMascotJson(JSON.stringify(o));
+      const l = lsGet(), s = slugify(o.name); l[s] = o;
+      try { localStorage.setItem(LK, JSON.stringify(l)); } catch (e) { toast('Storage full'); return ''; }
+      return s;
+    },
+    del: function (slug) {
+      if (hasApp) { Android.deleteMascot(slug); return; }
+      const l = lsGet(); delete l[slug]; localStorage.setItem(LK, JSON.stringify(l));
+    }
+  };
+
+  /* ---- file output ---- */
+  function download(name, mime, text, dataUrl) {
+    if (hasApp && Android.saveToDownloads) {
+      const b64 = dataUrl ? dataUrl.split(',')[1] : btoa(unescape(encodeURIComponent(text)));
+      Android.saveToDownloads(name, mime, b64); return;
+    }
+    const a = document.createElement('a');
+    a.href = dataUrl || URL.createObjectURL(new Blob([text], { type: mime }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
+  function exportPng(canvas, scale, name) {
+    const o = mk(canvas.width * scale, canvas.height * scale), x = o.getContext('2d');
+    x.imageSmoothingEnabled = false; x.drawImage(canvas, 0, 0, o.width, o.height);
+    download(name + '.png', 'image/png', null, o.toDataURL('image/png'));
+  }
+  function effectModule(code, loop, name) {
+    const c = compile(code);
+    if (c.kind === 'sim') return c.raw;
+    return '// Pixel Studio effect: ' + name + '\n// Put this file in src/fx/custom/\n' +
+      'export const LOOP = ' + loop + ';\nexport const W = ' + W + ', H = ' + H + ';\n\n' +
+      'const fx = ' + c.wrap + ';\n\n' +
+      'export function createCompanion(opts = {}) {\n  const state = { t: 0, action: "idle" };\n  return {\n    w: W, h: H, state,\n' +
+      '    step(dt) { state.t = (state.t + dt) % LOOP; },\n' +
+      '    draw(ctx, S, ptr = { x: W / 2, y: H / 2 }) {\n      ctx.clearRect(0, 0, W, H);\n      fx(ctx, state.t, ptr.x, ptr.y, W, H, S || { action: state.action, facing: true, talking: false });\n    },\n' +
+      '    poke() {}\n  };\n}\n\nexport default { name: "custom/' + slugify(name) + '", w: W, h: H, loop: LOOP, create: createCompanion };\n';
+  }
+
+  /* ---- pixel editor ---- */
+  function resizeFrames(n) {
+    for (let i = 0; i < 2; i++) {
+      const o = mk(n, n), x = o.getContext('2d'); x.imageSmoothingEnabled = false;
+      x.drawImage(F[i], 0, 0, n, n); F[i] = o;
+    }
+    W = H = n; undo = []; redo = [];
+  }
+  function renderGrid() {
+    const g = $('#grid'); g.width = W; g.height = H;
+    g.style.width = (W * zoom) + 'px'; g.style.height = (H * zoom) + 'px';
+    const x = g.getContext('2d'); x.clearRect(0, 0, W, H); x.drawImage(F[cur], 0, 0);
+    const gl = $('#gridLines');
+    gl.style.backgroundImage = zoom >= 6 ? 'linear-gradient(to right, rgba(255,255,255,.07) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px)' : 'none';
+    gl.style.backgroundSize = zoom + 'px ' + zoom + 'px';
+  }
+  function setUI() {
+    $$('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.dataset.tool === tool); });
+    $$('[data-frame]').forEach(function (b) { b.classList.toggle('on', +b.dataset.frame === cur); });
+    $('#mirrorBtn').classList.toggle('on', mirror);
+    $$('#tabs [data-tab]').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
+    $$('.tabpane').forEach(function (p) { p.classList.toggle('on', p.id === 't-' + tab); });
+  }
+  function snap() { undo.push([cur, ctxOf(cur).getImageData(0, 0, W, H)]); if (undo.length > 40) undo.shift(); redo = []; }
+  function doUndo() { const u = undo.pop(); if (!u) return; redo.push([u[0], ctxOf(u[0]).getImageData(0, 0, W, H)]); ctxOf(u[0]).putImageData(u[1], 0, 0); cur = u[0]; renderGrid(); setUI(); }
+  function doRedo() { const u = redo.pop(); if (!u) return; undo.push([u[0], ctxOf(u[0]).getImageData(0, 0, W, H)]); ctxOf(u[0]).putImageData(u[1], 0, 0); cur = u[0]; renderGrid(); setUI(); }
+  function hex(c) { return [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)]; }
+  function toHex(r, g, b) { return '#' + [r, g, b].map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join(''); }
+  function cell(e) { const r = $('#grid').getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * W), Math.floor((e.clientY - r.top) / r.height * H)]; }
+  function put(x, y) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const c = ctxOf(cur);
+    if (tool === 'eraser') c.clearRect(x, y, 1, 1); else { c.fillStyle = color; c.fillRect(x, y, 1, 1); }
+  }
+  function paint(x, y) { put(x, y); if (mirror) put(W - 1 - x, y); }
+  function pick(x, y) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const d = ctxOf(cur).getImageData(x, y, 1, 1).data;
+    if (d[3] > 0) { color = toHex(d[0], d[1], d[2]); $('#colorIn').value = color; }
+    tool = 'pencil'; setUI();
+  }
+  function flood(x0, y0) {
+    if (x0 < 0 || y0 < 0 || x0 >= W || y0 >= H) return;
+    const c = ctxOf(cur), id = c.getImageData(0, 0, W, H), d = id.data, i0 = (y0 * W + x0) * 4;
+    const t = [d[i0], d[i0 + 1], d[i0 + 2], d[i0 + 3]], n = hex(color); n.push(255);
+    if (t[0] === n[0] && t[1] === n[1] && t[2] === n[2] && t[3] === 255) return;
+    const st = [[x0, y0]];
+    while (st.length) {
+      const p = st.pop(), x = p[0], y = p[1];
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = (y * W + x) * 4;
+      if (d[i] !== t[0] || d[i + 1] !== t[1] || d[i + 2] !== t[2] || d[i + 3] !== t[3]) continue;
+      d[i] = n[0]; d[i + 1] = n[1]; d[i + 2] = n[2]; d[i + 3] = 255;
+      st.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    c.putImageData(id, 0, 0);
+  }
+  function setPalette(list) {
+    const pe = $('#pal'); pe.innerHTML = '';
+    list.forEach(function (c) {
+      const b = document.createElement('button'); b.className = 'sw'; b.style.background = c;
+      b.onclick = function () { color = c; $('#colorIn').value = c; tool = 'pencil'; setUI(); };
+      pe.appendChild(b);
+    });
+  }
+  const DEFAULT_PAL = ['#000000', '#ffffff', '#ff4d6d', '#ff9f1c', '#ffd166', '#06d6a0', '#118ab2', '#7b5cff', '#8d5524', '#f1c27d', '#3a2f7a', '#9aa0b4', '#e63946', '#1d3557', '#a8dadc', '#2b2d42'];
+
+  /* ---- image import: downscale + median-cut quantize ---- */
+  function quantize(d, k) {
+    const px = [];
+    for (let i = 0; i < d.length; i += 4) { if (d[i + 3] >= 128) px.push([d[i], d[i + 1], d[i + 2], i]); else d[i + 3] = 0; }
+    if (!px.length) return [];
+    if (!k) { px.forEach(function (p) { d[p[3] + 3] = 255; }); return []; }
+    function range(b) {
+      let mn = [255, 255, 255], mx = [0, 0, 0];
+      b.forEach(function (p) { for (let c = 0; c < 3; c++) { if (p[c] < mn[c]) mn[c] = p[c]; if (p[c] > mx[c]) mx[c] = p[c]; } });
+      const r = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]], ch = r[0] >= r[1] && r[0] >= r[2] ? 0 : (r[1] >= r[2] ? 1 : 2);
+      return { ch: ch, v: r[ch] };
+    }
+    let boxes = [px];
+    while (boxes.length < k) {
+      let bi = -1, bv = -1;
+      boxes.forEach(function (b, i) { if (b.length < 2) return; const r = range(b); if (r.v > bv) { bv = r.v; bi = i; } });
+      if (bi < 0 || bv <= 0) break;
+      const b = boxes[bi], ch = range(b).ch;
+      b.sort(function (p, q) { return p[ch] - q[ch]; });
+      const m = b.length >> 1;
+      boxes.splice(bi, 1, b.slice(0, m), b.slice(m));
+    }
+    const pal = [];
+    boxes.forEach(function (b) {
+      let r = 0, g = 0, bl = 0; b.forEach(function (p) { r += p[0]; g += p[1]; bl += p[2]; });
+      r = Math.round(r / b.length); g = Math.round(g / b.length); bl = Math.round(bl / b.length);
+      pal.push(toHex(r, g, bl));
+      b.forEach(function (p) { d[p[3]] = r; d[p[3] + 1] = g; d[p[3] + 2] = bl; d[p[3] + 3] = 255; });
+    });
+    return pal;
+  }
+  async function convert(file) {
+    const url = URL.createObjectURL(file), img = await loadImg(url);
+    if (!img) { toast('Could not read that image'); return; }
+    const n = +$('#impSize').value, k = +$('#impColors').value, fit = $('#impFit').value;
+    if (n !== W) { resizeFrames(n); }
+    snap();
+    const tmp = mk(n, n), tx = tmp.getContext('2d');
+    tx.imageSmoothingEnabled = true; tx.imageSmoothingQuality = 'high';
+    const s = fit === 'cover' ? Math.max(n / img.width, n / img.height) : Math.min(n / img.width, n / img.height);
+    const dw = img.width * s, dh = img.height * s;
+    tx.drawImage(img, (n - dw) / 2, (n - dh) / 2, dw, dh);
+    const id = tx.getImageData(0, 0, n, n), pal = quantize(id.data, k);
+    ctxOf(cur).clearRect(0, 0, n, n); ctxOf(cur).putImageData(id, 0, 0);
+    setPalette(pal.length ? pal : DEFAULT_PAL);
+    renderGrid(); setUI(); URL.revokeObjectURL(url);
+    toast('Converted to ' + n + 'x' + n);
+  }
+
+  /* ---- live code previews ---- */
+  const DEF_CODE = 'function(ctx,t,x,y){\n  // t = seconds, x,y = pointer, ctx.art = your grid drawing\n  const bob = Math.sin(t*3)*1.5;\n  ctx.drawImage(ctx.art, 0, Math.round(bob));\n  ctx.px(x, y, "#ffd166");   // follows your finger\n}\n';
+  const DEF_ANIM = 'function(ctx,t,x,y,W,H,S){\n  const ph=(t%4)/4, br=Math.sin(ph*Math.PI*2);\n  const cx=W/2, base=H-4, rw=9+br*0.8, rh=8-br*0.8;\n  for(let yy=-Math.round(rh); yy<=0; yy++){\n    const w=Math.round(rw*Math.sqrt(1-(yy/rh)*(yy/rh)));\n    ctx.r(cx-w, base+yy, w*2, 1, yy<-rh*0.5 ? "#7be0ff" : "#58b8ff");\n  }\n  const blink = ph>0.7 && ph<0.74;\n  ctx.r(cx-4, base-6, 2, blink?1:3, "#150f33");\n  ctx.r(cx+2, base-6, 2, blink?1:3, "#150f33");\n  if (S.action==="wave") ctx.r(cx+rw, base-8+Math.sin(t*9)*2, 2, 5, "#58b8ff");\n}\n';
+  const P = {
+    code: { r: null, err: '', t0: performance.now(), ptr: { x: 16, y: 16 }, tm: 0 },
+    anim: { r: null, err: '', t: 0, play: true, ptr: { x: 16, y: 16 }, tm: 0 }
+  };
+  function setErr(which, msg) { P[which].err = msg; $(which === 'code' ? '#codeErr' : '#animErr').textContent = msg; }
+  function rebuild(which) {
+    const ta = $(which === 'code' ? '#codeTa' : '#animTa');
+    try { P[which].r = makeRunner(ta.value); setErr(which, ''); P[which].t0 = performance.now(); if (which === 'anim') P.anim.t = 0; }
+    catch (e) { P[which].r = null; setErr(which, String(e.message || e)); }
+    saveDraft();
+  }
+  function schedule(which) { clearTimeout(P[which].tm); P[which].tm = setTimeout(function () { rebuild(which); }, 300); }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const S = { action: $('#actSel').value, facing: true, talking: false, mood: 'neutral' };
+    if (tab === 'code' && P.code.r && !P.code.r.broken) {
+      const cv = $('#liveC'); setLive(cv);
+      try { renderFrame(P.code.r, cv.getContext('2d'), cv, (now - P.code.t0) / 1000, dt, P.code.ptr, S, F[0], $('#showArt').checked, false); }
+      catch (e) { P.code.r.broken = true; setErr('code', String(e.message || e)); }
+    }
+    if (tab === 'anim' && P.anim.r && !P.anim.r.broken) {
+      const cv = $('#liveA'); setLive(cv);
+      const loop = Math.max(1, +$('#loopIn').value || 6), sc = $('#scrub');
+      let scrub = false;
+      if (P.anim.play) { P.anim.t = (P.anim.t + dt) % loop; sc.value = Math.round(P.anim.t * 100); }
+      else { P.anim.t = (+sc.value) / 100; scrub = true; }
+      $('#tLabel').textContent = P.anim.t.toFixed(2) + 's';
+      try { renderFrame(P.anim.r, cv.getContext('2d'), cv, P.anim.t, dt, P.anim.ptr, S, F[0], true, scrub); }
+      catch (e) { P.anim.r.broken = true; setErr('anim', String(e.message || e)); }
+    }
+    requestAnimationFrame(frame);
+  }
+  function setLive(cv) {
+    if (cv.width !== W && !(P.code.r && P.code.r.sim) && !(P.anim.r && P.anim.r.sim)) { cv.width = W; cv.height = H; }
+    const target = Math.min(320, Math.floor(Math.min(innerWidth - 40, 320) / cv.width) * cv.width) || 256;
+    cv.style.width = target + 'px'; cv.style.height = (target * cv.height / cv.width) + 'px';
+  }
+  function bindPtr(el, which) {
+    function mv(e) { const r = el.getBoundingClientRect(); P[which].ptr = { x: Math.floor((e.clientX - r.left) / r.width * el.width), y: Math.floor((e.clientY - r.top) / r.height * el.height) }; }
+    el.addEventListener('pointerdown', mv); el.addEventListener('pointermove', mv);
+  }
+
+  /* ---- library ---- */
+  function currentLoop() { return Math.max(1, +$('#loopIn').value || 6); }
+  async function saveMascot(kind) {
+    const name = ($('#mName').value || (kind === 'code' ? $('#codeName').value : kind === 'anim' ? $('#animName').value : '')).trim();
+    if (!name) { toast('Give it a name first'); return ''; }
+    const o = { name: name, type: kind === 'pixel' ? 'pixel' : 'code', src: kind, w: W, h: H, created: Date.now() };
+    if (kind === 'pixel') {
+      if (isEmpty(F[0])) { toast('Frame 1 is empty'); return ''; }
+      o.f1 = F[0].toDataURL(); o.f2 = isEmpty(F[1]) ? '' : F[1].toDataURL();
+    } else {
+      const code = $(kind === 'code' ? '#codeTa' : '#animTa').value;
+      try { compile(code); } catch (e) { toast('Fix the code first: ' + (e.message || e)); return ''; }
+      o.code = code; o.loop = kind === 'anim' ? currentLoop() : 0;
+      o.art = isEmpty(F[0]) ? '' : F[0].toDataURL(); o.base = kind === 'code' ? $('#showArt').checked : true;
+    }
+    const slug = Store.save(o);
+    if (slug) { toast('Saved "' + name + '"'); renderLib(); }
+    return slug;
+  }
+  async function loadMascot(slug) {
+    const o = Store.get(slug); if (!o) { toast('Could not load'); return; }
+    $('#mName').value = o.name;
+    if (o.type === 'pixel') {
+      const n = o.w || 32; if (n !== W) resizeFrames(n);
+      for (let i = 0; i < 2; i++) { ctxOf(i).clearRect(0, 0, W, H); const im = o['f' + (i + 1)] ? await loadImg(o['f' + (i + 1)]) : null; if (im) ctxOf(i).drawImage(im, 0, 0); }
+      cur = 0; tab = 'import'; renderGrid(); setUI();
+    } else {
+      if (o.art) { const im = await loadImg(o.art); if (im) { if ((o.w || W) !== W) resizeFrames(o.w || W); ctxOf(0).clearRect(0, 0, W, H); ctxOf(0).drawImage(im, 0, 0); } }
+      if (o.src === 'anim' || o.loop > 0) { $('#animTa').value = o.code; $('#loopIn').value = o.loop || 6; $('#animName').value = o.name; tab = 'anim'; rebuild('anim'); }
+      else { $('#codeTa').value = o.code; $('#codeName').value = o.name; $('#showArt').checked = !!o.base; tab = 'code'; rebuild('code'); }
+      renderGrid(); setUI();
+    }
+    toast('Loaded "' + o.name + '"');
+  }
+  function renderLib() {
+    const box = $('#libList'); box.innerHTML = '';
+    const list = Store.list();
+    if (!list.length) { box.innerHTML = '<div class="mut">No saved mascots yet.</div>'; return; }
+    list.forEach(function (m) {
+      const d = document.createElement('div'); d.className = 'card';
+      d.innerHTML = '<div class="row" style="margin:0"><img style="width:48px;height:48px;image-rendering:pixelated;background:#1f2140;border-radius:8px" alt=""><div style="flex:1;min-width:100px"><b></b><div class="mut"></div></div></div><div class="row"></div>';
+      if (m.thumb) d.querySelector('img').src = m.thumb;
+      d.querySelector('b').textContent = m.name; d.querySelector('.mut').textContent = m.type === 'pixel' ? 'pixel mascot' : 'code mascot';
+      const r = d.querySelectorAll('.row')[1];
+      function add(txt, cls, fn) { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = txt; b.onclick = fn; r.appendChild(b); }
+      add('Load', '', function () { loadMascot(m.slug); });
+      if (hasApp) add('Use in Hina', 'pri', function () { Android.useMascot(m.slug); toast('Now using ' + m.name); });
+      add('Download', '', function () { const o = Store.get(m.slug); download(m.slug + '.json', 'application/json', JSON.stringify(o)); });
+      add('Delete', 'red', function () { if (confirm('Delete ' + m.name + '?')) { Store.del(m.slug); renderLib(); } });
+      box.appendChild(d);
+    });
+  }
+
+  /* ---- drafts ---- */
+  function saveDraft() {
+    try {
+      localStorage.setItem('pxs_draft', JSON.stringify({
+        code: $('#codeTa').value, anim: $('#animTa').value, loop: $('#loopIn').value, n: W,
+        f1: F[0].toDataURL(), f2: F[1].toDataURL(), show: $('#showArt').checked
+      }));
+    } catch (e) { }
+  }
+  let dt0 = 0; function draftSoon() { clearTimeout(dt0); dt0 = setTimeout(saveDraft, 600); }
+
+  /* ---- init ---- */
+  async function init() {
+    $('#mode').textContent = hasApp ? 'in Hina' : 'browser';
+    if (hasApp) $('#back').style.display = 'inline';
+    $('#codeTa').value = DEF_CODE; $('#animTa').value = DEF_ANIM;
+    try {
+      const d = JSON.parse(localStorage.getItem('pxs_draft') || 'null');
+      if (d) {
+        if (d.n && d.n !== W) resizeFrames(d.n);
+        $('#codeTa').value = d.code || DEF_CODE; $('#animTa').value = d.anim || DEF_ANIM; $('#loopIn').value = d.loop || 6; $('#showArt').checked = !!d.show;
+        $('#impSize').value = String(W);
+        for (let i = 0; i < 2; i++) { const u = i ? d.f2 : d.f1; if (u) { const im = await loadImg(u); if (im) ctxOf(i).drawImage(im, 0, 0); } }
+      }
+    } catch (e) { }
+    setPalette(DEFAULT_PAL);
+    renderGrid(); setUI(); renderLib(); rebuild('code'); rebuild('anim');
+    $$('#tabs [data-tab]').forEach(function (b) { b.onclick = function () { tab = b.dataset.tab; setUI(); if (tab === 'lib') renderLib(); }; });
+    $$('[data-tool]').forEach(function (b) { b.onclick = function () { tool = b.dataset.tool; setUI(); }; });
+    $$('[data-frame]').forEach(function (b) { b.onclick = function () { cur = +b.dataset.frame; renderGrid(); setUI(); }; });
+    $('#mirrorBtn').onclick = function () { mirror = !mirror; setUI(); };
+    $('#colorIn').oninput = function (e) { color = e.target.value; tool = 'pencil'; setUI(); };
+    $('#undoBtn').onclick = doUndo; $('#redoBtn').onclick = doRedo;
+    $('#clearBtn').onclick = function () { snap(); ctxOf(cur).clearRect(0, 0, W, H); renderGrid(); draftSoon(); };
+    $('#copy12').onclick = function () { snap(); ctxOf(1).clearRect(0, 0, W, H); ctxOf(1).drawImage(F[0], 0, 0); cur = 1; renderGrid(); setUI(); draftSoon(); };
+    $('#zoomSel').onchange = function (e) { zoom = +e.target.value; renderGrid(); };
+    $('#impFile').onchange = function (e) { if (e.target.files[0]) convert(e.target.files[0]).then(draftSoon); e.target.value = ''; };
+    $('#impGo').onclick = function () { $('#impFile').click(); };
+    $('#impSize').onchange = function (e) { const n = +e.target.value; if (n !== W) { resizeFrames(n); renderGrid(); draftSoon(); } };
+    $('#expArt1').onclick = function () { exportPng(F[cur], 1, 'pixel-art'); };
+    $('#expArt8').onclick = function () { exportPng(F[cur], 8, 'pixel-art-x8'); };
+    let down = false;
+    const g = $('#grid');
+    g.addEventListener('pointerdown', function (e) {
+      g.setPointerCapture(e.pointerId); down = true; const c = cell(e);
+      if (tool === 'picker') { pick(c[0], c[1]); down = false; return; }
+      snap();
+      if (tool === 'fill') { flood(c[0], c[1]); if (mirror) flood(W - 1 - c[0], c[1]); down = false; } else paint(c[0], c[1]);
+      renderGrid();
+    });
+    g.addEventListener('pointermove', function (e) { if (!down) return; const c = cell(e); paint(c[0], c[1]); renderGrid(); });
+    const up = function () { if (down) { down = false; draftSoon(); } };
+    g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+    $('#codeTa').addEventListener('input', function () { schedule('code'); });
+    $('#animTa').addEventListener('input', function () { schedule('anim'); });
+    $('#showArt').onchange = draftSoon; $('#loopIn').onchange = function () { $('#scrub').max = currentLoop() * 100; draftSoon(); };
+    $('#scrub').max = currentLoop() * 100;
+    $('#playBtn').onclick = function () { P.anim.play = !P.anim.play; $('#playBtn').textContent = P.anim.play ? 'Pause' : 'Play'; };
+    $('#scrub').addEventListener('input', function () { P.anim.play = false; $('#playBtn').textContent = 'Play'; });
+    bindPtr($('#liveC'), 'code'); bindPtr($('#liveA'), 'anim');
+    $('#codeSave').onclick = async function () {
+      const n = $('#codeName').value.trim(); if (!n) { toast('Give it a name first'); return; }
+      $('#mName').value = n; const s = await saveMascot('code'); if (!s) return;
+      download(slugify(n) + '.js', 'text/javascript', effectModule($('#codeTa').value, 6, n));
+    };
+    $('#animSave').onclick = async function () {
+      const n = $('#animName').value.trim(); if (!n) { toast('Give it a name first'); return; }
+      $('#mName').value = n; const s = await saveMascot('anim'); if (!s) return;
+      download(slugify(n) + '.js', 'text/javascript', effectModule($('#animTa').value, currentLoop(), n));
+    };
+    $('#codePng').onclick = function () { exportPng($('#liveC'), 8, 'frame'); };
+    $('#animPng').onclick = function () { exportPng($('#liveA'), 8, 'frame'); };
+    $('#saveMascotPx').onclick = function () { saveMascot('pixel'); };
+    $('#saveMascotCode').onclick = function () { saveMascot('code'); };
+    $('#saveMascotAnim').onclick = function () { saveMascot('anim'); };
+    $('#jsonIn').onchange = function (e) {
+      const f = e.target.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = function () { try { const o = JSON.parse(rd.result); if (!o.name) throw 0; Store.save(o); renderLib(); toast('Restored ' + o.name); } catch (x) { toast('Not a mascot file'); } };
+      rd.readAsText(f); e.target.value = '';
+    };
+    requestAnimationFrame(frame);
+    window.__studio = { F: F, compile: compile, effectModule: effectModule, get W() { return W; }, Store: Store, saveMascot: saveMascot };
+  }
+  init();
+}
+</script>
+</body>
+</html>

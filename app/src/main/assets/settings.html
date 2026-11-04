@@ -151,6 +151,12 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     </div>
   </div>
   <div class="card">
+    <label>Pixel Studio</label>
+    <div class="mut" style="margin:4px 0 8px;font-size:13px">Import an image, paste pixel code, animate, and save mascots with names.</div>
+    <div class="btns"><button class="b" onclick="location.href='studio.html'">Open Pixel Studio</button></div>
+    <div id="myMasc" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
     <label>Make your own mascot</label>
     <div class="mut" style="margin:4px 0 8px;font-size:13px">Draw a 32x32 pixel character. Frame 1 is the normal look, frame 2 is optional (used for blinking and talking). Save, and he becomes your companion.</div>
     <div style="max-width:320px;margin:0 auto">
@@ -220,6 +226,14 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     try{var j=JSON.parse(Android.loadMascot());if(j.f1)mcLoad(0,j.f1);if(j.f2)mcLoad(1,j.f2);}catch(e){}
     mcRender();mcTools();}
   setTimeout(mcInit,150);
+  function mmList(){var box=document.getElementById('myMasc');if(!box)return;box.innerHTML='';
+    try{var a=JSON.parse(Android.listMascots()),cur=Android.getChar();
+      if(!a.length){box.innerHTML='<div class="mut" style="font-size:13px">No saved mascots yet.</div>';return;}
+      a.forEach(function(m){var b=document.createElement('button');b.className='b ghost';b.style.margin='3px';b.textContent=m.name;
+        if(cur=='mascot:'+m.slug)b.style.outline='2px solid #fff';
+        b.onclick=function(){Android.useMascot(m.slug);chrShow('');setTimeout(mmList,600);};box.appendChild(b);});
+    }catch(x){}}
+  setTimeout(mmList,500);
   function chrShow(id){document.querySelectorAll('#chrBtns button').forEach(function(b){b.style.outline=b.getAttribute('data-id')==id?'2px solid #fff':'none';});}
   function chrSet(id){try{Android.setChar(id);}catch(x){} chrShow(id);}
   setTimeout(function(){try{chrShow(Android.getChar());}catch(x){}},300);
