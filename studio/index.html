@@ -32,6 +32,11 @@
   .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
   .sw{width:28px;height:28px;border-radius:8px;border:2px solid rgba(0,0,0,.45)}
   #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#5b5bd6;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;display:none;z-index:50}
+  body.vrmtab #pvCard{display:none}
+  .err{color:#ffd6dc;background:#3a1018;border:1px solid #c2334d;border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,monospace}
+  .err:empty{display:none}
+  .chip{padding:4px 9px;border-radius:999px;border:1px solid #3a3d6b;background:#1a1c36;color:#d7d9f5;font-size:12px}
+  .chip.on{background:#5b5bd6;border-color:#5b5bd6}
 </style>
 </head>
 <body>
@@ -43,7 +48,7 @@
   </header>
 
   <!-- shared preview + error panel + actions -->
-  <div class="card" style="position:sticky;top:0;z-index:5">
+  <div class="card" id="pvCard" style="position:sticky;top:0;z-index:5">
     <canvas id="preview" class="cv" width="320" height="180"></canvas>
     <div id="error"></div>
     <div class="row">
@@ -64,6 +69,7 @@
     <button class="btn" data-tab="import">IMPORT</button>
     <button class="btn" data-tab="anim">ANIM</button>
     <button class="btn" data-tab="lib">LIBRARY</button>
+    <button class="btn" data-tab="vrm">VRM</button>
   </nav>
 
   <!-- ART: preset mascot, image -> pixel art, editor -->
@@ -164,6 +170,95 @@
       <div class="row"><label class="mut">Restore a downloaded mascot (.json)</label><input type="file" id="jsonIn" accept=".json,application/json" style="max-width:100%;font-size:13px"></div>
     </div>
     <div id="libList"></div>
+  </section>
+  <!-- VRM: load any .vrm/.glb, pose bones, edit animations -->
+  <section id="t-vrm" class="tabpane">
+    <div class="card">
+      <div class="row">
+        <button class="btn pri" id="vLoad">Load VRM / GLB</button>
+        <button class="btn" id="vHina">Use Hina's model</button>
+        <input type="file" id="vFile" accept=".vrm,.glb,application/octet-stream" style="display:none">
+      </div>
+      <div class="mut" id="vInfo">No model loaded. Tap Load and pick any .vrm or .glb (VRM 0.x, VRM 1.0 or plain skinned GLB).</div>
+      <canvas id="vCv" class="cv" style="width:100%;max-width:420px;aspect-ratio:1;display:block;margin:8px auto;image-rendering:auto"></canvas>
+      <div id="vError" class="err"></div>
+      <div class="row">
+        <button class="btn pri" id="vPlay">Pause</button>
+        <input type="range" id="vScrub" min="0" max="200" value="0" style="flex:1;min-width:120px">
+        <span class="mut" id="vT">0.00s</span>
+      </div>
+      <div class="row">
+        <label class="mut">Loop (s)</label><input type="number" id="vLoop" value="2" min="0.2" max="60" step="0.1" style="width:70px">
+        <button class="btn" id="vFlip">Turn 180</button>
+        <button class="btn" id="vCam">Reset camera</button>
+        <button class="btn" id="vPng">PNG</button>
+      </div>
+      <div class="mut">Drag = rotate. Two fingers = zoom.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn" id="vModeK">Keyframes</button>
+        <button class="btn" id="vModeC">Code</button>
+      </div>
+      <div class="row" id="vPresets">
+        <span class="mut">Start from:</span>
+        <button class="btn" data-preset="relax">Relax arms</button>
+        <button class="btn" data-preset="idle">Idle</button>
+        <button class="btn" data-preset="wave">Wave</button>
+        <button class="btn" data-preset="walk">Walk</button>
+        <button class="btn red" data-preset="clear">T-pose</button>
+      </div>
+
+      <div id="vKeysBox">
+        <div class="row">
+          <label class="mut">Bone</label>
+          <select id="vBone" style="flex:1;min-width:140px"></select>
+        </div>
+        <div class="row"><span class="mut" style="width:60px">Pitch X</span><input type="range" id="vX" min="-180" max="180" step="1" value="0" style="flex:1"><span class="mut" id="vXl" style="width:36px;text-align:right">0</span></div>
+        <div class="row"><span class="mut" style="width:60px">Turn Y</span><input type="range" id="vY" min="-180" max="180" step="1" value="0" style="flex:1"><span class="mut" id="vYl" style="width:36px;text-align:right">0</span></div>
+        <div class="row"><span class="mut" style="width:60px">Roll Z</span><input type="range" id="vZ" min="-180" max="180" step="1" value="0" style="flex:1"><span class="mut" id="vZl" style="width:36px;text-align:right">0</span></div>
+        <div id="vPosBox">
+          <div class="row"><span class="mut" style="width:60px">Move X</span><input type="range" id="vPX" min="-30" max="30" step="0.5" value="0" style="flex:1"><span class="mut" id="vPXl" style="width:36px;text-align:right">0</span></div>
+          <div class="row"><span class="mut" style="width:60px">Move Y</span><input type="range" id="vPY" min="-30" max="30" step="0.5" value="0" style="flex:1"><span class="mut" id="vPYl" style="width:36px;text-align:right">0</span></div>
+          <div class="row"><span class="mut" style="width:60px">Move Z</span><input type="range" id="vPZ" min="-30" max="30" step="0.5" value="0" style="flex:1"><span class="mut" id="vPZl" style="width:36px;text-align:right">0</span></div>
+        </div>
+        <div class="row">
+          <button class="btn pri" id="vKey">Set key here</button>
+          <button class="btn red" id="vDelKey">Delete key</button>
+          <label class="mut"><input type="checkbox" id="vAuto"> auto-key</label>
+        </div>
+        <div class="row" id="vChips"></div>
+        <div class="row">
+          <button class="btn red" id="vClearBone">Clear this bone</button>
+          <button class="btn red" id="vClearAll">Clear all</button>
+        </div>
+      </div>
+
+      <div id="vCodeBox" style="display:none">
+        <div class="mut" style="margin-bottom:6px">JavaScript. <b>pose.head(x,y,z)</b> rotates a bone (degrees). <b>pose.rot("leftUpperArm",x,y,z)</b> works too. <b>pose.move("hips",x,y,z)</b> moves in meters. <b>t</b> = seconds. Bone names are in the Bone list above (Keyframes mode).</div>
+        <textarea id="vCode" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="row"><button class="btn pri" id="vRunCode">RUN</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input type="text" id="vName" placeholder="animation name" style="flex:1;min-width:140px">
+        <button class="btn pri" id="vSaveAnim">Save</button>
+      </div>
+      <div class="row">
+        <select id="vAnimSel" style="flex:1;min-width:140px"></select>
+        <button class="btn" id="vLoadAnim">Load</button>
+        <button class="btn red" id="vDelAnim">Delete</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="vExport">Export JSON</button>
+        <button class="btn" id="vImportJson">Load JSON from box</button>
+      </div>
+      <textarea id="vJson" spellcheck="false" style="min-height:90px" placeholder="animation JSON (Export fills this; paste one here and tap Load JSON from box)"></textarea>
+      <div class="mut" style="margin-top:6px">Animations use standard humanoid bone names, so one animation works on any VRM.</div>
+    </div>
   </section>
 </div>
 <div id="toast"></div>
@@ -823,6 +918,646 @@ if (!RUN) {
   }
   init();
 }
+</script>
+<script>
+/* ===================== VRM TAB: loader + WebGL viewer + animation editor =====================
+   Own minimal GLB/VRM parser, CPU skinning, WebGL1 renderer. No libraries, no ImageData constructor. */
+(function () {
+'use strict';
+if (location.hash.indexOf('run') >= 0) return;
+const $ = function (s) { return document.querySelector(s); };
+const hasApp = !!(window.Android && Android.pickStudioVrm);
+const D2R = Math.PI / 180;
+
+/* ---------- math (column-major 4x4) ---------- */
+const M = {
+  id: function () { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); },
+  mul: function (a, b) {
+    const o = new Float32Array(16);
+    for (let c = 0; c < 4; c++) {
+      const b0 = b[c*4], b1 = b[c*4+1], b2 = b[c*4+2], b3 = b[c*4+3];
+      for (let r = 0; r < 4; r++) o[c*4+r] = a[r]*b0 + a[4+r]*b1 + a[8+r]*b2 + a[12+r]*b3;
+    }
+    return o;
+  },
+  trs: function (t, q, s) {
+    const x = q[0], y = q[1], z = q[2], w = q[3];
+    const xx = x*x, yy = y*y, zz = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
+    return new Float32Array([
+      (1-2*(yy+zz))*s[0], (2*(xy+wz))*s[0], (2*(xz-wy))*s[0], 0,
+      (2*(xy-wz))*s[1], (1-2*(xx+zz))*s[1], (2*(yz+wx))*s[1], 0,
+      (2*(xz+wy))*s[2], (2*(yz-wx))*s[2], (1-2*(xx+yy))*s[2], 0,
+      t[0], t[1], t[2], 1]);
+  },
+  persp: function (fov, asp, n, f) {
+    const t = 1 / Math.tan(fov / 2);
+    return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]);
+  },
+  lookAt: function (e, c, u) {
+    let zx = e[0]-c[0], zy = e[1]-c[1], zz = e[2]-c[2], l = Math.hypot(zx, zy, zz) || 1;
+    zx /= l; zy /= l; zz /= l;
+    let xx = u[1]*zz - u[2]*zy, xy = u[2]*zx - u[0]*zz, xz = u[0]*zy - u[1]*zx;
+    l = Math.hypot(xx, xy, xz) || 1; xx /= l; xy /= l; xz /= l;
+    const yx = zy*xz - zz*xy, yy = zz*xx - zx*xz, yz = zx*xy - zy*xx;
+    return new Float32Array([xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0,
+      -(xx*e[0]+xy*e[1]+xz*e[2]), -(yx*e[0]+yy*e[1]+yz*e[2]), -(zx*e[0]+zy*e[1]+zz*e[2]), 1]);
+  }
+};
+function qmul(a, b) {
+  return [a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1], a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+          a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3], a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
+}
+function qax(i, deg) { const h = deg * D2R / 2, s = Math.sin(h), q = [0, 0, 0, Math.cos(h)]; q[i] = s; return q; }
+function eulerQ(r) { return qmul(qmul(qax(0, r[0]), qax(1, r[1])), qax(2, r[2])); }
+function decomp(m) {
+  const sx = Math.hypot(m[0], m[1], m[2]), sy = Math.hypot(m[4], m[5], m[6]), sz = Math.hypot(m[8], m[9], m[10]);
+  const m00 = m[0]/sx, m10 = m[1]/sx, m20 = m[2]/sx, m01 = m[4]/sy, m11 = m[5]/sy, m21 = m[6]/sy, m02 = m[8]/sz, m12 = m[9]/sz, m22 = m[10]/sz;
+  const tr = m00 + m11 + m22; let x, y, z, w, S;
+  if (tr > 0) { S = Math.sqrt(tr + 1) * 2; w = S/4; x = (m21-m12)/S; y = (m02-m20)/S; z = (m10-m01)/S; }
+  else if (m00 > m11 && m00 > m22) { S = Math.sqrt(1+m00-m11-m22) * 2; w = (m21-m12)/S; x = S/4; y = (m01+m10)/S; z = (m02+m20)/S; }
+  else if (m11 > m22) { S = Math.sqrt(1+m11-m00-m22) * 2; w = (m02-m20)/S; x = (m01+m10)/S; y = S/4; z = (m12+m21)/S; }
+  else { S = Math.sqrt(1+m22-m00-m11) * 2; w = (m10-m01)/S; x = (m02+m20)/S; y = (m12+m21)/S; z = S/4; }
+  return { t: [m[12], m[13], m[14]], q: [x, y, z, w], s: [sx, sy, sz] };
+}
+
+/* ---------- GLB / VRM parsing ---------- */
+const CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
+const NC = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
+const GETTER = { 5120: 'getInt8', 5121: 'getUint8', 5122: 'getInt16', 5123: 'getUint16', 5125: 'getUint32', 5126: 'getFloat32' };
+function parseGLB(buf) {
+  if (buf.byteLength < 20) throw new Error('File is too small to be a model');
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('Not a binary GLB/VRM file. Use a .vrm or .glb file.');
+  let off = 12, json = null, bin = null;
+  while (off + 8 <= buf.byteLength) {
+    const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true);
+    if (type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, off + 8, len)));
+    else if (type === 0x004E4942 && !bin) bin = buf.slice(off + 8, off + 8 + len);
+    off += 8 + len;
+  }
+  if (!json) throw new Error('Model has no JSON chunk');
+  if (!bin) throw new Error('Model has no binary data (only .glb / .vrm with embedded data are supported)');
+  return { json: json, bin: bin };
+}
+function readAcc(g, i) {
+  const a = g.json.accessors[i], T = CT[a.componentType], n = NC[a.type];
+  if (a.bufferView == null) return new T(a.count * n);
+  const bv = g.json.bufferViews[a.bufferView], bs = T.BYTES_PER_ELEMENT;
+  const base = (bv.byteOffset || 0) + (a.byteOffset || 0), stride = bv.byteStride || n * bs;
+  let out;
+  if (stride === n * bs && base % bs === 0) out = new T(g.bin, base, a.count * n).slice();
+  else {
+    out = new T(a.count * n); const dv = new DataView(g.bin), get = GETTER[a.componentType];
+    for (let k = 0; k < a.count; k++) for (let c = 0; c < n; c++) out[k * n + c] = dv[get](base + k * stride + c * bs, true);
+  }
+  if (a.normalized && T !== Float32Array) {
+    const mx = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535, 5125: 4294967295 }[a.componentType], f = new Float32Array(out.length);
+    for (let k = 0; k < out.length; k++) f[k] = Math.max(out[k] / mx, -1);
+    out = f;
+  }
+  return out;
+}
+const BONE_ORDER = ['hips','spine','chest','upperChest','neck','head','leftShoulder','leftUpperArm','leftLowerArm','leftHand','rightShoulder','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','leftToes','rightUpperLeg','rightLowerLeg','rightFoot','rightToes','jaw','leftEye','rightEye'];
+
+async function buildModel(buf) {
+  const g = parseGLB(buf), J = g.json;
+  const nodes = (J.nodes || []).map(function (n, i) {
+    let t = n.translation || [0, 0, 0], q = n.rotation || [0, 0, 0, 1], s = n.scale || [1, 1, 1];
+    if (n.matrix) { const d = decomp(n.matrix); t = d.t; q = d.q; s = d.s; }
+    return { i: i, name: n.name || ('node' + i), t: t.slice(), q: q.slice(), s: s.slice(), rt: t.slice(), rq: q.slice(), children: n.children || [], mesh: n.mesh, skin: n.skin, parent: -1, world: M.id() };
+  });
+  nodes.forEach(function (n) { n.children.forEach(function (c) { if (nodes[c]) nodes[c].parent = n.i; }); });
+  const sc = (J.scenes && J.scenes[J.scene || 0]) || null;
+  const roots = sc && sc.nodes ? sc.nodes : nodes.filter(function (n) { return n.parent < 0; }).map(function (n) { return n.i; });
+  function updateWorld() {
+    const visit = function (i, pw) { const n = nodes[i], l = M.trs(n.t, n.q, n.s); n.world = pw ? M.mul(pw, l) : l; for (let k = 0; k < n.children.length; k++) visit(n.children[k], n.world); };
+    roots.forEach(function (r) { visit(r, null); });
+  }
+  const skins = (J.skins || []).map(function (s) {
+    let ibm = s.inverseBindMatrices != null ? readAcc(g, s.inverseBindMatrices) : null;
+    if (!ibm) { ibm = new Float32Array(s.joints.length * 16); for (let k = 0; k < s.joints.length; k++) { ibm[k*16] = ibm[k*16+5] = ibm[k*16+10] = ibm[k*16+15] = 1; } }
+    return { joints: s.joints, ibm: ibm };
+  });
+
+  /* textures */
+  const texCache = {};
+  function getImg(ti) {
+    if (ti == null || !J.textures || !J.textures[ti]) return Promise.resolve(null);
+    if (texCache[ti]) return texCache[ti];
+    const t = J.textures[ti], im = t.source != null && J.images ? J.images[t.source] : null;
+    if (!im || im.bufferView == null) return Promise.resolve(null);
+    const bv = J.bufferViews[im.bufferView];
+    const blob = new Blob([new Uint8Array(g.bin, bv.byteOffset || 0, bv.byteLength)], { type: im.mimeType || 'image/png' });
+    texCache[ti] = createImageBitmap(blob).catch(function () { return null; });
+    return texCache[ti];
+  }
+  const v0 = J.extensions && J.extensions.VRM, v1 = J.extensions && J.extensions.VRMC_vrm;
+  const defMat = { col: [1, 1, 1, 1], img: null, mode: 0, cut: 0.5, dbl: false, name: 'default' };
+  const mats = await Promise.all((J.materials || []).map(async function (m, mi) {
+    const p = m.pbrMetallicRoughness || {};
+    let col = (p.baseColorFactor || [1, 1, 1, 1]).slice(), ti = p.baseColorTexture ? p.baseColorTexture.index : null;
+    const mp = v0 && v0.materialProperties && v0.materialProperties[mi];
+    if (mp && ti == null && mp.textureProperties && mp.textureProperties._MainTex != null) ti = mp.textureProperties._MainTex;
+    if (mp && !p.baseColorFactor && mp.vectorProperties && mp.vectorProperties._Color) col = mp.vectorProperties._Color.slice();
+    return { col: col, img: await getImg(ti), mode: m.alphaMode === 'BLEND' ? 2 : (m.alphaMode === 'MASK' ? 1 : 0), cut: m.alphaCutoff != null ? m.alphaCutoff : 0.5, dbl: !!m.doubleSided, name: m.name || ('mat' + mi) };
+  }));
+
+  /* primitives */
+  const prims = [];
+  nodes.forEach(function (n) {
+    if (n.mesh == null || !J.meshes[n.mesh]) return;
+    J.meshes[n.mesh].primitives.forEach(function (pr) {
+      if (pr.mode != null && pr.mode !== 4) return;
+      const a = pr.attributes; if (a.POSITION == null) return;
+      const P = readAcc(g, a.POSITION), count = P.length / 3;
+      let N = a.NORMAL != null ? readAcc(g, a.NORMAL) : null;
+      if (!N) { N = new Float32Array(count * 3); for (let k = 0; k < count; k++) N[k*3+1] = 1; }
+      const UV = a.TEXCOORD_0 != null ? readAcc(g, a.TEXCOORD_0) : new Float32Array(count * 2);
+      let idx;
+      if (pr.indices != null) idx = readAcc(g, pr.indices); else { idx = new Uint32Array(count); for (let k = 0; k < count; k++) idx[k] = k; }
+      if (!(idx instanceof Uint16Array)) { let mx = 0; for (let k = 0; k < idx.length; k++) if (idx[k] > mx) mx = idx[k]; if (mx < 65536) idx = Uint16Array.from(idx); }
+      const skin = (n.skin != null && skins[n.skin] && a.JOINTS_0 != null && a.WEIGHTS_0 != null) ? n.skin : -1;
+      prims.push({
+        node: n, P: P, N: N, UV: UV, idx: idx, count: count, skin: skin,
+        Jn: skin >= 0 ? readAcc(g, a.JOINTS_0) : null, W: skin >= 0 ? readAcc(g, a.WEIGHTS_0) : null,
+        mat: pr.material != null && mats[pr.material] ? mats[pr.material] : defMat,
+        oP: P.slice(), oN: N.slice()
+      });
+    });
+  });
+  if (!prims.length) throw new Error('This file has no triangle meshes');
+
+  /* humanoid bones */
+  const hm = {}; let ver = -1;
+  if (v1 && v1.humanoid && v1.humanoid.humanBones) { ver = 1; for (const k in v1.humanoid.humanBones) hm[k] = v1.humanoid.humanBones[k].node; }
+  else if (v0 && v0.humanoid && v0.humanoid.humanBones) { ver = 0; v0.humanoid.humanBones.forEach(function (b) { hm[b.bone] = b.node; }); }
+  const bones = [], bmap = {};
+  if (ver >= 0) {
+    BONE_ORDER.forEach(function (k) { if (hm[k] != null && nodes[hm[k]]) { bones.push({ name: k, node: hm[k] }); bmap[k] = hm[k]; } });
+    Object.keys(hm).forEach(function (k) { if (bmap[k] == null && nodes[hm[k]]) { bones.push({ name: k, node: hm[k] }); bmap[k] = hm[k]; } });
+  } else {
+    const seen = {};
+    skins.forEach(function (s) { s.joints.forEach(function (ji) { let nm = nodes[ji].name; if (seen[nm]) nm = nm + '_' + ji; seen[nm] = 1; bones.push({ name: nm, node: ji }); bmap[nm] = ji; }); });
+  }
+  const order = prims.slice().sort(function (a, b) { return (a.mat.mode === 2 ? 1 : 0) - (b.mat.mode === 2 ? 1 : 0); });
+  const model = { nodes: nodes, roots: roots, skins: skins, prims: prims, order: order, mats: mats, bones: bones, bmap: bmap, ver: ver, facing: ver === 0 ? -1 : 1, updateWorld: updateWorld };
+  model.applyPose = function (pose) {
+    for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; n.t[0] = n.rt[0]; n.t[1] = n.rt[1]; n.t[2] = n.rt[2]; n.q[0] = n.rq[0]; n.q[1] = n.rq[1]; n.q[2] = n.rq[2]; n.q[3] = n.rq[3]; }
+    const rot = pose.rot || {}, pos = pose.pos || {};
+    for (let i = 0; i < bones.length; i++) {
+      const b = bones[i], n = nodes[b.node], r = rot[b.name], p = pos[b.name];
+      if (r) { const q = qmul(n.rq, eulerQ(r)); n.q[0] = q[0]; n.q[1] = q[1]; n.q[2] = q[2]; n.q[3] = q[3]; }
+      if (p) { n.t[0] = n.rt[0] + p[0]; n.t[1] = n.rt[1] + p[1]; n.t[2] = n.rt[2] + p[2]; }
+    }
+    updateWorld();
+  };
+  model.skin = function () {
+    const cache = {};
+    for (let pi = 0; pi < prims.length; pi++) {
+      const p = prims[pi]; if (p.skin < 0) continue;
+      let jm = cache[p.skin];
+      if (!jm) {
+        const s = skins[p.skin]; jm = new Float32Array(s.joints.length * 16);
+        for (let k = 0; k < s.joints.length; k++) jm.set(M.mul(nodes[s.joints[k]].world, s.ibm.subarray(k * 16, k * 16 + 16)), k * 16);
+        cache[p.skin] = jm;
+      }
+      const P = p.P, N = p.N, W = p.W, Jn = p.Jn, oP = p.oP, oN = p.oN, n = p.count;
+      for (let i = 0; i < n; i++) {
+        const px = P[i*3], py = P[i*3+1], pz = P[i*3+2], nx = N[i*3], ny = N[i*3+1], nz = N[i*3+2];
+        let x = 0, y = 0, z = 0, ax = 0, ay = 0, az = 0, ws = 0;
+        for (let k = 0; k < 4; k++) {
+          const w = W[i*4+k]; if (!w) continue;
+          const o = Jn[i*4+k] * 16; ws += w;
+          x += w * (jm[o]*px + jm[o+4]*py + jm[o+8]*pz + jm[o+12]);
+          y += w * (jm[o+1]*px + jm[o+5]*py + jm[o+9]*pz + jm[o+13]);
+          z += w * (jm[o+2]*px + jm[o+6]*py + jm[o+10]*pz + jm[o+14]);
+          ax += w * (jm[o]*nx + jm[o+4]*ny + jm[o+8]*nz);
+          ay += w * (jm[o+1]*nx + jm[o+5]*ny + jm[o+9]*nz);
+          az += w * (jm[o+2]*nx + jm[o+6]*ny + jm[o+10]*nz);
+        }
+        if (ws === 0) { oP[i*3] = px; oP[i*3+1] = py; oP[i*3+2] = pz; oN[i*3] = nx; oN[i*3+1] = ny; oN[i*3+2] = nz; }
+        else { oP[i*3] = x; oP[i*3+1] = y; oP[i*3+2] = z; oN[i*3] = ax; oN[i*3+1] = ay; oN[i*3+2] = az; }
+      }
+    }
+  };
+  model.bounds = function () {
+    const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+    prims.forEach(function (p) {
+      const w = p.node.world, src = p.skin >= 0 ? p.oP : p.P;
+      for (let i = 0; i < p.count; i++) {
+        let x = src[i*3], y = src[i*3+1], z = src[i*3+2];
+        if (p.skin < 0) { const X = w[0]*x + w[4]*y + w[8]*z + w[12], Y = w[1]*x + w[5]*y + w[9]*z + w[13], Z = w[2]*x + w[6]*y + w[10]*z + w[14]; x = X; y = Y; z = Z; }
+        if (x < mn[0]) mn[0] = x; if (y < mn[1]) mn[1] = y; if (z < mn[2]) mn[2] = z;
+        if (x > mx[0]) mx[0] = x; if (y > mx[1]) mx[1] = y; if (z > mx[2]) mx[2] = z;
+      }
+    });
+    return { mn: mn, mx: mx };
+  };
+  model.vertexCount = prims.reduce(function (s, p) { return s + p.count; }, 0);
+  return model;
+}
+
+/* ---------- WebGL renderer ---------- */
+const VS = 'attribute vec3 aP;attribute vec3 aN;attribute vec2 aT;uniform mat4 uVP;uniform mat4 uM;varying vec3 vN;varying vec2 vT;' +
+  'void main(){vec4 w=uM*vec4(aP,1.0);gl_Position=uVP*w;vN=(uM*vec4(aN,0.0)).xyz;vT=aT;}';
+const FS = 'precision mediump float;varying vec3 vN;varying vec2 vT;uniform sampler2D uTex;uniform vec4 uCol;uniform float uHas;uniform float uCut;uniform float uMode;' +
+  'void main(){vec4 c=uCol;if(uHas>0.5)c*=texture2D(uTex,vT);if(uMode>0.5&&uMode<1.5&&c.a<uCut)discard;float a=(uMode>1.5)?c.a:1.0;' +
+  'vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;float d=max(dot(n,normalize(vec3(0.35,0.7,0.6))),0.0);gl_FragColor=vec4(c.rgb*(0.62+0.5*d),a);}';
+function makeRenderer(cv) {
+  const gl = cv.getContext('webgl', { antialias: true, preserveDrawingBuffer: true, alpha: false }) || cv.getContext('experimental-webgl', { preserveDrawingBuffer: true, alpha: false });
+  if (!gl) throw new Error('WebGL is not available here');
+  const u32 = gl.getExtension('OES_element_index_uint');
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader error: ' + gl.getShaderInfoLog(s)); return s; }
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error('Program link failed');
+  gl.useProgram(pr);
+  const L = { aP: gl.getAttribLocation(pr, 'aP'), aN: gl.getAttribLocation(pr, 'aN'), aT: gl.getAttribLocation(pr, 'aT') };
+  ['uVP', 'uM', 'uTex', 'uCol', 'uHas', 'uCut', 'uMode'].forEach(function (k) { L[k] = gl.getUniformLocation(pr, k); });
+  gl.enableVertexAttribArray(L.aP); gl.enableVertexAttribArray(L.aN); gl.enableVertexAttribArray(L.aT);
+  function pow2(n) { return Math.max(1, Math.pow(2, Math.round(Math.log2(Math.max(1, n))))); }
+  function mkTex(img) {
+    const w = Math.min(1024, pow2(img.width)), h = Math.min(1024, pow2(img.height));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    return t;
+  }
+  function buf(target, data, usage) { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, usage); return b; }
+  const R = {
+    gl: gl,
+    free: function (m) {
+      if (!m) return;
+      m.prims.forEach(function (p) { [p.bP, p.bN, p.bT, p.bI].forEach(function (b) { if (b) gl.deleteBuffer(b); }); });
+      m.mats.forEach(function (x) { if (x.gl) gl.deleteTexture(x.gl); });
+    },
+    upload: function (m) {
+      m.prims.forEach(function (p) {
+        p.bP = buf(gl.ARRAY_BUFFER, p.skin >= 0 ? p.oP : p.P, p.skin >= 0 ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+        p.bN = buf(gl.ARRAY_BUFFER, p.skin >= 0 ? p.oN : p.N, p.skin >= 0 ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+        p.bT = buf(gl.ARRAY_BUFFER, p.UV, gl.STATIC_DRAW);
+        p.bI = buf(gl.ELEMENT_ARRAY_BUFFER, p.idx, gl.STATIC_DRAW);
+        p.glType = p.idx instanceof Uint16Array ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT;
+        p.skip = p.glType === gl.UNSIGNED_INT && !u32;
+      });
+      m.mats.forEach(function (x) { if (x.img && !x.gl) x.gl = mkTex(x.img); });
+    },
+    draw: function (m, cam, aspect) {
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.clearColor(0.106, 0.114, 0.227, 1); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      const cp = Math.cos(cam.pitch), eye = [cam.target[0] + cam.dist * Math.sin(cam.yaw) * cp, cam.target[1] + cam.dist * Math.sin(cam.pitch), cam.target[2] + cam.dist * Math.cos(cam.yaw) * cp];
+      const vp = M.mul(M.persp(30 * D2R, aspect, Math.max(0.01, cam.dist * 0.02), cam.dist * 20), M.lookAt(eye, cam.target, [0, 1, 0]));
+      gl.uniformMatrix4fv(L.uVP, false, vp);
+      const idm = M.id();
+      for (let k = 0; k < m.order.length; k++) {
+        const p = m.order[k]; if (p.skip) continue;
+        const mt = p.mat;
+        gl.bindBuffer(gl.ARRAY_BUFFER, p.bP); if (p.skin >= 0) gl.bufferSubData(gl.ARRAY_BUFFER, 0, p.oP); gl.vertexAttribPointer(L.aP, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, p.bN); if (p.skin >= 0) gl.bufferSubData(gl.ARRAY_BUFFER, 0, p.oN); gl.vertexAttribPointer(L.aN, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, p.bT); gl.vertexAttribPointer(L.aT, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.bI);
+        gl.uniformMatrix4fv(L.uM, false, p.skin >= 0 ? idm : p.node.world);
+        gl.uniform4f(L.uCol, mt.col[0], mt.col[1], mt.col[2], mt.col[3]);
+        gl.uniform1f(L.uCut, mt.cut); gl.uniform1f(L.uMode, mt.mode);
+        if (mt.gl) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mt.gl); gl.uniform1i(L.uTex, 0); gl.uniform1f(L.uHas, 1); } else gl.uniform1f(L.uHas, 0);
+        if (mt.mode === 2) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); } else { gl.disable(gl.BLEND); gl.depthMask(true); }
+        if (mt.dbl) gl.disable(gl.CULL_FACE); else gl.enable(gl.CULL_FACE);
+        gl.drawElements(gl.TRIANGLES, p.idx.length, p.glType, 0);
+      }
+    }
+  };
+  return R;
+}
+
+/* ---------- animation data ---------- */
+const S = { model: null, rend: null, anim: { name: '', loop: 2, tracks: {} }, playing: true, t: 0, mode: 'keys', bone: 'hips', edit: null, cam: { yaw: 0, pitch: 0.12, dist: 3, target: [0, 1, 0] }, codeFn: null, codeBad: false };
+function evalTrack(keys, t, loop) {
+  const n = keys.length; if (!n) return null; if (n === 1) return { r: keys[0].r.slice(), p: keys[0].p.slice() };
+  let a, b, u;
+  if (t < keys[0].t) { a = keys[n-1]; b = keys[0]; const sp = (b.t + loop) - a.t; u = sp > 0 ? ((t + loop) - a.t) / sp : 0; }
+  else if (t >= keys[n-1].t) { a = keys[n-1]; b = keys[0]; const sp = (b.t + loop) - a.t; u = sp > 0 ? (t - a.t) / sp : 0; }
+  else { let i = 0; while (i < n - 2 && keys[i+1].t <= t) i++; a = keys[i]; b = keys[i+1]; u = (t - a.t) / ((b.t - a.t) || 1); }
+  u = Math.max(0, Math.min(1, u)); u = (1 - Math.cos(Math.PI * u)) / 2;
+  const mix = function (x, y) { return [x[0] + (y[0]-x[0]) * u, x[1] + (y[1]-x[1]) * u, x[2] + (y[2]-x[2]) * u]; };
+  return { r: mix(a.r, b.r), p: mix(a.p, b.p) };
+}
+function evalAnim(t) {
+  const out = { rot: {}, pos: {} }, loop = S.anim.loop || 2;
+  for (const b in S.anim.tracks) { const v = evalTrack(S.anim.tracks[b], t, loop); if (v) { out.rot[b] = v.r; out.pos[b] = v.p; } }
+  return out;
+}
+function addKey(bone, t, r, p) {
+  const tr = S.anim.tracks[bone] || (S.anim.tracks[bone] = []);
+  t = Math.round(t * 100) / 100;
+  const ex = tr.find(function (k) { return Math.abs(k.t - t) < 0.03; });
+  if (ex) { ex.t = t; ex.r = r.slice(); ex.p = (p || [0, 0, 0]).slice(); } else { tr.push({ t: t, r: r.slice(), p: (p || [0, 0, 0]).slice() }); tr.sort(function (a, b) { return a.t - b.t; }); }
+}
+function has(b) { return S.model && S.model.bmap[b] != null; }
+
+/* code mode */
+const DEF_CODE = 'function(pose, t, model){\n  // degrees. Try it, then change numbers.\n  pose.head(Math.sin(t*2)*8, Math.sin(t)*15, 0);\n  pose.spine(Math.sin(t*1.5)*2, 0, 0);\n  pose.move("hips", 0, Math.sin(t*3)*0.01, 0);\n}\n';
+function compileCode(txt) {
+  let c = txt.replace(/^\s*import[^\n]*\n/gm, '').replace(/export\s+default\s+/, '').trim();
+  if (!c) throw new Error('Code is empty');
+  if (c.charAt(0) === '<') throw new Error('That looks like HTML, not JavaScript.');
+  let fn = null;
+  try { fn = new Function('return (' + c.replace(/;\s*$/, '') + ')')(); } catch (e) { fn = null; }
+  if (typeof fn !== 'function') fn = new Function('pose', 't', 'model', c);
+  return fn;
+}
+function runCode(t) {
+  const rot = {}, pos = {}, names = S.model.bones.map(function (b) { return b.name; });
+  const api = { bones: names, rot: function (b, x, y, z) { rot[b] = [x || 0, y || 0, z || 0]; }, move: function (b, x, y, z) { pos[b] = [x || 0, y || 0, z || 0]; } };
+  names.forEach(function (n) { if (!(n in api)) api[n] = function (x, y, z) { rot[n] = [x || 0, y || 0, z || 0]; }; });
+  S.codeFn(api, t, S.model);
+  return { rot: rot, pos: pos };
+}
+
+/* ---------- UI plumbing ---------- */
+const cv = $('#vCv');
+function vErr(m) { $('#vError').textContent = m || ''; }
+function errText(e) { let m = String(e && e.message ? e.message : e); if (e instanceof SyntaxError) m += '\nTip: pose.head(10,0,0);  pose.rot("leftUpperArm",0,0,60);'; return m; }
+function loopLen() { return Math.max(0.2, S.anim.loop || 2); }
+function setPlayLabel() { $('#vPlay').textContent = S.playing ? 'Pause' : 'Play'; }
+function curRot() {
+  if (S.edit && S.edit.bone === S.bone) return S.edit;
+  const p = evalAnim(S.t); return { bone: S.bone, r: p.rot[S.bone] || [0, 0, 0], p: p.pos[S.bone] || [0, 0, 0] };
+}
+const SL = ['vX', 'vY', 'vZ'], PL = ['vPX', 'vPY', 'vPZ'];
+function syncBone() {
+  const c = curRot();
+  SL.forEach(function (id, i) { $('#' + id).value = c.r[i]; $('#' + id + 'l').textContent = Math.round(c.r[i]); });
+  PL.forEach(function (id, i) { const v = c.p[i] * 100; $('#' + id).value = v; $('#' + id + 'l').textContent = Math.round(v * 10) / 10; });
+  $('#vPosBox').style.display = S.bone === 'hips' ? 'block' : 'none';
+  renderChips();
+}
+function renderChips() {
+  const box = $('#vChips'); box.innerHTML = '';
+  const keys = S.anim.tracks[S.bone] || [];
+  if (!keys.length) { const s = document.createElement('span'); s.className = 'mut'; s.textContent = 'No keys on this bone yet.'; box.appendChild(s); return; }
+  keys.forEach(function (k) {
+    const b = document.createElement('button'); b.className = 'chip' + (Math.abs(k.t - S.t) < 0.03 ? ' on' : ''); b.textContent = k.t.toFixed(2) + 's';
+    b.onclick = function () { S.edit = null; S.playing = false; setPlayLabel(); S.t = k.t; $('#vScrub').value = Math.round(k.t * 100); syncBone(); };
+    box.appendChild(b);
+  });
+}
+function fillBones() {
+  const sel = $('#vBone'); sel.innerHTML = '';
+  S.model.bones.forEach(function (b) { const o = document.createElement('option'); o.textContent = b.name; o.value = b.name; sel.appendChild(o); });
+  if (!has(S.bone)) S.bone = S.model.bones.length ? S.model.bones[0].name : '';
+  sel.value = S.bone;
+}
+function fitCam() {
+  S.model.applyPose({}); S.model.skin();
+  const b = S.model.bounds(), ext = Math.max(b.mx[0] - b.mn[0], b.mx[1] - b.mn[1], b.mx[2] - b.mn[2]) || 1;
+  S.cam.target = [(b.mn[0] + b.mx[0]) / 2, (b.mn[1] + b.mx[1]) / 2, (b.mn[2] + b.mx[2]) / 2];
+  S.cam.dist = ext * 2.2; S.cam.yaw = S.model.facing < 0 ? Math.PI : 0; S.cam.pitch = 0.1;
+}
+async function loadBuf(name, buf, persist) {
+  vErr(''); $('#vInfo').textContent = 'Loading ' + name + ' ...';
+  try {
+    const m = await buildModel(buf);
+    m.name = name;
+    if (!S.rend) S.rend = makeRenderer(cv);
+    if (S.model) S.rend.free(S.model);
+    S.model = m; S.rend.upload(m); fitCam(); fillBones(); S.edit = null; syncBone();
+    $('#vInfo').textContent = name + '  |  ' + m.vertexCount + ' vertices  |  ' + m.bones.length + ' bones  |  ' + (m.ver === 1 ? 'VRM 1.0' : (m.ver === 0 ? 'VRM 0.x' : 'plain GLB (bone names from the skeleton)'));
+    if (persist) idbPut('last', { name: name, buf: buf }).catch(function () { });
+  } catch (e) { vErr(errText(e)); $('#vInfo').textContent = 'Could not load ' + name; }
+}
+
+/* IndexedDB: remember the last model */
+function idb() { return new Promise(function (res, rej) { const r = indexedDB.open('pxs_vrm', 1); r.onupgradeneeded = function () { r.result.createObjectStore('m'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
+function idbPut(k, v) { return idb().then(function (d) { return new Promise(function (res, rej) { const t = d.transaction('m', 'readwrite'); t.objectStore('m').put(v, k); t.oncomplete = res; t.onerror = function () { rej(t.error); }; }); }); }
+function idbGet(k) { return idb().then(function (d) { return new Promise(function (res, rej) { const q = d.transaction('m').objectStore('m').get(k); q.onsuccess = function () { res(q.result); }; q.onerror = function () { rej(q.error); }; }); }); }
+
+/* App bridge: native file picker + chunked read */
+window.onStudioVrm = async function (name, size, err) {
+  if (!name) { vErr(err || 'Could not read that file'); return; }
+  $('#vInfo').textContent = 'Reading ' + name + ' ...';
+  const out = new Uint8Array(size); let off = 0;
+  while (off < size) {
+    const b64 = Android.vrmChunk(off, 786432); if (!b64) break;
+    const bin = atob(b64); for (let i = 0; i < bin.length; i++) out[off + i] = bin.charCodeAt(i);
+    off += bin.length; await new Promise(function (r) { setTimeout(r, 0); });
+  }
+  if (off < size) { vErr('Read stopped early (' + off + ' of ' + size + ' bytes)'); return; }
+  loadBuf(name, out.buffer, true);
+};
+
+/* ---------- presets ---------- */
+function probe(base, bone, axis, deg, measure, comp) {
+  const rot = {}; for (const k in base) rot[k] = base[k].slice();
+  const r = (rot[bone] || [0, 0, 0]).slice(); r[axis] = deg; rot[bone] = r;
+  S.model.applyPose({ rot: rot });
+  const v = S.model.nodes[S.model.bmap[measure]].world[12 + comp];
+  return v;
+}
+function bestSign(base, bone, axis, measure, comp, want) {
+  if (!has(bone) || !has(measure)) return 1;
+  const a = probe(base, bone, axis, 40, measure, comp), b = probe(base, bone, axis, -40, measure, comp);
+  return (want === 'max' ? a > b : a < b) ? 1 : -1;
+}
+function setTrack(a, bone, list) { if (!has(bone)) return; a.tracks[bone] = list.map(function (k) { return { t: k[0], r: k[1].slice(), p: (k[2] || [0, 0, 0]).slice() }; }); }
+function presetAnim(name) {
+  const a = { name: name, loop: 2, tracks: {} }, f = S.model.facing;
+  const sdL = bestSign({}, 'leftUpperArm', 2, 'leftLowerArm', 1, 'min'), sdR = bestSign({}, 'rightUpperArm', 2, 'rightLowerArm', 1, 'min');
+  const relaxBase = {}; if (has('leftUpperArm')) relaxBase.leftUpperArm = [0, 0, sdL * 62]; if (has('rightUpperArm')) relaxBase.rightUpperArm = [0, 0, sdR * 62];
+  const arm = function (side, extraX) { const s = side === 'left' ? sdL : sdR; return [extraX || 0, 0, s * 62]; };
+  if (name === 'relax') {
+    a.loop = 2; setTrack(a, 'leftUpperArm', [[0, arm('left')]]); setTrack(a, 'rightUpperArm', [[0, arm('right')]]);
+    setTrack(a, 'leftLowerArm', [[0, [0, 0, sdL * 8]]]); setTrack(a, 'rightLowerArm', [[0, [0, 0, sdR * 8]]]);
+  } else if (name === 'idle') {
+    a.loop = 4;
+    setTrack(a, 'leftUpperArm', [[0, [0, 0, sdL * 62]], [2, [0, 0, sdL * 59]], [4, [0, 0, sdL * 62]]]);
+    setTrack(a, 'rightUpperArm', [[0, [0, 0, sdR * 62]], [2, [0, 0, sdR * 59]], [4, [0, 0, sdR * 62]]]);
+    setTrack(a, 'spine', [[0, [0, 0, 0]], [2, [2.5, 0, 0]], [4, [0, 0, 0]]]);
+    setTrack(a, 'chest', [[0, [0, 0, 0]], [2, [1.5, 0, 0]], [4, [0, 0, 0]]]);
+    setTrack(a, 'head', [[0, [1, -4, 0]], [2, [-1, 4, 0]], [4, [1, -4, 0]]]);
+  } else if (name === 'wave') {
+    a.loop = 2;
+    setTrack(a, 'leftUpperArm', [[0, arm('left')], [2, arm('left')]]);
+    setTrack(a, 'rightUpperArm', [[0, [0, 0, -sdR * 70]], [2, [0, 0, -sdR * 70]]]);
+    setTrack(a, 'rightLowerArm', [[0, [0, 0, -28]], [0.5, [0, 0, 28]], [1, [0, 0, -28]], [1.5, [0, 0, 28]], [2, [0, 0, -28]]]);
+    setTrack(a, 'head', [[0, [0, -5, 4]], [1, [0, 5, -4]], [2, [0, -5, 4]]]);
+  } else if (name === 'walk') {
+    a.loop = 1.2;
+    const hs = bestSign({}, 'leftUpperLeg', 0, 'leftFoot', 2, f > 0 ? 'max' : 'min');
+    const ks = -bestSign({}, 'leftLowerLeg', 0, 'leftFoot', 2, f > 0 ? 'max' : 'min');
+    const as = bestSign(relaxBase, 'leftUpperArm', 0, 'leftLowerArm', 2, f > 0 ? 'max' : 'min');
+    setTrack(a, 'leftUpperLeg', [[0, [hs * 25, 0, 0]], [0.6, [-hs * 25, 0, 0]], [1.2, [hs * 25, 0, 0]]]);
+    setTrack(a, 'rightUpperLeg', [[0, [-hs * 25, 0, 0]], [0.6, [hs * 25, 0, 0]], [1.2, [-hs * 25, 0, 0]]]);
+    setTrack(a, 'leftLowerLeg', [[0, [0, 0, 0]], [0.6, [ks * 5, 0, 0]], [0.9, [ks * 45, 0, 0]], [1.2, [0, 0, 0]]]);
+    setTrack(a, 'rightLowerLeg', [[0, [ks * 5, 0, 0]], [0.3, [ks * 45, 0, 0]], [0.6, [0, 0, 0]], [1.2, [ks * 5, 0, 0]]]);
+    setTrack(a, 'leftUpperArm', [[0, [-as * 18, 0, sdL * 62]], [0.6, [as * 18, 0, sdL * 62]], [1.2, [-as * 18, 0, sdL * 62]]]);
+    setTrack(a, 'rightUpperArm', [[0, [as * 18, 0, sdR * 62]], [0.6, [-as * 18, 0, sdR * 62]], [1.2, [as * 18, 0, sdR * 62]]]);
+    setTrack(a, 'hips', [[0, [0, 0, 0], [0, 0, 0]], [0.3, [0, 3, 0], [0, 0.015, 0]], [0.6, [0, 0, 0], [0, 0, 0]], [0.9, [0, -3, 0], [0, 0.015, 0]], [1.2, [0, 0, 0], [0, 0, 0]]]);
+    setTrack(a, 'spine', [[0, [0, 3, 0]], [0.6, [0, -3, 0]], [1.2, [0, 3, 0]]]);
+  }
+  return a;
+}
+function applyPreset(name) {
+  if (!S.model) { vErr('Load a model first.'); return; }
+  vErr('');
+  S.anim = name === 'clear' ? { name: '', loop: S.anim.loop || 2, tracks: {} } : presetAnim(name);
+  $('#vLoop').value = S.anim.loop; $('#vScrub').max = Math.round(loopLen() * 100); S.t = 0; S.edit = null; S.playing = name !== 'clear' && name !== 'relax' ? true : S.playing;
+  setMode('keys'); setPlayLabel(); syncBone();
+  if (name !== 'clear') $('#vName').value = S.anim.name;
+}
+function setMode(m) {
+  S.mode = m;
+  $('#vKeysBox').style.display = m === 'keys' ? 'block' : 'none';
+  $('#vCodeBox').style.display = m === 'code' ? 'block' : 'none';
+  $('#vModeK').classList.toggle('on', m === 'keys'); $('#vModeC').classList.toggle('on', m === 'code');
+}
+function compileUserCode() {
+  try { S.codeFn = compileCode($('#vCode').value); S.codeBad = false; vErr(''); }
+  catch (e) { S.codeFn = null; S.codeBad = true; vErr(errText(e)); }
+}
+
+/* saved animations */
+const AK = 'pxs_vrm_anims';
+function anims() { try { return JSON.parse(localStorage.getItem(AK) || '{}'); } catch (e) { return {}; } }
+function saveAnims(o) { try { localStorage.setItem(AK, JSON.stringify(o)); } catch (e) { vErr('Storage full'); } }
+function refreshAnimSel() {
+  const sel = $('#vAnimSel'), o = anims(); sel.innerHTML = '';
+  const ks = Object.keys(o);
+  if (!ks.length) { const e = document.createElement('option'); e.textContent = '(no saved animations)'; e.value = ''; sel.appendChild(e); return; }
+  ks.forEach(function (k) { const e = document.createElement('option'); e.textContent = k; e.value = k; sel.appendChild(e); });
+}
+function slug(n) { return (n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'anim').slice(0, 40); }
+function animJson() { return { format: 'pixel-studio-vrm-anim', ver: 1, name: S.anim.name || $('#vName').value || 'anim', loop: loopLen(), tracks: S.anim.tracks, code: S.mode === 'code' ? $('#vCode').value : undefined }; }
+function loadAnimObj(o) {
+  if (!o || typeof o !== 'object' || !o.tracks) throw new Error('That is not an animation JSON (needs a "tracks" field)');
+  const tr = {};
+  for (const b in o.tracks) tr[b] = o.tracks[b].map(function (k) { return { t: +k.t || 0, r: (k.r || [0, 0, 0]).map(Number), p: (k.p || [0, 0, 0]).map(Number) }; });
+  S.anim = { name: o.name || '', loop: +o.loop || 2, tracks: tr };
+  $('#vLoop').value = S.anim.loop; $('#vScrub').max = Math.round(loopLen() * 100); $('#vName').value = S.anim.name; S.t = 0; S.edit = null;
+  if (o.code) { $('#vCode').value = o.code; compileUserCode(); setMode('code'); } else setMode('keys');
+  syncBone();
+}
+function dl(name, mime, text, dataUrl) {
+  if (hasApp && Android.saveToDownloads) { Android.saveToDownloads(name, mime, dataUrl ? dataUrl.split(',')[1] : btoa(unescape(encodeURIComponent(text)))); return; }
+  const a = document.createElement('a'); a.href = dataUrl || URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- render loop ---------- */
+let last = performance.now(), frameN = 0;
+function active() { const s = $('#t-vrm'); return s && s.classList.contains('on'); }
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  document.body.classList.toggle('vrmtab', active());
+  if (!active() || !S.model || !S.rend) return;
+  try {
+    const w = Math.max(64, Math.floor(cv.clientWidth * Math.min(window.devicePixelRatio || 1, 2)));
+    if (cv.width !== w || cv.height !== w) { cv.width = w; cv.height = w; }
+    const loop = loopLen();
+    if (S.playing) { S.t = (S.t + dt) % loop; $('#vScrub').value = Math.round(S.t * 100); if ((frameN++ % 6) === 0 && S.mode === 'keys') syncBone(); }
+    $('#vT').textContent = S.t.toFixed(2) + 's';
+    let pose;
+    if (S.mode === 'code') { pose = S.codeFn && !S.codeBad ? runCode(S.t) : { rot: {}, pos: {} }; }
+    else pose = evalAnim(S.t);
+    if (S.edit && S.mode === 'keys') { pose.rot[S.edit.bone] = S.edit.r; pose.pos[S.edit.bone] = S.edit.p; }
+    S.model.applyPose(pose); S.model.skin();
+    S.rend.draw(S.model, S.cam, 1);
+  } catch (e) { if (S.mode === 'code') { S.codeBad = true; } vErr(errText(e)); }
+}
+
+/* ---------- wiring ---------- */
+function init() {
+  $('#vCode').value = DEF_CODE;
+  setMode('keys'); refreshAnimSel(); setPlayLabel();
+  $('#vLoad').onclick = function () { if (hasApp) Android.pickStudioVrm(); else $('#vFile').click(); };
+  $('#vFile').onchange = function (e) {
+    const f = e.target.files[0]; if (!f) return;
+    f.arrayBuffer().then(function (b) { loadBuf(f.name, b, true); }); e.target.value = '';
+  };
+  $('#vHina').onclick = function () {
+    if (hasApp && Android.loadHinaModel) Android.loadHinaModel();
+    else vErr('Open this inside the Hina app to use its model, or tap Load VRM / GLB.');
+  };
+  $('#vPlay').onclick = function () { S.playing = !S.playing; if (S.playing) S.edit = null; setPlayLabel(); };
+  $('#vScrub').oninput = function (e) { S.playing = false; setPlayLabel(); S.edit = null; S.t = (+e.target.value) / 100; if (S.mode === 'keys') syncBone(); };
+  $('#vLoop').onchange = function (e) { S.anim.loop = Math.max(0.2, +e.target.value || 2); $('#vScrub').max = Math.round(loopLen() * 100); };
+  $('#vScrub').max = 200;
+  $('#vFlip').onclick = function () { S.cam.yaw += Math.PI; };
+  $('#vCam').onclick = function () { if (S.model) fitCam(); };
+  $('#vPng').onclick = function () { if (S.model) dl((slug(S.model.name || 'model')) + '.png', 'image/png', null, cv.toDataURL('image/png')); };
+  $('#vModeK').onclick = function () { setMode('keys'); syncBone(); };
+  $('#vModeC').onclick = function () { setMode('code'); compileUserCode(); };
+  $('#vRunCode').onclick = function () { S.playing = true; setPlayLabel(); compileUserCode(); };
+  $('#vCode').addEventListener('input', function () { clearTimeout(init.tm); init.tm = setTimeout(compileUserCode, 400); });
+  Array.prototype.forEach.call(document.querySelectorAll('#vPresets [data-preset]'), function (b) { b.onclick = function () { applyPreset(b.dataset.preset); }; });
+  $('#vBone').onchange = function (e) { S.bone = e.target.value; S.edit = null; syncBone(); };
+  function onSlide() {
+    if (!S.model || !S.bone) return;
+    S.playing = false; setPlayLabel();
+    const r = SL.map(function (id) { return +$('#' + id).value; }), p = PL.map(function (id) { return (+$('#' + id).value) / 100; });
+    S.edit = { bone: S.bone, r: r, p: S.bone === 'hips' ? p : [0, 0, 0] };
+    SL.forEach(function (id, i) { $('#' + id + 'l').textContent = Math.round(r[i]); });
+    PL.forEach(function (id, i) { $('#' + id + 'l').textContent = Math.round(p[i] * 1000) / 10; });
+    if ($('#vAuto').checked) { addKey(S.bone, S.t, S.edit.r, S.edit.p); renderChips(); }
+  }
+  SL.concat(PL).forEach(function (id) { $('#' + id).addEventListener('input', onSlide); });
+  $('#vKey').onclick = function () {
+    if (!S.model || !S.bone) { vErr('Load a model first.'); return; }
+    const c = curRot(); addKey(S.bone, S.t, c.r, c.p); S.edit = null; renderChips(); vErr('');
+  };
+  $('#vDelKey').onclick = function () {
+    const tr = S.anim.tracks[S.bone]; if (!tr) return;
+    let bi = -1, bd = 0.06; tr.forEach(function (k, i) { const d = Math.abs(k.t - S.t); if (d < bd) { bd = d; bi = i; } });
+    if (bi >= 0) tr.splice(bi, 1); if (!tr.length) delete S.anim.tracks[S.bone]; S.edit = null; syncBone();
+  };
+  $('#vClearBone').onclick = function () { delete S.anim.tracks[S.bone]; S.edit = null; syncBone(); };
+  $('#vClearAll').onclick = function () { S.anim.tracks = {}; S.edit = null; syncBone(); };
+  $('#vSaveAnim').onclick = function () {
+    const n = $('#vName').value.trim(); if (!n) { vErr('Give the animation a name first.'); return; }
+    S.anim.name = n; const o = anims(); o[n] = animJson(); saveAnims(o); refreshAnimSel(); $('#vAnimSel').value = n; vErr('');
+  };
+  $('#vLoadAnim').onclick = function () { const k = $('#vAnimSel').value, o = anims(); if (!k || !o[k]) return; try { loadAnimObj(o[k]); vErr(''); } catch (e) { vErr(errText(e)); } };
+  $('#vDelAnim').onclick = function () { const k = $('#vAnimSel').value, o = anims(); if (!k) return; delete o[k]; saveAnims(o); refreshAnimSel(); };
+  $('#vExport').onclick = function () {
+    const txt = JSON.stringify(animJson(), null, 1); $('#vJson').value = txt;
+    dl(slug($('#vName').value || S.anim.name || 'anim') + '.vrmanim.json', 'application/json', txt);
+  };
+  $('#vImportJson').onclick = function () { try { loadAnimObj(JSON.parse($('#vJson').value)); vErr(''); } catch (e) { vErr(errText(e)); } };
+
+  /* camera */
+  const ptrs = new Map();
+  cv.addEventListener('pointerdown', function (e) { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); });
+  cv.addEventListener('pointermove', function (e) {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    if (ptrs.size === 1) { S.cam.yaw -= (e.clientX - p[0]) * 0.008; S.cam.pitch = Math.max(-1.4, Math.min(1.4, S.cam.pitch + (e.clientY - p[1]) * 0.008)); }
+    else if (ptrs.size === 2) {
+      let o = null; ptrs.forEach(function (v, id) { if (id !== e.pointerId) o = v; });
+      const d0 = Math.hypot(p[0] - o[0], p[1] - o[1]), d1 = Math.hypot(e.clientX - o[0], e.clientY - o[1]);
+      if (d1 > 4) S.cam.dist = Math.max(0.05, S.cam.dist * d0 / d1);
+    }
+    ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  });
+  const up = function (e) { ptrs.delete(e.pointerId); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', function (e) { e.preventDefault(); S.cam.dist = Math.max(0.05, S.cam.dist * (1 + e.deltaY * 0.001)); }, { passive: false });
+
+  /* restore the last model the first time the VRM tab opens */
+  let restored = false;
+  document.getElementById('tabs').addEventListener('click', function () {
+    setTimeout(function () {
+      if (!active() || restored) return; restored = true;
+      idbGet('last').then(function (v) { if (v && v.buf && !S.model) loadBuf(v.name, v.buf, false); }).catch(function () { });
+    }, 0);
+  });
+  window.__vrm = { S: S, buildModel: buildModel, loadBuf: loadBuf, presetAnim: presetAnim, applyPreset: applyPreset, evalAnim: evalAnim };
+  requestAnimationFrame(tick);
+}
+init();
+})();
 </script>
 </body>
 </html>

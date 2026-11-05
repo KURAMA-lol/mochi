@@ -104,6 +104,27 @@ class MainActivity : Activity() {
             }.start()
             return
         }
+        if (requestCode == 80) {
+            val u80 = data?.data
+            if (resultCode != RESULT_OK || u80 == null) return
+            Thread {
+                try {
+                    var nm = "model.vrm"
+                    contentResolver.query(u80, null, null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            val ix = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (ix >= 0) nm = c.getString(ix) ?: nm
+                        }
+                    }
+                    val f = File(cacheDir, "studio.vrm")
+                    contentResolver.openInputStream(u80)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                    js("window.onStudioVrm && onStudioVrm(" + JSONObject.quote(nm) + "," + f.length() + ")")
+                } catch (e: Throwable) {
+                    js("window.onStudioVrm && onStudioVrm(null,0," + JSONObject.quote(e.message ?: "read failed") + ")")
+                }
+            }.start()
+            return
+        }
         if (requestCode != 77 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         Thread {
@@ -281,6 +302,39 @@ class MainActivity : Activity() {
             getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", id).apply()
             runOnUiThread { restartCompanion() }
         }
+
+        @JavascriptInterface fun pickStudioVrm() {
+            runOnUiThread {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
+                startActivityForResult(i, 80)
+            }
+        }
+
+        @JavascriptInterface fun loadHinaModel() {
+            Thread {
+                try {
+                    val src = ChibiView.modelFile(this@MainActivity)
+                    if (!src.exists()) {
+                        js("window.onStudioVrm && onStudioVrm(null,0,'No 3D model set in Hina yet')")
+                        return@Thread
+                    }
+                    val f = File(cacheDir, "studio.vrm")
+                    src.copyTo(f, true)
+                    js("window.onStudioVrm && onStudioVrm('hina-model.vrm'," + f.length() + ")")
+                } catch (e: Throwable) {
+                    js("window.onStudioVrm && onStudioVrm(null,0," + JSONObject.quote(e.message ?: "read failed") + ")")
+                }
+            }.start()
+        }
+
+        @JavascriptInterface fun vrmChunk(off: Int, len: Int): String = try {
+            java.io.RandomAccessFile(File(cacheDir, "studio.vrm"), "r").use { r ->
+                r.seek(off.toLong())
+                val b = ByteArray(len)
+                val n = r.read(b)
+                if (n <= 0) "" else android.util.Base64.encodeToString(b, 0, n, android.util.Base64.NO_WRAP)
+            }
+        } catch (e: Throwable) { "" }
 
         @JavascriptInterface fun pickModel() {
             runOnUiThread {
