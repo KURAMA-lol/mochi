@@ -256,6 +256,13 @@
         <button class="btn" id="vExport">Export JSON</button>
         <button class="btn" id="vImportJson">Load JSON from box</button>
       </div>
+      <div class="row">
+        <span class="mut">Play in Hina when:</span>
+        <select id="vAct"><option>idle</option><option>walk</option><option>run</option><option>sit</option><option>sleep</option><option>wave</option><option>sus</option><option>drag</option></select>
+        <button class="btn pri" id="vUse">Use in Hina</button>
+        <button class="btn red" id="vUnuse">Remove</button>
+      </div>
+      <div class="mut" id="vUsed"></div>
       <textarea id="vJson" spellcheck="false" style="min-height:90px" placeholder="animation JSON (Export fills this; paste one here and tap Load JSON from box)"></textarea>
       <div class="mut" style="margin-top:6px">Animations use standard humanoid bone names, so one animation works on any VRM.</div>
     </div>
@@ -1081,8 +1088,11 @@ async function buildModel(buf) {
         node: n, P: P, N: N, UV: UV, idx: idx, count: count, skin: skin,
         Jn: skin >= 0 ? readAcc(g, a.JOINTS_0) : null, W: skin >= 0 ? readAcc(g, a.WEIGHTS_0) : null,
         mat: pr.material != null && mats[pr.material] ? mats[pr.material] : defMat,
-        oP: P.slice(), oN: N.slice()
+        oP: P.slice(), oN: N.slice(),
+        morph: (pr.targets && pr.targets.length && skin >= 0) ? pr.targets.map(function (tg) { return tg.POSITION != null ? readAcc(g, tg.POSITION) : null; }) : null,
+        mP: null
       });
+      const lp = prims[prims.length - 1]; if (lp.morph) lp.mP = P.slice();
     });
   });
   if (!prims.length) throw new Error('This file has no triangle meshes');
@@ -1099,8 +1109,33 @@ async function buildModel(buf) {
     const seen = {};
     skins.forEach(function (s) { s.joints.forEach(function (ji) { let nm = nodes[ji].name; if (seen[nm]) nm = nm + '_' + ji; seen[nm] = 1; bones.push({ name: nm, node: ji }); bmap[nm] = ji; }); });
   }
+  const exprs = {};
+  const alias = function (n) { const m = { joy: 'happy', sorrow: 'sad', fun: 'relaxed', a: 'aa', i: 'ih', u: 'ou', e: 'ee', o: 'oh', blink_l: 'blinkLeft', blink_r: 'blinkRight' }; return m[String(n).toLowerCase()] || n; };
+  if (v0 && v0.blendShapeMaster && v0.blendShapeMaster.blendShapeGroups) v0.blendShapeMaster.blendShapeGroups.forEach(function (gr) {
+    const nm = gr.presetName && gr.presetName !== 'unknown' ? gr.presetName : gr.name;
+    if (!nm || !gr.binds || !gr.binds.length) return;
+    exprs[alias(nm)] = gr.binds.map(function (b) { return { mesh: b.mesh, idx: b.index, w: (b.weight != null ? b.weight : 100) / 100 }; });
+  });
+  if (v1 && v1.expressions) ['preset', 'custom'].forEach(function (sec) {
+    const o = v1.expressions[sec]; if (!o) return;
+    Object.keys(o).forEach(function (k) { const mb = o[k].morphTargetBinds; if (mb && mb.length) exprs[k] = mb.map(function (b) { return { node: b.node, idx: b.index, w: b.weight != null ? b.weight : 1 }; }); });
+  });
   const order = prims.slice().sort(function (a, b) { return (a.mat.mode === 2 ? 1 : 0) - (b.mat.mode === 2 ? 1 : 0); });
   const model = { nodes: nodes, roots: roots, skins: skins, prims: prims, order: order, mats: mats, bones: bones, bmap: bmap, ver: ver, facing: ver === 0 ? -1 : 1, updateWorld: updateWorld };
+  model.exprs = exprs; model.exprNames = Object.keys(exprs);
+  model.setExpr = function (wts) {
+    prims.forEach(function (p) {
+      if (!p.morph) return;
+      const tw = new Float32Array(p.morph.length);
+      for (const name in wts) {
+        const v = wts[name], bl = exprs[name]; if (!(v > 0.001) || !bl) continue;
+        bl.forEach(function (b) { if (((b.mesh != null && b.mesh === p.node.mesh) || (b.node != null && b.node === p.node.i)) && b.idx < tw.length) tw[b.idx] += v * b.w; });
+      }
+      const key = tw.join(','); if (p.mKey === key) return; p.mKey = key;
+      p.mP.set(p.P);
+      for (let k = 0; k < tw.length; k++) { const w = Math.min(1, tw[k]); if (w > 0.001 && p.morph[k]) { const d = p.morph[k]; for (let i = 0; i < d.length; i++) p.mP[i] += d[i] * w; } }
+    });
+  };
   model.applyPose = function (pose) {
     for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; n.t[0] = n.rt[0]; n.t[1] = n.rt[1]; n.t[2] = n.rt[2]; n.q[0] = n.rq[0]; n.q[1] = n.rq[1]; n.q[2] = n.rq[2]; n.q[3] = n.rq[3]; }
     const rot = pose.rot || {}, pos = pose.pos || {};
@@ -1121,7 +1156,7 @@ async function buildModel(buf) {
         for (let k = 0; k < s.joints.length; k++) jm.set(M.mul(nodes[s.joints[k]].world, s.ibm.subarray(k * 16, k * 16 + 16)), k * 16);
         cache[p.skin] = jm;
       }
-      const P = p.P, N = p.N, W = p.W, Jn = p.Jn, oP = p.oP, oN = p.oN, n = p.count;
+      const P = p.mP || p.P, N = p.N, W = p.W, Jn = p.Jn, oP = p.oP, oN = p.oN, n = p.count;
       for (let i = 0; i < n; i++) {
         const px = P[i*3], py = P[i*3+1], pz = P[i*3+2], nx = N[i*3], ny = N[i*3+1], nz = N[i*3+2];
         let x = 0, y = 0, z = 0, ax = 0, ay = 0, az = 0, ws = 0;
@@ -1257,7 +1292,7 @@ function addKey(bone, t, r, p) {
   const ex = tr.find(function (k) { return Math.abs(k.t - t) < 0.03; });
   if (ex) { ex.t = t; ex.r = r.slice(); ex.p = (p || [0, 0, 0]).slice(); } else { tr.push({ t: t, r: r.slice(), p: (p || [0, 0, 0]).slice() }); tr.sort(function (a, b) { return a.t - b.t; }); }
 }
-function has(b) { return S.model && S.model.bmap[b] != null; }
+function has(b) { if (!S.model) return false; if (String(b).indexOf('expr:') === 0) return !!S.model.exprs[String(b).slice(5)]; return S.model.bmap[b] != null; }
 
 /* code mode */
 const DEF_CODE = 'function(pose, t, model){\n  // degrees. Try it, then change numbers.\n  pose.head(Math.sin(t*2)*8, Math.sin(t)*15, 0);\n  pose.spine(Math.sin(t*1.5)*2, 0, 0);\n  pose.move("hips", 0, Math.sin(t*3)*0.01, 0);\n}\n';
@@ -1272,7 +1307,7 @@ function compileCode(txt) {
 }
 function runCode(t) {
   const rot = {}, pos = {}, names = S.model.bones.map(function (b) { return b.name; });
-  const api = { bones: names, rot: function (b, x, y, z) { rot[b] = [x || 0, y || 0, z || 0]; }, move: function (b, x, y, z) { pos[b] = [x || 0, y || 0, z || 0]; } };
+  const api = { bones: names, rot: function (b, x, y, z) { rot[b] = [x || 0, y || 0, z || 0]; }, move: function (b, x, y, z) { pos[b] = [x || 0, y || 0, z || 0]; }, expressions: S.model.exprNames, expr: function (n, v) { rot['expr:' + n] = [Math.max(0, Math.min(1, v || 0)) * 100, 0, 0]; } };
   names.forEach(function (n) { if (!(n in api)) api[n] = function (x, y, z) { rot[n] = [x || 0, y || 0, z || 0]; }; });
   S.codeFn(api, t, S.model);
   return { rot: rot, pos: pos };
@@ -1290,6 +1325,10 @@ function curRot() {
 }
 const SL = ['vX', 'vY', 'vZ'], PL = ['vPX', 'vPY', 'vPZ'];
 function syncBone() {
+  const ex = S.bone.indexOf('expr:') === 0;
+  $('#vX').min = ex ? 0 : -180; $('#vX').max = ex ? 100 : 180;
+  $('#vX').previousElementSibling.textContent = ex ? 'Amount' : 'Pitch X';
+  $('#vY').parentNode.style.display = ex ? 'none' : 'flex'; $('#vZ').parentNode.style.display = ex ? 'none' : 'flex';
   const c = curRot();
   SL.forEach(function (id, i) { $('#' + id).value = c.r[i]; $('#' + id + 'l').textContent = Math.round(c.r[i]); });
   PL.forEach(function (id, i) { const v = c.p[i] * 100; $('#' + id).value = v; $('#' + id + 'l').textContent = Math.round(v * 10) / 10; });
@@ -1309,6 +1348,11 @@ function renderChips() {
 function fillBones() {
   const sel = $('#vBone'); sel.innerHTML = '';
   S.model.bones.forEach(function (b) { const o = document.createElement('option'); o.textContent = b.name; o.value = b.name; sel.appendChild(o); });
+  if (S.model.exprNames.length) {
+    const og = document.createElement('optgroup'); og.label = 'Face expressions';
+    S.model.exprNames.forEach(function (n) { const o = document.createElement('option'); o.value = 'expr:' + n; o.textContent = 'face: ' + n; og.appendChild(o); });
+    sel.appendChild(og);
+  }
   if (!has(S.bone)) S.bone = S.model.bones.length ? S.model.bones[0].name : '';
   sel.value = S.bone;
 }
@@ -1379,12 +1423,14 @@ function presetAnim(name) {
     setTrack(a, 'spine', [[0, [0, 0, 0]], [2, [2.5, 0, 0]], [4, [0, 0, 0]]]);
     setTrack(a, 'chest', [[0, [0, 0, 0]], [2, [1.5, 0, 0]], [4, [0, 0, 0]]]);
     setTrack(a, 'head', [[0, [1, -4, 0]], [2, [-1, 4, 0]], [4, [1, -4, 0]]]);
+    setTrack(a, 'expr:blink', [[0, [0, 0, 0]], [3.4, [0, 0, 0]], [3.52, [100, 0, 0]], [3.7, [0, 0, 0]]]);
   } else if (name === 'wave') {
     a.loop = 2;
     setTrack(a, 'leftUpperArm', [[0, arm('left')], [2, arm('left')]]);
     setTrack(a, 'rightUpperArm', [[0, [0, 0, -sdR * 70]], [2, [0, 0, -sdR * 70]]]);
     setTrack(a, 'rightLowerArm', [[0, [0, 0, -28]], [0.5, [0, 0, 28]], [1, [0, 0, -28]], [1.5, [0, 0, 28]], [2, [0, 0, -28]]]);
     setTrack(a, 'head', [[0, [0, -5, 4]], [1, [0, 5, -4]], [2, [0, -5, 4]]]);
+    setTrack(a, 'expr:happy', [[0, [80, 0, 0]], [2, [80, 0, 0]]]);
   } else if (name === 'walk') {
     a.loop = 1.2;
     const hs = bestSign({}, 'leftUpperLeg', 0, 'leftFoot', 2, f > 0 ? 'max' : 'min');
@@ -1432,6 +1478,18 @@ function refreshAnimSel() {
 }
 function slug(n) { return (n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'anim').slice(0, 40); }
 function animJson() { return { format: 'pixel-studio-vrm-anim', ver: 1, name: S.anim.name || $('#vName').value || 'anim', loop: loopLen(), tracks: S.anim.tracks, code: S.mode === 'code' ? $('#vCode').value : undefined }; }
+function nativeJson() {
+  const base = animJson(); delete base.code;
+  if (S.mode !== 'code') return base;
+  if (!S.codeFn) throw new Error('Fix the code first (see the red message).');
+  const loop = loopLen(), tr = {}, saveT = S.t;
+  for (let t = 0; t <= loop + 1e-6; t += 0.05) {
+    const tt = Math.min(t, loop), pz = runCode(tt), ts = Math.round(tt * 100) / 100;
+    for (const b in pz.rot) (tr[b] || (tr[b] = [])).push({ t: ts, r: pz.rot[b].slice(), p: (pz.pos[b] || [0, 0, 0]).slice() });
+    for (const b in pz.pos) if (!pz.rot[b]) (tr[b] || (tr[b] = [])).push({ t: ts, r: [0, 0, 0], p: pz.pos[b].slice() });
+  }
+  S.t = saveT; base.tracks = tr; return base;
+}
 function loadAnimObj(o) {
   if (!o || typeof o !== 'object' || !o.tracks) throw new Error('That is not an animation JSON (needs a "tracks" field)');
   const tr = {};
@@ -1464,6 +1522,8 @@ function tick(now) {
     if (S.mode === 'code') { pose = S.codeFn && !S.codeBad ? runCode(S.t) : { rot: {}, pos: {} }; }
     else pose = evalAnim(S.t);
     if (S.edit && S.mode === 'keys') { pose.rot[S.edit.bone] = S.edit.r; pose.pos[S.edit.bone] = S.edit.p; }
+    const ew = {}; for (const k in pose.rot) if (k.indexOf('expr:') === 0) ew[k.slice(5)] = Math.max(0, pose.rot[k][0] / 100);
+    S.model.setExpr(ew);
     S.model.applyPose(pose); S.model.skin();
     S.rend.draw(S.model, S.cam, 1);
   } catch (e) { if (S.mode === 'code') { S.codeBad = true; } vErr(errText(e)); }
@@ -1499,6 +1559,7 @@ function init() {
     if (!S.model || !S.bone) return;
     S.playing = false; setPlayLabel();
     const r = SL.map(function (id) { return +$('#' + id).value; }), p = PL.map(function (id) { return (+$('#' + id).value) / 100; });
+    if (S.bone.indexOf('expr:') === 0) { r[1] = 0; r[2] = 0; }
     S.edit = { bone: S.bone, r: r, p: S.bone === 'hips' ? p : [0, 0, 0] };
     SL.forEach(function (id, i) { $('#' + id + 'l').textContent = Math.round(r[i]); });
     PL.forEach(function (id, i) { $('#' + id + 'l').textContent = Math.round(p[i] * 1000) / 10; });
@@ -1527,6 +1588,22 @@ function init() {
     dl(slug($('#vName').value || S.anim.name || 'anim') + '.vrmanim.json', 'application/json', txt);
   };
   $('#vImportJson').onclick = function () { try { loadAnimObj(JSON.parse($('#vJson').value)); vErr(''); } catch (e) { vErr(errText(e)); } };
+
+  function refreshUsed() {
+    if (!(hasApp && Android.listAnims)) { $('#vUsed').textContent = 'Sending to Hina only works inside the Hina app.'; return; }
+    try { const o = JSON.parse(Android.listAnims()), ks = Object.keys(o); $('#vUsed').textContent = ks.length ? 'In Hina now: ' + ks.map(function (k) { return k + ' = ' + (o[k] || 'unnamed'); }).join(', ') : 'Nothing assigned yet (Hina uses its built-in moves).'; } catch (e) { $('#vUsed').textContent = ''; }
+  }
+  $('#vUse').onclick = function () {
+    if (!(hasApp && Android.setAnim)) { vErr('Open Pixel Studio inside the Hina app to send animations to it.'); return; }
+    try {
+      const o = nativeJson();
+      if (!Object.keys(o.tracks).length) { vErr('Nothing to send: this animation has no keys yet.'); return; }
+      const act = $('#vAct').value; if (!o.name || o.name === 'anim') o.name = act;
+      vErr(Android.setAnim(act, JSON.stringify(o)) ? '' : 'Hina could not read that animation.'); refreshUsed();
+    } catch (e) { vErr(errText(e)); }
+  };
+  $('#vUnuse').onclick = function () { if (hasApp && Android.removeAnim) { Android.removeAnim($('#vAct').value); refreshUsed(); } };
+  refreshUsed();
 
   /* camera */
   const ptrs = new Map();

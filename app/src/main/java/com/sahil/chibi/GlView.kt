@@ -62,6 +62,34 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
         private val LLX = 5; private val RLX = 6; private val HY = 7; private val HX = 8; private val HZ = 9
         private val HYAW = 10; private val YAW = 11; private val RTW = 12
 
+        private val st9 = HashMap<String, FloatArray>()
+        private val evalOut = HashMap<String, FloatArray>()
+        private val exprW = HashMap<String, Float>()
+        private val hipsOff = FloatArray(3)
+
+        private fun euler9(c: FloatArray): FloatArray =
+            M3.mulNew(M3.mulNew(M3.rotX(c[0]), M3.rotY(c[1])), M3.rotZ(c[2]))
+
+        private fun applyAnim(rig: VrmRig, a: VrmAnim, t: Float, dt: Float, snap: Boolean) {
+            evalOut.clear()
+            a.eval(t, evalOut)
+            val k = if (snap) 1f else 1f - exp(-dt * 12f)
+            val names = HashSet<String>(st9.keys)
+            names.addAll(evalOut.keys)
+            hipsOff[0] = 0f; hipsOff[1] = 0f; hipsOff[2] = 0f
+            for (name in names) {
+                val goal = evalOut[name]
+                val c = st9.getOrPut(name) { FloatArray(6) }
+                for (i in 0..5) c[i] += ((goal?.get(i) ?: 0f) - c[i]) * k
+                if (name.startsWith("expr:")) {
+                    exprW[name.substring(5)] = (c[0] / 100f).coerceIn(0f, 1f)
+                } else {
+                    rig.setLocal(name, euler9(c))
+                    if (name == "hips") { hipsOff[0] = c[3]; hipsOff[1] = c[4]; hipsOff[2] = c[5] }
+                }
+            }
+        }
+
         override fun run() {
             try {
                 val m = VrmLoader.load(file)
@@ -271,6 +299,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             val fb: FloatBuffer = ByteBuffer.allocateDirect(vc * 8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             val curPos = FloatArray(vc * 3)
             val blinkIdx = m.targetNames.indexOf("Blink")
+            val tw = FloatArray(m.targets.size)
 
             GLES20.glEnable(GLES20.GL_DEPTH_TEST)
             GLES20.glClearColor(0f, 0f, 0f, 0f)
@@ -281,6 +310,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             var blinkStart = 0L
             var lw = 0; var lh = 0
             var first = true
+            var animFirst = true
             while (running) {
                 val now = SystemClock.uptimeMillis()
                 val t = (now - start) / 1000f
@@ -295,13 +325,25 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 else for (i in 0..12) approach(i, dt)
 
                 rig.clear()
+                Anims.ensure(this@GlView.context)
+                val anim = Anims.get(owner.action) ?: Anims.get("idle")
+                var hipsY = cur[HY]
+                rig.hx = 0f; rig.hz = 0f
+                if (anim != null) {
+                    applyAnim(rig, anim, t, dt, animFirst)
+                    animFirst = false
+                    hipsY = hipsOff[1]; rig.hx = hipsOff[0]; rig.hz = hipsOff[2]
+                } else {
+                    animFirst = true
+                    if (st9.isNotEmpty()) { st9.clear(); exprW.clear() }
                 rig.setDelta("leftUpperArm", M3.mulNew(M3.rotX(cur[LAX]), M3.rotZ(cur[LAZ])))
                 rig.setDelta("rightUpperArm", M3.mulNew(M3.mulNew(M3.rotX(cur[RAX]), M3.rotZ(cur[RAZ])), M3.rotX(cur[RTW])))
                 rig.setDelta("rightLowerArm", M3.rotZ(cur[RLZ]))
                 rig.setDelta("leftUpperLeg", M3.rotX(cur[LLX]))
                 rig.setDelta("rightUpperLeg", M3.rotX(cur[RLX]))
                 rig.setDelta("head", M3.mulNew(M3.rotZ(cur[HZ]), M3.mulNew(M3.rotY(cur[HYAW]), M3.rotX(cur[HX]))))
-                rig.solve(cur[HY])
+                }
+                rig.solve(hipsY)
 
                 if (now >= nextBlink && blinkStart == 0L) { blinkStart = now }
                 var bw = 0f
@@ -312,10 +354,37 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 }
                 if (owner.action == "sleep") bw = 1f
 
-                if (blinkIdx >= 0 && blinkIdx < m.targets.size && bw > 0.001f) {
-                    val d = m.targets[blinkIdx]
-                    for (i in curPos.indices) curPos[i] = m.pos[i] + d[i] * bw
-                } else System.arraycopy(m.pos, 0, curPos, 0, curPos.size)
+                java.util.Arrays.fill(tw, 0f)
+                fun addExpr(name: String, v: Float) {
+                    if (v <= 0.001f) return
+                    val binds = m.exprs[name]
+                    if (binds != null) {
+                        for (bd in binds) if (bd.first in tw.indices) tw[bd.first] += v * bd.second
+                    } else if (name == "blink" && blinkIdx >= 0 && blinkIdx < tw.size) tw[blinkIdx] += v
+                }
+                var blinkW = bw
+                val ab = exprW["blink"]
+                if (ab != null && ab > blinkW) blinkW = ab
+                addExpr("blink", blinkW)
+                for ((en, ev) in exprW) if (en != "blink") addExpr(en, ev)
+                if (owner.talking) addExpr("aa", 0.55f * abs(sin(t * 11f)))
+                val mex = when (owner.mood) {
+                    "happy", "excited", "love" -> "happy"
+                    "sad" -> "sad"
+                    "angry" -> "angry"
+                    "surprised", "shocked" -> "surprised"
+                    "relaxed", "calm" -> "relaxed"
+                    else -> ""
+                }
+                if (mex.isNotEmpty() && owner.action != "sleep" && !exprW.containsKey(mex)) addExpr(mex, 0.7f)
+                System.arraycopy(m.pos, 0, curPos, 0, curPos.size)
+                for (ti in tw.indices) {
+                    val wv = tw[ti].coerceIn(0f, 1f)
+                    if (wv > 0.001f) {
+                        val d = m.targets[ti]
+                        for (i in curPos.indices) curPos[i] += d[i] * wv
+                    }
+                }
 
                 val jm = rig.jointMats
                 for (v in 0 until vc) {

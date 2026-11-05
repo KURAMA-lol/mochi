@@ -16,7 +16,8 @@ class VrmModel(
     val targets: List<FloatArray>, val targetNames: List<String>,
     val parent: IntArray, val restT: FloatArray, val restR: FloatArray,
     val order: IntArray, val joints: IntArray, val ibm: FloatArray,
-    val bones: Map<String, Int>
+    val bones: Map<String, Int>,
+    val exprs: Map<String, List<Pair<Int, Float>>>
 )
 
 object VrmLoader {
@@ -154,10 +155,57 @@ object VrmLoader {
             val o = hb.getJSONObject(k)
             bones[o.getString("bone")] = o.getInt("node")
         }
+        if (bones.isEmpty()) {
+            val h1 = j.optJSONObject("extensions")?.optJSONObject("VRMC_vrm")?.optJSONObject("humanoid")?.optJSONObject("humanBones")
+            if (h1 != null) {
+                val hk = h1.keys()
+                while (hk.hasNext()) {
+                    val k = hk.next()
+                    bones[k] = h1.getJSONObject(k).getInt("node")
+                }
+            }
+        }
         if (!bones.containsKey("hips") || !bones.containsKey("head")) throw IllegalArgumentException("not a humanoid VRM")
 
+        val exprs = HashMap<String, List<Pair<Int, Float>>>()
+        fun alias(n: String): String = when (n.lowercase()) {
+            "joy" -> "happy"; "sorrow" -> "sad"; "fun" -> "relaxed"
+            "a" -> "aa"; "i" -> "ih"; "u" -> "ou"; "e" -> "ee"; "o" -> "oh"
+            "blink_l" -> "blinkLeft"; "blink_r" -> "blinkRight"
+            else -> n
+        }
+        val ext = j.optJSONObject("extensions")
+        val groups = ext?.optJSONObject("VRM")?.optJSONObject("blendShapeMaster")?.optJSONArray("blendShapeGroups")
+        if (groups != null) for (gi in 0 until groups.length()) {
+            val gr = groups.getJSONObject(gi)
+            var nm = gr.optString("presetName", "")
+            if (nm.isEmpty() || nm == "unknown") nm = gr.optString("name", "")
+            if (nm.isEmpty()) continue
+            val binds = gr.optJSONArray("binds") ?: continue
+            val l = ArrayList<Pair<Int, Float>>()
+            for (bi in 0 until binds.length()) {
+                val b = binds.getJSONObject(bi)
+                if (b.optInt("mesh", 0) == 0) l.add(Pair(b.getInt("index"), b.optDouble("weight", 100.0).toFloat() / 100f))
+            }
+            if (l.isNotEmpty()) exprs[alias(nm)] = l
+        }
+        val pre = ext?.optJSONObject("VRMC_vrm")?.optJSONObject("expressions")?.optJSONObject("preset")
+        if (pre != null) {
+            val pk = pre.keys()
+            while (pk.hasNext()) {
+                val k = pk.next()
+                val binds = pre.getJSONObject(k).optJSONArray("morphTargetBinds") ?: continue
+                val l = ArrayList<Pair<Int, Float>>()
+                for (bi in 0 until binds.length()) {
+                    val b = binds.getJSONObject(bi)
+                    if (nodes.getJSONObject(b.getInt("node")).optInt("mesh", -1) == 0) l.add(Pair(b.getInt("index"), b.optDouble("weight", 1.0).toFloat()))
+                }
+                if (l.isNotEmpty()) exprs[k] = l
+            }
+        }
+
         return VrmModel(vc, pos, nrm, uv, jointIdx, weights, indices, texData, targets, names,
-            parent, restT, restR, order.toIntArray(), joints, ibm, bones)
+            parent, restT, restR, order.toIntArray(), joints, ibm, bones, exprs)
     }
 }
 
@@ -184,10 +232,14 @@ class VrmRig(private val m: VrmModel) {
     private val wt = FloatArray(n * 3)
     private val delta = FloatArray(n * 9)
     private val hasDelta = BooleanArray(n)
+    private val localR = FloatArray(n * 9)
+    private val hasLocal = BooleanArray(n)
+    var hx = 0f
+    var hz = 0f
     private val hips = m.bones["hips"] ?: -1
     val jointMats = FloatArray(m.joints.size * 12)
 
-    fun clear() { java.util.Arrays.fill(hasDelta, false) }
+    fun clear() { java.util.Arrays.fill(hasDelta, false); java.util.Arrays.fill(hasLocal, false) }
 
     fun setDelta(bone: String, r: FloatArray) {
         val i = m.bones[bone] ?: return
@@ -195,12 +247,22 @@ class VrmRig(private val m: VrmModel) {
         hasDelta[i] = true
     }
 
+    /** Local-axis rotation applied after the rest rotation (what Pixel Studio animations use). */
+    fun setLocal(bone: String, r: FloatArray) {
+        val i = m.bones[bone] ?: return
+        System.arraycopy(r, 0, localR, i * 9, 9)
+        hasLocal[i] = true
+    }
+
     fun solve(hipsDy: Float) {
         val l = FloatArray(9); val t1 = FloatArray(9); val t2 = FloatArray(9)
         for (i in m.order) {
             val p = m.parent[i]
             System.arraycopy(m.restR, i * 9, l, 0, 9)
-            if (hasDelta[i]) {
+            if (hasLocal[i]) {
+                M3.mul(m.restR, i * 9, localR, i * 9, t1, 0)
+                System.arraycopy(t1, 0, l, 0, 9)
+            } else if (hasDelta[i]) {
                 if (p >= 0) {
                     M3.mul(delta, i * 9, wr, p * 9, t1, 0)
                     M3.mulT(wr, p * 9, t1, 0, t2, 0)
@@ -210,10 +272,10 @@ class VrmRig(private val m: VrmModel) {
                 }
                 System.arraycopy(t1, 0, l, 0, 9)
             }
-            val tx = m.restT[i * 3]
+            var tx = m.restT[i * 3]
             var ty = m.restT[i * 3 + 1]
-            val tz = m.restT[i * 3 + 2]
-            if (i == hips) ty += hipsDy
+            var tz = m.restT[i * 3 + 2]
+            if (i == hips) { tx += hx; ty += hipsDy; tz += hz }
             if (p < 0) {
                 System.arraycopy(l, 0, wr, i * 9, 9)
                 wt[i * 3] = tx; wt[i * 3 + 1] = ty; wt[i * 3 + 2] = tz

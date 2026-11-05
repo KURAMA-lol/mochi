@@ -336,6 +336,13 @@ class MainActivity : Activity() {
             }
         } catch (e: Throwable) { "" }
 
+        @JavascriptInterface fun setAnim(action: String, json: String): Boolean =
+            try { Anims.put(this@MainActivity, action, json) } catch (e: Throwable) { false }
+
+        @JavascriptInterface fun removeAnim(action: String) { Anims.remove(this@MainActivity, action) }
+
+        @JavascriptInterface fun listAnims(): String = Anims.list(this@MainActivity)
+
         @JavascriptInterface fun pickModel() {
             runOnUiThread {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
