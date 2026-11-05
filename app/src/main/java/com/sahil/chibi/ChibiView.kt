@@ -37,8 +37,20 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         fun charId(c: Context): String =
             c.getSharedPreferences("char_cfg", Context.MODE_PRIVATE).getString("id", "amongus") ?: "amongus"
 
+        fun modelPath(c: Context, slug: String): File {
+            val d = File(c.filesDir, "models"); d.mkdirs()
+            return File(d, slug + ".vrm")
+        }
+
+        fun currentModel(c: Context): File {
+            val id = charId(c)
+            return if (id.startsWith("model:")) modelPath(c, id.substring(6)) else modelFile(c)
+        }
+
         fun has3d(c: Context): Boolean {
-            if (charId(c) != "amongus") return false
+            val id = charId(c)
+            if (id.startsWith("model:")) return modelPath(c, id.substring(6)).exists()
+            if (id != "amongus") return false
             val f = modelFile(c)
             if (!f.exists()) {
                 try {
@@ -85,7 +97,7 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); "custom" -> Custom(ctx).takeIf { it.ok() }; else -> null }
         loadMascot(ctx)
         if (has3d(ctx)) {
-            val g = GlView(ctx, this, modelFile(ctx))
+            val g = GlView(ctx, this, currentModel(ctx))
             gl = g
             addView(g, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         }

@@ -1462,8 +1462,8 @@ async function sendModelToHina(buf, name) {
       mnote('Sending "' + name + '" to Hina ... ' + Math.round(Math.min(100, (off + CH) * 100 / u8.length)) + '%');
       await new Promise(function (r) { setTimeout(r, 0); });
     }
-    const err = Android.studioModelUse();
-    if (err) { vErr('Hina cannot use this model: ' + err); mnote(''); } else mnote('Done. Hina now uses "' + name + '".');
+    const err = Android.studioModelSave ? Android.studioModelSave(name) : Android.studioModelUse();
+    if (err) { vErr('Hina cannot use this model: ' + err); mnote(''); } else mnote('Saved "' + name + '" and selected it. Hina restarts with it; you can also pick it in Hina Settings > My 3D models.');
   } catch (e) { vErr(errText(e)); mnote(''); }
 }
 

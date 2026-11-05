@@ -151,6 +151,11 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     </div>
   </div>
   <div class="card">
+    <label>My 3D models</label>
+    <div id="myMdl" class="mut" style="font-size:13px;margin:4px 0">No saved 3D models yet. Pixel Studio > VRM tab > load a model > Use in Hina.</div>
+    <div id="mdlErr" style="color:#ff8a8a;font-size:12px;margin-top:6px"></div>
+  </div>
+  <div class="card">
     <label>Pixel Studio</label>
     <div class="mut" style="margin:4px 0 8px;font-size:13px">Import an image, paste pixel code, animate, and save mascots with names.</div>
     <div class="btns"><button class="b" onclick="location.href='studio.html'">Open Pixel Studio</button></div>
@@ -235,7 +240,20 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     }catch(x){}}
   setTimeout(mmList,500);
   function chrShow(id){document.querySelectorAll('#chrBtns button').forEach(function(b){b.style.outline=b.getAttribute('data-id')==id?'2px solid #fff':'none';});}
-  function chrSet(id){try{Android.setChar(id);}catch(x){} chrShow(id);}
+  function chrSet(id){try{Android.setChar(id);}catch(x){} chrShow(id);setTimeout(mdList,300);}
+    function mdList(){var box=document.getElementById('myMdl');if(!box)return;
+      try{var a=JSON.parse(Android.listModels()),cur=Android.getChar();box.innerHTML='';
+        if(!a.length)box.innerHTML='<div class="mut" style="font-size:13px">No saved 3D models yet. Pixel Studio > VRM tab > load a model > Use in Hina.</div>';
+        a.forEach(function(m){var w=document.createElement('div');w.style.margin='4px 0';
+          var b=document.createElement('button');b.className='b ghost';b.textContent=m.name+' ('+m.kb+' KB)';
+          if(cur=='model:'+m.slug)b.style.outline='2px solid #fff';
+          b.onclick=function(){Android.useModel(m.slug);chrShow('');setTimeout(mdList,600);};
+          var d=document.createElement('button');d.className='b ghost';d.textContent='Delete';d.style.marginLeft='6px';
+          var armed=false;d.onclick=function(){if(!armed){armed=true;d.textContent='Tap again';setTimeout(function(){armed=false;d.textContent='Delete';},2500);return;}Android.deleteModel(m.slug);setTimeout(mdList,600);};
+          w.appendChild(b);w.appendChild(d);box.appendChild(w);});
+        var i=JSON.parse(Android.modelInfo());document.getElementById('mdlErr').textContent=i.error?('3D load failed, using sprite: '+i.error):'';
+      }catch(x){}}
+    setTimeout(mdList,500);setInterval(mdList,4000);
   setTimeout(function(){try{chrShow(Android.getChar());}catch(x){}},300);
   function mdl(){try{var i=JSON.parse(Android.modelInfo());var e=document.getElementById('mdlInfo');
    e.textContent=i.has?('3D model active ('+i.sizeKb+' KB)'+(i.error?(' - failed, using sprite: '+i.error):'')):'Using the default sprite.';}catch(x){}}

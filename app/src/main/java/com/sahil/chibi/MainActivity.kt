@@ -353,18 +353,54 @@ class MainActivity : Activity() {
             true
         } catch (e: Throwable) { false }
 
-        /** Validates the uploaded model, makes it Hina's model, restarts the companion. Returns "" or an error message. */
-        @JavascriptInterface fun studioModelUse(): String = try {
+        private fun saveNamed(name: String): String {
             val tmp = File(cacheDir, "studio_up.vrm")
             VrmLoader.load(tmp)
-            val dst = ChibiView.modelFile(this@MainActivity)
-            dst.delete()
+            var slug = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            if (slug.isEmpty()) slug = "model"
+            if (slug.length > 40) slug = slug.substring(0, 40)
+            val dst = ChibiView.modelPath(this@MainActivity, slug)
             tmp.copyTo(dst, true)
+            File(dst.parentFile, slug + ".name").writeText(name.take(60))
             tmp.delete()
+            getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", "model:" + slug).apply()
             ChibiView.lastError = ""
             runOnUiThread { restartCompanion() }
-            ""
-        } catch (e: Throwable) { e.message ?: e.toString() }
+            return ""
+        }
+
+        /** Validates the uploaded model, saves it under its name, selects it, restarts the companion. Returns "" or an error. */
+        @JavascriptInterface fun studioModelSave(name: String): String = try { saveNamed(name) } catch (e: Throwable) { e.message ?: e.toString() }
+
+        @JavascriptInterface fun studioModelUse(): String = try { saveNamed("My model") } catch (e: Throwable) { e.message ?: e.toString() }
+
+        @JavascriptInterface fun listModels(): String {
+            val a = JSONArray()
+            val d = File(filesDir, "models")
+            val fs = d.listFiles()?.filter { it.name.endsWith(".vrm") }?.sortedBy { it.name }
+            if (fs != null) for (f in fs) {
+                val slug = f.name.removeSuffix(".vrm")
+                val nf = File(d, slug + ".name")
+                a.put(JSONObject().put("slug", slug).put("name", if (nf.exists()) nf.readText() else slug).put("kb", f.length() / 1024))
+            }
+            return a.toString()
+        }
+
+        @JavascriptInterface fun useModel(slug: String) {
+            val sl = slug.replace(Regex("[^a-z0-9-]"), "")
+            getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", "model:" + sl).apply()
+            ChibiView.lastError = ""
+            runOnUiThread { restartCompanion() }
+        }
+
+        @JavascriptInterface fun deleteModel(slug: String) {
+            val sl = slug.replace(Regex("[^a-z0-9-]"), "")
+            ChibiView.modelPath(this@MainActivity, sl).delete()
+            File(File(filesDir, "models"), sl + ".name").delete()
+            if (ChibiView.charId(this@MainActivity) == "model:" + sl)
+                getSharedPreferences("char_cfg", MODE_PRIVATE).edit().putString("id", "amongus").apply()
+            runOnUiThread { restartCompanion() }
+        }
 
         @JavascriptInterface fun pickModel() {
             runOnUiThread {

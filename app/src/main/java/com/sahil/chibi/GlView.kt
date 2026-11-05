@@ -149,7 +149,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
 
         private fun isPot(v: Int) = v > 0 && (v and (v - 1)) == 0
 
-        private fun makeTex(bytes: ByteArray?): Int {
+        private fun makeTex(bytes: ByteArray?, color: Int): Int {
             val id = IntArray(1)
             GLES20.glGenTextures(1, id, 0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, id[0])
@@ -166,7 +166,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             }
             if (bmp == null) {
                 bmp = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-                bmp.eraseColor(0xFFCCCCCC.toInt())
+                bmp.eraseColor(color)
             }
             val pot = isPot(bmp.width) && isPot(bmp.height)
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0)
@@ -253,6 +253,19 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
 
         private fun loop(m: VrmModel) {
             val rig = VrmRig(m)
+            rig.clear(); rig.hx = 0f; rig.hz = 0f; rig.solve(0f)
+            val laP = rig.wpos("leftUpperArm"); val raP = rig.wpos("rightUpperArm")
+            val llP = rig.wpos("leftLowerArm"); val rlP = rig.wpos("rightLowerArm")
+            val sgn = if (laP != null && raP != null && laP[0] > raP[0]) -1f else 1f
+            val yawBase = if (sgn < 0f) 0f else 180f
+            fun armAng(a: FloatArray?, b: FloatArray?): Float {
+                if (a == null || b == null) return 90f
+                return Math.toDegrees(Math.atan2(abs(b[0] - a[0]).toDouble(), (a[1] - b[1]).toDouble())).toFloat()
+            }
+            val armLow = ((armAng(laP, llP) + armAng(raP, rlP)) / 2f - 45f).coerceIn(0f, 120f)
+            var fitCy = 0.56f
+            var fitHh = 0.68f
+            var fitted = false
             val vc = m.vertexCount
 
             val prog = GLES20.glCreateProgram()
@@ -271,7 +284,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 uniform sampler2D uTex;
                 varying vec2 vUv; varying vec3 vN;
                 void main() {
-                    vec3 c = texture2D(uTex, vUv).rgb;
+                    vec4 tc = texture2D(uTex, vUv); if (tc.a < 0.5) discard; vec3 c = tc.rgb;
                     float l = dot(normalize(vN), normalize(vec3(0.3, 0.6, 0.75)));
                     float sh = mix(0.80, 1.0, smoothstep(-0.1, 0.35, l));
                     gl_FragColor = vec4(c * sh, 1.0);
@@ -289,7 +302,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             val uTex = GLES20.glGetUniformLocation(prog, "uTex")
             val uSc = GLES20.glGetUniformLocation(prog, "uSc")
 
-            val texIds = IntArray(m.indices.size) { makeTex(m.texData[it]) }
+            val texIds = IntArray(m.indices.size) { makeTex(m.texData[it], m.colors[it]) }
             val idxBufs = m.indices.map {
                 val b = ByteBuffer.allocateDirect(it.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer()
                 b.put(it); b.position(0); b
@@ -298,7 +311,7 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
             for (v in 0 until vc) { vdata[v * 8 + 6] = m.uv[v * 2]; vdata[v * 8 + 7] = m.uv[v * 2 + 1] }
             val fb: FloatBuffer = ByteBuffer.allocateDirect(vc * 8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             val curPos = FloatArray(vc * 3)
-            val blinkIdx = m.targetNames.indexOf("Blink")
+            val blinkIdx = m.targetNames.indexOfFirst { it.lowercase().contains("blink") || it.equals("Fcl_EYE_Close", true) }
             val tw = FloatArray(m.targets.size)
 
             GLES20.glEnable(GLES20.GL_DEPTH_TEST)
@@ -336,12 +349,12 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                 } else {
                     animFirst = true
                     if (st9.isNotEmpty()) { st9.clear(); exprW.clear() }
-                rig.setDelta("leftUpperArm", M3.mulNew(M3.rotX(cur[LAX]), M3.rotZ(cur[LAZ])))
-                rig.setDelta("rightUpperArm", M3.mulNew(M3.mulNew(M3.rotX(cur[RAX]), M3.rotZ(cur[RAZ])), M3.rotX(cur[RTW])))
-                rig.setDelta("rightLowerArm", M3.rotZ(cur[RLZ]))
-                rig.setDelta("leftUpperLeg", M3.rotX(cur[LLX]))
-                rig.setDelta("rightUpperLeg", M3.rotX(cur[RLX]))
-                rig.setDelta("head", M3.mulNew(M3.rotZ(cur[HZ]), M3.mulNew(M3.rotY(cur[HYAW]), M3.rotX(cur[HX]))))
+                rig.setDelta("leftUpperArm", M3.mulNew(M3.rotX(cur[LAX]), M3.rotZ(sgn * (cur[LAZ] - 45f + armLow))))
+                rig.setDelta("rightUpperArm", M3.mulNew(M3.mulNew(M3.rotX(cur[RAX]), M3.rotZ(sgn * (cur[RAZ] + 45f - armLow))), M3.rotX(cur[RTW])))
+                rig.setDelta("rightLowerArm", M3.rotZ(sgn * cur[RLZ]))
+                rig.setDelta("leftUpperLeg", M3.rotX(cur[LLX] * sgn))
+                rig.setDelta("rightUpperLeg", M3.rotX(cur[RLX] * sgn))
+                rig.setDelta("head", M3.mulNew(M3.rotZ(sgn * cur[HZ]), M3.mulNew(M3.rotY(cur[HYAW]), M3.rotX(cur[HX] * sgn))))
                 }
                 rig.solve(hipsY)
 
@@ -406,16 +419,22 @@ class GlView(ctx: Context, private val owner: ChibiView, private val file: File)
                     vdata[b] = ox; vdata[b + 1] = oy; vdata[b + 2] = oz
                     vdata[b + 3] = nx; vdata[b + 4] = ny; vdata[b + 5] = nz
                 }
+                if (!fitted) {
+                    var lo = 1e9f; var hi = -1e9f
+                    for (v in 0 until vc) { val y = vdata[v * 8 + 1]; if (y < lo) lo = y; if (y > hi) hi = y }
+                    if (hi - lo > 0.05f) { fitCy = (lo + hi) / 2f; fitHh = (hi - lo) / 2f * 1.21f }
+                    fitted = true
+                }
                 fb.position(0); fb.put(vdata); fb.position(0)
 
                 GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
                 GLES20.glUseProgram(prog)
-                val r = M3.rotY(cur[YAW] + 180f)
+                val r = M3.rotY(cur[YAW] + yawBase)
                 val rc = floatArrayOf(r[0], r[3], r[6], r[1], r[4], r[7], r[2], r[5], r[8])
                 GLES20.glUniformMatrix3fv(uRot, 1, false, rc, 0)
-                val hh = 0.68f
+                val hh = fitHh
                 val hw = hh * w / h
-                GLES20.glUniform4f(uProj, 1f / hw, 1f / hh, 0.56f, 0.5f)
+                GLES20.glUniform4f(uProj, 1f / hw, 1f / hh, fitCy, 0.5f)
                 GLES20.glUniform2f(uSc, owner.vsx, owner.vsy)
                 fb.position(0); GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 32, fb)
                 fb.position(3); GLES20.glVertexAttribPointer(aNrm, 3, GLES20.GL_FLOAT, false, 32, fb)
