@@ -177,6 +177,7 @@
       <div class="row">
         <button class="btn pri" id="vLoad">Load VRM / GLB</button>
         <button class="btn" id="vHina">Use Hina's model</button>
+        <button class="btn pri" id="vSendHina">Use this model in Hina</button>
         <input type="file" id="vFile" accept=".vrm,.glb,application/octet-stream" style="display:none">
       </div>
       <div class="mut" id="vInfo">No model loaded. Tap Load and pick any .vrm or .glb (VRM 0.x, VRM 1.0 or plain skinned GLB).</div>
@@ -198,6 +199,15 @@
 
     <div class="card">
       <div class="row">
+        <input type="text" id="vModelName" placeholder="model name" style="flex:1;min-width:140px">
+        <button class="btn pri" id="vSaveModel">Save model</button>
+      </div>
+      <div class="mut" id="vModelMsg">Saved models stay on this phone. Load one any time, or send it to Hina.</div>
+      <div id="vModels"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
         <button class="btn" id="vModeK">Keyframes</button>
         <button class="btn" id="vModeC">Code</button>
       </div>
@@ -210,6 +220,10 @@
         <button class="btn red" data-preset="clear">T-pose</button>
       </div>
 
+      <div class="row">
+        <button class="btn" id="vUndo">Undo</button><button class="btn" id="vRedo">Redo</button>
+        <label class="mut">Speed</label><select id="vSpeed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
+      </div>
       <div id="vKeysBox">
         <div class="row">
           <label class="mut">Bone</label>
@@ -229,6 +243,13 @@
           <label class="mut"><input type="checkbox" id="vAuto"> auto-key</label>
         </div>
         <div class="row" id="vChips"></div>
+        <canvas id="vSheet" class="cv" style="width:100%;height:40px;display:block;image-rendering:auto;touch-action:manipulation"></canvas>
+        <div class="mut">Timeline: each row is a bone with keys. Tap it to jump there.</div>
+        <div class="row">
+          <button class="btn" id="vKeyAll">Key all animated bones here</button>
+          <button class="btn" id="vMirror">Copy to other side</button>
+          <button class="btn" id="vFlip2">Flip whole animation L/R</button>
+        </div>
         <div class="row">
           <button class="btn red" id="vClearBone">Clear this bone</button>
           <button class="btn red" id="vClearAll">Clear all</button>
@@ -805,7 +826,7 @@ if (!RUN) {
       add('Load', '', function () { loadMascot(m.slug); });
       if (hasApp) add('Use in Hina', 'pri', function () { Android.useMascot(m.slug); toast('Now using ' + m.name); });
       add('Download', '', function () { const o = Store.get(m.slug); download(m.slug + '.json', 'application/json', JSON.stringify(o)); });
-      add('Delete', 'red', function () { if (confirm('Delete ' + m.name + '?')) { Store.del(m.slug); renderLib(); } });
+      add('Delete', 'red', function (ev) { const bt = ev.currentTarget; if (bt.dataset.arm) { Store.del(m.slug); renderLib(); } else { bt.dataset.arm = '1'; bt.textContent = 'Sure?'; setTimeout(function () { bt.dataset.arm = ''; bt.textContent = 'Delete'; }, 3000); } });
       box.appendChild(d);
     });
   }
@@ -1370,6 +1391,7 @@ async function loadBuf(name, buf, persist) {
     if (!S.rend) S.rend = makeRenderer(cv);
     if (S.model) S.rend.free(S.model);
     S.model = m; S.rend.upload(m); fitCam(); fillBones(); S.edit = null; syncBone();
+    S.buf = buf; S.mname = name; $('#vModelName').value = name.replace(/\.(vrm|glb)$/i, '');
     $('#vInfo').textContent = name + '  |  ' + m.vertexCount + ' vertices  |  ' + m.bones.length + ' bones  |  ' + (m.ver === 1 ? 'VRM 1.0' : (m.ver === 0 ? 'VRM 0.x' : 'plain GLB (bone names from the skeleton)'));
     if (persist) idbPut('last', { name: name, buf: buf }).catch(function () { });
   } catch (e) { vErr(errText(e)); $('#vInfo').textContent = 'Could not load ' + name; }
@@ -1379,6 +1401,105 @@ async function loadBuf(name, buf, persist) {
 function idb() { return new Promise(function (res, rej) { const r = indexedDB.open('pxs_vrm', 1); r.onupgradeneeded = function () { r.result.createObjectStore('m'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
 function idbPut(k, v) { return idb().then(function (d) { return new Promise(function (res, rej) { const t = d.transaction('m', 'readwrite'); t.objectStore('m').put(v, k); t.oncomplete = res; t.onerror = function () { rej(t.error); }; }); }); }
 function idbGet(k) { return idb().then(function (d) { return new Promise(function (res, rej) { const q = d.transaction('m').objectStore('m').get(k); q.onsuccess = function () { res(q.result); }; q.onerror = function () { rej(q.error); }; }); }); }
+
+/* model library (IndexedDB) */
+function idbRange(prefix) {
+  return idb().then(function (d) { return new Promise(function (res, rej) {
+    const out = [], q = d.transaction('m').objectStore('m').openCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+    q.onsuccess = function () { const c = q.result; if (c) { out.push({ k: c.key, v: c.value }); c.continue(); } else res(out); };
+    q.onerror = function () { rej(q.error); };
+  }); });
+}
+function idbDel(k) { return idb().then(function (d) { return new Promise(function (res, rej) { const t = d.transaction('m', 'readwrite'); t.objectStore('m').delete(k); t.oncomplete = res; t.onerror = function () { rej(t.error); }; }); }); }
+function mnote(m) { $('#vModelMsg').textContent = m; }
+function armTap(btn, label, fn) {
+  btn.onclick = function () {
+    if (btn.dataset.arm) { btn.dataset.arm = ''; fn(); return; }
+    btn.dataset.arm = '1'; btn.textContent = 'Sure?';
+    setTimeout(function () { btn.dataset.arm = ''; btn.textContent = label; }, 3000);
+  };
+}
+async function saveModel() {
+  if (!S.buf) { vErr('Load a model first.'); return; }
+  const name = ($('#vModelName').value || '').trim(); if (!name) { vErr('Give the model a name first.'); return; }
+  const sl = slug(name), tc = document.createElement('canvas'); tc.width = tc.height = 96;
+  try { tc.getContext('2d').drawImage(cv, 0, 0, 96, 96); } catch (e) { }
+  try {
+    await idbPut('model:' + sl, S.buf);
+    await idbPut('meta:' + sl, { name: name, thumb: tc.toDataURL('image/jpeg', 0.7), size: S.buf.byteLength, t: Date.now(), file: S.mname || '' });
+    vErr(''); mnote('Saved "' + name + '"'); renderModels();
+  } catch (e) { vErr('Could not save the model: ' + errText(e) + ' (phone storage may be full)'); }
+}
+function renderModels() {
+  const box = $('#vModels'); box.innerHTML = '';
+  idbRange('meta:').then(function (list) {
+    if (!list.length) { box.innerHTML = '<div class="mut" style="margin-top:8px">No saved models yet.</div>'; return; }
+    list.sort(function (a, b) { return b.v.t - a.v.t; });
+    list.forEach(function (it) {
+      const sl = it.k.slice(5), d = document.createElement('div'); d.className = 'card'; d.style.marginTop = '8px';
+      d.innerHTML = '<div class="row" style="margin:0"><img style="width:56px;height:56px;border-radius:8px;background:#1f2140" alt=""><div style="flex:1;min-width:100px"><b></b><div class="mut"></div></div></div><div class="row"></div>';
+      d.querySelector('img').src = it.v.thumb || ''; d.querySelector('b').textContent = it.v.name;
+      d.querySelector('.mut').textContent = (it.v.size / 1048576).toFixed(1) + ' MB';
+      const r = d.querySelectorAll('.row')[1];
+      function add(txt, cls) { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = txt; r.appendChild(b); return b; }
+      add('Load', '').onclick = function () { idbGet('model:' + sl).then(function (buf) { if (buf) loadBuf(it.v.file || it.v.name, buf, true).then(function () { $('#vModelName').value = it.v.name; }); else vErr('That model is missing from storage.'); }); };
+      add('Use in Hina', 'pri').onclick = function () { idbGet('model:' + sl).then(function (buf) { if (buf) sendModelToHina(buf, it.v.name); }); };
+      const del = add('Delete', 'red'); armTap(del, 'Delete', function () { idbDel('model:' + sl).then(function () { return idbDel('meta:' + sl); }).then(renderModels); });
+      box.appendChild(d);
+    });
+  }).catch(function () { box.innerHTML = '<div class="mut">Saving models is not available in this browser.</div>'; });
+}
+async function sendModelToHina(buf, name) {
+  if (!(hasApp && Android.studioModelStart)) { vErr('Open Pixel Studio inside the Hina app to send a model to Hina.'); return; }
+  vErr(''); mnote('Sending "' + name + '" to Hina ...');
+  try {
+    Android.studioModelStart();
+    const u8 = new Uint8Array(buf), CH = 786432;
+    for (let off = 0; off < u8.length; off += CH) {
+      const part = u8.subarray(off, Math.min(off + CH, u8.length)); let bin = '';
+      for (let i = 0; i < part.length; i += 8192) bin += String.fromCharCode.apply(null, part.subarray(i, i + 8192));
+      if (!Android.studioModelChunk(btoa(bin))) throw new Error('Could not write to the phone');
+      mnote('Sending "' + name + '" to Hina ... ' + Math.round(Math.min(100, (off + CH) * 100 / u8.length)) + '%');
+      await new Promise(function (r) { setTimeout(r, 0); });
+    }
+    const err = Android.studioModelUse();
+    if (err) { vErr('Hina cannot use this model: ' + err); mnote(''); } else mnote('Done. Hina now uses "' + name + '".');
+  } catch (e) { vErr(errText(e)); mnote(''); }
+}
+
+/* timeline sheet, mirror, history */
+function opp(n) { if (/^left/.test(n)) return 'right' + n.slice(4); if (/^right/.test(n)) return 'left' + n.slice(5); return null; }
+function drawSheet() {
+  const c = $('#vSheet'); if (!c || S.mode !== 'keys') return;
+  const keys = Object.keys(S.anim.tracks), rows = Math.max(1, keys.length), rh = Math.max(5, Math.min(14, Math.floor(130 / rows))), hcss = Math.max(36, rows * rh + 6), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(50, Math.floor(c.clientWidth * dpr)), h = Math.floor(hcss * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; c.style.height = hcss + 'px'; }
+  const g = c.getContext('2d'), loop = loopLen();
+  g.clearRect(0, 0, w, h);
+  keys.forEach(function (b, i) {
+    const y = (3 + i * rh) * dpr;
+    g.fillStyle = b === S.bone ? 'rgba(91,91,214,0.35)' : (i % 2 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)');
+    g.fillRect(0, y, w, rh * dpr);
+    g.fillStyle = b.indexOf('expr:') === 0 ? '#ffd166' : '#d7d9f5';
+    const s = Math.max(2, rh * 0.32) * dpr;
+    S.anim.tracks[b].forEach(function (k) {
+      const x = Math.min(1, k.t / loop) * (w - 8 * dpr) + 4 * dpr, cy = y + rh * dpr / 2;
+      g.beginPath(); g.moveTo(x, cy - s); g.lineTo(x + s, cy); g.lineTo(x, cy + s); g.lineTo(x - s, cy); g.closePath(); g.fill();
+    });
+  });
+  const px = Math.min(1, S.t / loop) * (w - 8 * dpr) + 4 * dpr;
+  g.fillStyle = '#ff4d6d'; g.fillRect(px - 1, 0, 2 * dpr, h);
+}
+const H = { list: [], pos: -1, seen: '', at: 0 };
+function snapJson() { return JSON.stringify(S.anim); }
+function draftSave() {
+  try { localStorage.setItem('pxs_vrm_draft', JSON.stringify({ anim: S.anim, mode: S.mode, code: $('#vCode').value, name: $('#vName').value, loop: $('#vLoop').value })); } catch (e) { }
+}
+function histUndo(step) {
+  const np = H.pos + step; if (np < 0 || np >= H.list.length) return;
+  H.pos = np; S.anim = JSON.parse(H.list[np]); H.seen = H.list[np];
+  $('#vLoop').value = S.anim.loop; $('#vScrub').max = Math.round(loopLen() * 100); S.edit = null; syncBone();
+}
 
 /* App bridge: native file picker + chunked read */
 window.onStudioVrm = async function (name, size, err) {
@@ -1516,8 +1637,8 @@ function tick(now) {
     const w = Math.max(64, Math.floor(cv.clientWidth * Math.min(window.devicePixelRatio || 1, 2)));
     if (cv.width !== w || cv.height !== w) { cv.width = w; cv.height = w; }
     const loop = loopLen();
-    if (S.playing) { S.t = (S.t + dt) % loop; $('#vScrub').value = Math.round(S.t * 100); if ((frameN++ % 6) === 0 && S.mode === 'keys') syncBone(); }
-    $('#vT').textContent = S.t.toFixed(2) + 's';
+    if (S.playing) { S.t = (S.t + dt * (+$('#vSpeed').value || 1)) % loop; $('#vScrub').value = Math.round(S.t * 100); if ((frameN++ % 6) === 0 && S.mode === 'keys') syncBone(); }
+    $('#vT').textContent = S.t.toFixed(2) + 's'; drawSheet();
     let pose;
     if (S.mode === 'code') { pose = S.codeFn && !S.codeBad ? runCode(S.t) : { rot: {}, pos: {} }; }
     else pose = evalAnim(S.t);
@@ -1533,6 +1654,23 @@ function tick(now) {
 function init() {
   $('#vCode').value = DEF_CODE;
   setMode('keys'); refreshAnimSel(); setPlayLabel();
+  try {
+    const dr = JSON.parse(localStorage.getItem('pxs_vrm_draft') || 'null');
+    if (dr && dr.anim && dr.anim.tracks) {
+      S.anim = dr.anim; if (dr.code) $('#vCode').value = dr.code; if (dr.name) $('#vName').value = dr.name;
+      $('#vLoop').value = S.anim.loop || 2; $('#vScrub').max = Math.round(loopLen() * 100);
+    }
+  } catch (e) { }
+  H.list = [snapJson()]; H.pos = 0; H.seen = H.list[0];
+  setInterval(function () {
+    const c = snapJson();
+    if (c !== H.seen) { H.seen = c; H.at = Date.now() + 500; return; }
+    if (H.at && Date.now() >= H.at) {
+      H.at = 0;
+      if (c !== H.list[H.pos]) { H.list = H.list.slice(0, H.pos + 1); H.list.push(c); if (H.list.length > 60) H.list.shift(); H.pos = H.list.length - 1; }
+      draftSave();
+    }
+  }, 250);
   $('#vLoad').onclick = function () { if (hasApp) Android.pickStudioVrm(); else $('#vFile').click(); };
   $('#vFile').onchange = function (e) {
     const f = e.target.files[0]; if (!f) return;
@@ -1604,6 +1742,40 @@ function init() {
   };
   $('#vUnuse').onclick = function () { if (hasApp && Android.removeAnim) { Android.removeAnim($('#vAct').value); refreshUsed(); } };
   refreshUsed();
+
+  $('#vSaveModel').onclick = saveModel;
+  $('#vSendHina').onclick = function () { if (!S.buf) { vErr('Load a model first.'); return; } sendModelToHina(S.buf, S.mname || 'model'); };
+  renderModels();
+  $('#vUndo').onclick = function () { histUndo(-1); };
+  $('#vRedo').onclick = function () { histUndo(1); };
+  $('#vKeyAll').onclick = function () {
+    const loop = loopLen(); let n = 0;
+    Object.keys(S.anim.tracks).forEach(function (b) {
+      const v = (S.edit && S.edit.bone === b) ? { r: S.edit.r, p: S.edit.p } : evalTrack(S.anim.tracks[b], S.t, loop);
+      if (v) { addKey(b, S.t, v.r, v.p); n++; }
+    });
+    S.edit = null; syncBone(); if (!n) vErr('Nothing to key yet: add a key to a bone first.');
+  };
+  $('#vMirror').onclick = function () {
+    const o = opp(S.bone); if (!o || !has(o)) { vErr('This bone has no opposite side (try an arm or leg bone).'); return; }
+    vErr(''); const c = curRot(); addKey(o, S.t, [c.r[0], -c.r[1], -c.r[2]], [-c.p[0], c.p[1], c.p[2]]); S.edit = null; renderChips();
+  };
+  $('#vFlip2').onclick = function () {
+    const out = {};
+    Object.keys(S.anim.tracks).forEach(function (b) {
+      if (b.indexOf('expr:') === 0) { out[b] = S.anim.tracks[b]; return; }
+      const nb = opp(b) || b;
+      out[nb] = S.anim.tracks[b].map(function (k) { return { t: k.t, r: [k.r[0], -k.r[1], -k.r[2]], p: [-k.p[0], k.p[1], k.p[2]] }; });
+    });
+    S.anim.tracks = out; S.edit = null; syncBone();
+  };
+  $('#vSheet').addEventListener('pointerdown', function (e) {
+    const c = $('#vSheet'), r = c.getBoundingClientRect(), keys = Object.keys(S.anim.tracks), rh = Math.max(5, Math.min(14, Math.floor(130 / Math.max(1, keys.length))));
+    const row = Math.floor((e.clientY - r.top - 3) / rh);
+    if (keys[row]) { S.bone = keys[row]; $('#vBone').value = S.bone; }
+    S.playing = false; setPlayLabel(); S.edit = null;
+    S.t = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * loopLen(); $('#vScrub').value = Math.round(S.t * 100); syncBone();
+  });
 
   /* camera */
   const ptrs = new Map();

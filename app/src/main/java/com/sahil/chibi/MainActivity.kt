@@ -343,6 +343,29 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun listAnims(): String = Anims.list(this@MainActivity)
 
+        @JavascriptInterface fun studioModelStart() {
+            try { File(cacheDir, "studio_up.vrm").delete() } catch (e: Throwable) { }
+        }
+
+        @JavascriptInterface fun studioModelChunk(b64: String): Boolean = try {
+            val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+            java.io.FileOutputStream(File(cacheDir, "studio_up.vrm"), true).use { it.write(bytes) }
+            true
+        } catch (e: Throwable) { false }
+
+        /** Validates the uploaded model, makes it Hina's model, restarts the companion. Returns "" or an error message. */
+        @JavascriptInterface fun studioModelUse(): String = try {
+            val tmp = File(cacheDir, "studio_up.vrm")
+            VrmLoader.load(tmp)
+            val dst = ChibiView.modelFile(this@MainActivity)
+            dst.delete()
+            tmp.copyTo(dst, true)
+            tmp.delete()
+            ChibiView.lastError = ""
+            runOnUiThread { restartCompanion() }
+            ""
+        } catch (e: Throwable) { e.message ?: e.toString() }
+
         @JavascriptInterface fun pickModel() {
             runOnUiThread {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
