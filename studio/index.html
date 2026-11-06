@@ -217,6 +217,12 @@
         <button class="btn" data-preset="idle">Idle</button>
         <button class="btn" data-preset="wave">Wave</button>
         <button class="btn" data-preset="walk">Walk</button>
+        <button class="btn" data-preset="run">Run</button>
+        <button class="btn" data-preset="sit">Sit (legs folded)</button>
+        <button class="btn" data-preset="vibe">Vibe</button>
+        <button class="btn" data-preset="peek">Peek (hand on edge)</button>
+        <button class="btn" data-preset="sleep">Sleep</button>
+        <button class="btn" data-preset="drag">Dragged</button>
         <button class="btn red" data-preset="clear">T-pose</button>
       </div>
 
@@ -281,6 +287,7 @@
         <span class="mut">Play in Hina when:</span>
         <select id="vAct"><option>idle</option><option>walk</option><option>run</option><option>sit</option><option>sleep</option><option>wave</option><option>sus</option><option>drag</option></select>
         <button class="btn pri" id="vUse">Use in Hina</button>
+        <button class="btn pri" id="vPack">Send full pack to Hina</button>
         <button class="btn red" id="vUnuse">Remove</button>
       </div>
       <div class="mut" id="vUsed"></div>
@@ -1045,6 +1052,23 @@ function readAcc(g, i) {
   }
   return out;
 }
+function humanName(raw) {
+  const s = String(raw || '').toLowerCase(); let m;
+  if ((m = /^j_bip_([clr])_([a-z]+)(\d?)(_\d+)?$/.exec(s))) {
+    const side = m[1], part = m[2], idx = m[3];
+    if (side === 'c') return ({ hips: 'hips', spine: 'spine', chest: 'chest', upperchest: 'upperChest', neck: 'neck', head: 'head' })[part] || null;
+    const sd = side === 'l' ? 'left' : 'right';
+    const core = ({ shoulder: 'Shoulder', upperarm: 'UpperArm', lowerarm: 'LowerArm', hand: 'Hand', upperleg: 'UpperLeg', lowerleg: 'LowerLeg', foot: 'Foot', toebase: 'Toes' })[part];
+    if (core) return sd + core;
+    const fg = ({ thumb: 'Thumb', index: 'Index', middle: 'Middle', ring: 'Ring', little: 'Little' })[part], seg = ({ '1': 'Proximal', '2': 'Intermediate', '3': 'Distal' })[idx];
+    return fg && seg ? sd + fg + seg : null;
+  }
+  const t = s.replace(/^mixamorig\d*:/, '');
+  const one = ({ hips: 'hips', spine: 'spine', spine1: 'chest', spine2: 'upperChest', neck: 'neck', head: 'head' })[t]; if (one) return one;
+  if ((m = /^(left|right)(shoulder|arm|forearm|hand|upleg|leg|foot|toebase)$/.exec(t)))
+    return m[1] + ({ shoulder: 'Shoulder', arm: 'UpperArm', forearm: 'LowerArm', hand: 'Hand', upleg: 'UpperLeg', leg: 'LowerLeg', foot: 'Foot', toebase: 'Toes' })[m[2]];
+  return null;
+}
 const BONE_ORDER = ['hips','spine','chest','upperChest','neck','head','leftShoulder','leftUpperArm','leftLowerArm','leftHand','rightShoulder','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','leftToes','rightUpperLeg','rightLowerLeg','rightFoot','rightToes','jaw','leftEye','rightEye'];
 
 async function buildModel(buf) {
@@ -1128,7 +1152,7 @@ async function buildModel(buf) {
     Object.keys(hm).forEach(function (k) { if (bmap[k] == null && nodes[hm[k]]) { bones.push({ name: k, node: hm[k] }); bmap[k] = hm[k]; } });
   } else {
     const seen = {};
-    skins.forEach(function (s) { s.joints.forEach(function (ji) { let nm = nodes[ji].name; if (seen[nm]) nm = nm + '_' + ji; seen[nm] = 1; bones.push({ name: nm, node: ji }); bmap[nm] = ji; }); });
+    skins.forEach(function (s) { s.joints.forEach(function (ji) { let nm = humanName(nodes[ji].name) || nodes[ji].name; if (seen[nm]) nm = nm + '_' + ji; seen[nm] = 1; bones.push({ name: nm, node: ji }); bmap[nm] = ji; }); });
   }
   const exprs = {};
   const alias = function (n) { const m = { joy: 'happy', sorrow: 'sad', fun: 'relaxed', a: 'aa', i: 'ih', u: 'ou', e: 'ee', o: 'oh', blink_l: 'blinkLeft', blink_r: 'blinkRight' }; return m[String(n).toLowerCase()] || n; };
@@ -1392,7 +1416,7 @@ async function loadBuf(name, buf, persist) {
     if (S.model) S.rend.free(S.model);
     S.model = m; S.rend.upload(m); fitCam(); fillBones(); S.edit = null; syncBone();
     S.buf = buf; S.mname = name; $('#vModelName').value = name.replace(/\.(vrm|glb)$/i, '');
-    $('#vInfo').textContent = name + '  |  ' + m.vertexCount + ' vertices  |  ' + m.bones.length + ' bones  |  ' + (m.ver === 1 ? 'VRM 1.0' : (m.ver === 0 ? 'VRM 0.x' : 'plain GLB (bone names from the skeleton)'));
+    $('#vInfo').textContent = name + '  |  ' + m.vertexCount + ' vertices  |  ' + m.bones.length + ' bones  |  ' + (m.ver === 1 ? 'VRM 1.0' : (m.ver === 0 ? 'VRM 0.x' : 'plain GLB (VRoid/Mixamo bone names mapped)'));
     if (persist) idbPut('last', { name: name, buf: buf }).catch(function () { });
   } catch (e) { vErr(errText(e)); $('#vInfo').textContent = 'Could not load ' + name; }
 }
@@ -1529,42 +1553,111 @@ function bestSign(base, bone, axis, measure, comp, want) {
   return (want === 'max' ? a > b : a < b) ? 1 : -1;
 }
 function setTrack(a, bone, list) { if (!has(bone)) return; a.tracks[bone] = list.map(function (k) { return { t: k[0], r: k[1].slice(), p: (k[2] || [0, 0, 0]).slice() }; }); }
+function axisFor(bone, measure, comp, want, base) {
+  if (!has(bone) || !has(measure)) return function () { return [0, 0, 0]; };
+  let best = { ax: 2, sg: 1, mag: -1 };
+  for (let ax = 0; ax < 3; ax++) {
+    const p = probe(base || {}, bone, ax, 40, measure, comp), q = probe(base || {}, bone, ax, -40, measure, comp), mag = Math.abs(p - q);
+    if (mag > best.mag + 1e-6) best = { ax: ax, sg: (want === 'max' ? p > q : p < q) ? 1 : -1, mag: mag };
+  }
+  return function (d) { const v = [0, 0, 0]; v[best.ax] = best.sg * d; return v; };
+}
+function vadd(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
 function presetAnim(name) {
-  const a = { name: name, loop: 2, tracks: {} }, f = S.model.facing;
-  const sdL = bestSign({}, 'leftUpperArm', 2, 'leftLowerArm', 1, 'min'), sdR = bestSign({}, 'rightUpperArm', 2, 'rightLowerArm', 1, 'min');
-  const relaxBase = {}; if (has('leftUpperArm')) relaxBase.leftUpperArm = [0, 0, sdL * 62]; if (has('rightUpperArm')) relaxBase.rightUpperArm = [0, 0, sdR * 62];
-  const arm = function (side, extraX) { const s = side === 'left' ? sdL : sdR; return [extraX || 0, 0, s * 62]; };
+  const a = { name: name, loop: 2, tracks: {} }, f = S.model.facing, fw = f > 0 ? 'max' : 'min', bw = f > 0 ? 'min' : 'max';
+  const AL = axisFor('leftUpperArm', 'leftLowerArm', 1, 'min', {}), AR = axisFor('rightUpperArm', 'rightLowerArm', 1, 'min', {});
+  const hipY = has('hips') ? S.model.nodes[S.model.bmap.hips].world[13] : 0.8;
   if (name === 'relax') {
-    a.loop = 2; setTrack(a, 'leftUpperArm', [[0, arm('left')]]); setTrack(a, 'rightUpperArm', [[0, arm('right')]]);
-    setTrack(a, 'leftLowerArm', [[0, [0, 0, sdL * 8]]]); setTrack(a, 'rightLowerArm', [[0, [0, 0, sdR * 8]]]);
+    setTrack(a, 'leftUpperArm', [[0, AL(62)]]); setTrack(a, 'rightUpperArm', [[0, AR(62)]]);
   } else if (name === 'idle') {
     a.loop = 4;
-    setTrack(a, 'leftUpperArm', [[0, [0, 0, sdL * 62]], [2, [0, 0, sdL * 59]], [4, [0, 0, sdL * 62]]]);
-    setTrack(a, 'rightUpperArm', [[0, [0, 0, sdR * 62]], [2, [0, 0, sdR * 59]], [4, [0, 0, sdR * 62]]]);
+    setTrack(a, 'leftUpperArm', [[0, AL(62)], [2, AL(59)], [4, AL(62)]]);
+    setTrack(a, 'rightUpperArm', [[0, AR(62)], [2, AR(59)], [4, AR(62)]]);
     setTrack(a, 'spine', [[0, [0, 0, 0]], [2, [2.5, 0, 0]], [4, [0, 0, 0]]]);
     setTrack(a, 'chest', [[0, [0, 0, 0]], [2, [1.5, 0, 0]], [4, [0, 0, 0]]]);
     setTrack(a, 'head', [[0, [1, -4, 0]], [2, [-1, 4, 0]], [4, [1, -4, 0]]]);
     setTrack(a, 'expr:blink', [[0, [0, 0, 0]], [3.4, [0, 0, 0]], [3.52, [100, 0, 0]], [3.7, [0, 0, 0]]]);
   } else if (name === 'wave') {
     a.loop = 2;
-    setTrack(a, 'leftUpperArm', [[0, arm('left')], [2, arm('left')]]);
-    setTrack(a, 'rightUpperArm', [[0, [0, 0, -sdR * 70]], [2, [0, 0, -sdR * 70]]]);
-    setTrack(a, 'rightLowerArm', [[0, [0, 0, -28]], [0.5, [0, 0, 28]], [1, [0, 0, -28]], [1.5, [0, 0, 28]], [2, [0, 0, -28]]]);
+    const BR = axisFor('rightLowerArm', 'rightHand', 1, 'max', { rightUpperArm: AR(-70) });
+    setTrack(a, 'leftUpperArm', [[0, AL(62)], [2, AL(62)]]);
+    setTrack(a, 'rightUpperArm', [[0, AR(-70)], [2, AR(-70)]]);
+    setTrack(a, 'rightLowerArm', [[0, BR(-28)], [0.5, BR(28)], [1, BR(-28)], [1.5, BR(28)], [2, BR(-28)]]);
     setTrack(a, 'head', [[0, [0, -5, 4]], [1, [0, 5, -4]], [2, [0, -5, 4]]]);
     setTrack(a, 'expr:happy', [[0, [80, 0, 0]], [2, [80, 0, 0]]]);
-  } else if (name === 'walk') {
-    a.loop = 1.2;
-    const hs = bestSign({}, 'leftUpperLeg', 0, 'leftFoot', 2, f > 0 ? 'max' : 'min');
-    const ks = -bestSign({}, 'leftLowerLeg', 0, 'leftFoot', 2, f > 0 ? 'max' : 'min');
-    const as = bestSign(relaxBase, 'leftUpperArm', 0, 'leftLowerArm', 2, f > 0 ? 'max' : 'min');
-    setTrack(a, 'leftUpperLeg', [[0, [hs * 25, 0, 0]], [0.6, [-hs * 25, 0, 0]], [1.2, [hs * 25, 0, 0]]]);
-    setTrack(a, 'rightUpperLeg', [[0, [-hs * 25, 0, 0]], [0.6, [hs * 25, 0, 0]], [1.2, [-hs * 25, 0, 0]]]);
-    setTrack(a, 'leftLowerLeg', [[0, [0, 0, 0]], [0.6, [ks * 5, 0, 0]], [0.9, [ks * 45, 0, 0]], [1.2, [0, 0, 0]]]);
-    setTrack(a, 'rightLowerLeg', [[0, [ks * 5, 0, 0]], [0.3, [ks * 45, 0, 0]], [0.6, [0, 0, 0]], [1.2, [ks * 5, 0, 0]]]);
-    setTrack(a, 'leftUpperArm', [[0, [-as * 18, 0, sdL * 62]], [0.6, [as * 18, 0, sdL * 62]], [1.2, [-as * 18, 0, sdL * 62]]]);
-    setTrack(a, 'rightUpperArm', [[0, [as * 18, 0, sdR * 62]], [0.6, [-as * 18, 0, sdR * 62]], [1.2, [as * 18, 0, sdR * 62]]]);
-    setTrack(a, 'hips', [[0, [0, 0, 0], [0, 0, 0]], [0.3, [0, 3, 0], [0, 0.015, 0]], [0.6, [0, 0, 0], [0, 0, 0]], [0.9, [0, -3, 0], [0, 0.015, 0]], [1.2, [0, 0, 0], [0, 0, 0]]]);
-    setTrack(a, 'spine', [[0, [0, 3, 0]], [0.6, [0, -3, 0]], [1.2, [0, 3, 0]]]);
+  } else if (name === 'walk' || name === 'run') {
+    const r = name === 'run', L = r ? 0.7 : 1.2, m = r ? 1.45 : 1;
+    a.loop = L;
+    const hs = bestSign({}, 'leftUpperLeg', 0, 'leftFoot', 2, fw);
+    const ks = -bestSign({}, 'leftLowerLeg', 0, 'leftFoot', 2, fw);
+    const SL = axisFor('leftUpperArm', 'leftLowerArm', 2, fw, { leftUpperArm: AL(62) }), SR = axisFor('rightUpperArm', 'rightLowerArm', 2, fw, { rightUpperArm: AR(62) });
+    const T = function (x) { return Math.round(x * L / 1.2 * 1000) / 1000; };
+    setTrack(a, 'leftUpperLeg', [[0, [hs * 25 * m, 0, 0]], [T(0.6), [-hs * 25 * m, 0, 0]], [T(1.2), [hs * 25 * m, 0, 0]]]);
+    setTrack(a, 'rightUpperLeg', [[0, [-hs * 25 * m, 0, 0]], [T(0.6), [hs * 25 * m, 0, 0]], [T(1.2), [-hs * 25 * m, 0, 0]]]);
+    setTrack(a, 'leftLowerLeg', [[0, [0, 0, 0]], [T(0.6), [ks * 5, 0, 0]], [T(0.9), [ks * 45 * m, 0, 0]], [T(1.2), [0, 0, 0]]]);
+    setTrack(a, 'rightLowerLeg', [[0, [ks * 5, 0, 0]], [T(0.3), [ks * 45 * m, 0, 0]], [T(0.6), [0, 0, 0]], [T(1.2), [ks * 5, 0, 0]]]);
+    setTrack(a, 'leftUpperArm', [[0, vadd(AL(62), SL(-18 * m))], [T(0.6), vadd(AL(62), SL(18 * m))], [T(1.2), vadd(AL(62), SL(-18 * m))]]);
+    setTrack(a, 'rightUpperArm', [[0, vadd(AR(62), SR(18 * m))], [T(0.6), vadd(AR(62), SR(-18 * m))], [T(1.2), vadd(AR(62), SR(18 * m))]]);
+    setTrack(a, 'hips', [[0, [0, 0, 0], [0, 0, 0]], [T(0.3), [0, 3, 0], [0, 0.015 * m, 0]], [T(0.6), [0, 0, 0], [0, 0, 0]], [T(0.9), [0, -3, 0], [0, 0.015 * m, 0]], [T(1.2), [0, 0, 0], [0, 0, 0]]]);
+    setTrack(a, 'spine', [[0, [0, 3, 0]], [T(0.6), [0, -3, 0]], [T(1.2), [0, 3, 0]]]);
+  } else if (name === 'sit' || name === 'sleep') {
+    a.loop = 4;
+    const sf = bestSign({}, 'spine', 0, 'head', 2, fw), drop = -hipY * 0.85;
+    ['left', 'right'].forEach(function (sd) {
+      const A1 = sd === 'left' ? AL : AR, up = sd + 'UpperArm';
+      const hf = bestSign({}, sd + 'UpperLeg', 0, sd + 'Foot', 2, fw), kf = bestSign({}, sd + 'LowerLeg', 0, sd + 'Foot', 2, bw);
+      const base = {}; base[up] = A1(72);
+      const EB = axisFor(sd + 'LowerArm', sd + 'Hand', 2, fw, base);
+      setTrack(a, sd + 'UpperLeg', [[0, [hf * 88, 0, 0]], [4, [hf * 88, 0, 0]]]);
+      setTrack(a, sd + 'LowerLeg', [[0, [kf * 150, 0, 0]], [4, [kf * 150, 0, 0]]]);
+      setTrack(a, sd + 'Foot', [[0, [kf * -20, 0, 0]], [4, [kf * -20, 0, 0]]]);
+      setTrack(a, up, [[0, A1(72)], [4, A1(72)]]);
+      setTrack(a, sd + 'LowerArm', [[0, EB(45)], [4, EB(45)]]);
+    });
+    if (name === 'sit') {
+      setTrack(a, 'hips', [[0, [0, 0, 0], [0, drop, 0]], [4, [0, 0, 0], [0, drop, 0]]]);
+      setTrack(a, 'spine', [[0, [sf * 3, 0, 0]], [2, [sf * 5, 0, 1.5]], [4, [sf * 3, 0, 0]]]);
+      setTrack(a, 'head', [[0, [0, -6, 3]], [2, [0, 6, -3]], [4, [0, -6, 3]]]);
+      setTrack(a, 'expr:happy', [[0, [40, 0, 0]], [4, [40, 0, 0]]]);
+      setTrack(a, 'expr:blink', [[0, [0, 0, 0]], [2.6, [0, 0, 0]], [2.72, [100, 0, 0]], [2.9, [0, 0, 0]]]);
+    } else {
+      setTrack(a, 'hips', [[0, [0, 0, 0], [0, drop, 0]], [4, [0, 0, 0], [0, drop, 0]]]);
+      setTrack(a, 'spine', [[0, [sf * 14, 0, 0]], [2, [sf * 17, 0, 0]], [4, [sf * 14, 0, 0]]]);
+      setTrack(a, 'chest', [[0, [sf * 6, 0, 0]], [2, [sf * 8, 0, 0]], [4, [sf * 6, 0, 0]]]);
+      setTrack(a, 'head', [[0, [sf * 22, 0, 6]], [2, [sf * 26, 0, 6]], [4, [sf * 22, 0, 6]]]);
+      setTrack(a, 'expr:blink', [[0, [100, 0, 0]], [4, [100, 0, 0]]]);
+    }
+  } else if (name === 'vibe') {
+    a.loop = 2;
+    setTrack(a, 'head', [[0, [2, -12, 14]], [0.5, [-1, 0, 0]], [1, [2, 12, -14]], [1.5, [-1, 0, 0]], [2, [2, -12, 14]]]);
+    setTrack(a, 'neck', [[0, [0, -5, 6]], [1, [0, 5, -6]], [2, [0, -5, 6]]]);
+    setTrack(a, 'spine', [[0, [0, -4, 5]], [1, [0, 4, -5]], [2, [0, -4, 5]]]);
+    setTrack(a, 'chest', [[0, [0, -3, 3]], [1, [0, 3, -3]], [2, [0, -3, 3]]]);
+    setTrack(a, 'hips', [[0, [0, 3, 0], [0.02, 0, 0]], [0.5, [0, 0, 0], [0, -0.012, 0]], [1, [0, -3, 0], [-0.02, 0, 0]], [1.5, [0, 0, 0], [0, -0.012, 0]], [2, [0, 3, 0], [0.02, 0, 0]]]);
+    setTrack(a, 'leftUpperArm', [[0, AL(58)], [0.5, AL(52)], [1, AL(58)], [1.5, AL(52)], [2, AL(58)]]);
+    setTrack(a, 'rightUpperArm', [[0, AR(58)], [0.5, AR(52)], [1, AR(58)], [1.5, AR(52)], [2, AR(58)]]);
+    setTrack(a, 'expr:happy', [[0, [70, 0, 0]], [2, [70, 0, 0]]]);
+    setTrack(a, 'expr:blink', [[0, [0, 0, 0]], [0.8, [0, 0, 0]], [0.9, [100, 0, 0]], [1.4, [100, 0, 0]], [1.5, [0, 0, 0]]]);
+  } else if (name === 'peek') {
+    a.loop = 5;
+    const BR = axisFor('rightLowerArm', 'rightHand', 1, 'max', { rightUpperArm: AR(-78) });
+    const lean = axisFor('spine', 'head', 0, 'min', {});
+    setTrack(a, 'rightUpperArm', [[0, AR(-78)], [5, AR(-78)]]);
+    setTrack(a, 'rightLowerArm', [[0, BR(70)], [2.5, BR(62)], [5, BR(70)]]);
+    setTrack(a, 'leftUpperArm', [[0, AL(60)], [5, AL(60)]]);
+    setTrack(a, 'spine', [[0, lean(8)], [1.2, lean(18)], [3.4, lean(18)], [5, lean(8)]]);
+    setTrack(a, 'chest', [[0, lean(4)], [1.2, lean(8)], [3.4, lean(8)], [5, lean(4)]]);
+    setTrack(a, 'head', [[0, [0, 8, 0]], [1.2, [0, 18, 0]], [2.3, [0, -4, 0]], [3.4, [0, 18, 0]], [5, [0, 8, 0]]]);
+    setTrack(a, 'expr:blink', [[0, [0, 0, 0]], [2.8, [0, 0, 0]], [2.9, [100, 0, 0]], [3.1, [0, 0, 0]]]);
+  } else if (name === 'drag') {
+    a.loop = 1;
+    const hf = bestSign({}, 'leftUpperLeg', 0, 'leftFoot', 2, fw);
+    setTrack(a, 'leftUpperArm', [[0, AL(-55)], [0.5, AL(-75)], [1, AL(-55)]]);
+    setTrack(a, 'rightUpperArm', [[0, AR(-75)], [0.5, AR(-55)], [1, AR(-75)]]);
+    setTrack(a, 'leftUpperLeg', [[0, [hf * 14, 0, 0]], [0.5, [-hf * 8, 0, 0]], [1, [hf * 14, 0, 0]]]);
+    setTrack(a, 'rightUpperLeg', [[0, [-hf * 8, 0, 0]], [0.5, [hf * 14, 0, 0]], [1, [-hf * 8, 0, 0]]]);
+    setTrack(a, 'head', [[0, [0, 0, 8]], [0.5, [0, 0, -8]], [1, [0, 0, 8]]]);
+    setTrack(a, 'expr:surprised', [[0, [70, 0, 0]], [1, [70, 0, 0]]]);
   }
   return a;
 }
@@ -1738,6 +1831,21 @@ function init() {
       if (!Object.keys(o.tracks).length) { vErr('Nothing to send: this animation has no keys yet.'); return; }
       const act = $('#vAct').value; if (!o.name || o.name === 'anim') o.name = act;
       vErr(Android.setAnim(act, JSON.stringify(o)) ? '' : 'Hina could not read that animation.'); refreshUsed();
+    } catch (e) { vErr(errText(e)); }
+  };
+  $('#vPack').onclick = function () {
+    if (!S.model) { vErr('Load a model first.'); return; }
+    if (!(hasApp && Android.setAnim)) { vErr('Open Pixel Studio inside the Hina app to send animations to it.'); return; }
+    const map = { idle: 'vibe', sit: 'sit', sus: 'peek', sleep: 'sleep', drag: 'drag', walk: 'walk', run: 'run', wave: 'wave' };
+    let ok = 0;
+    try {
+      for (const act in map) {
+        const a = presetAnim(map[act]); a.name = act;
+        const o = { format: 'pixel-studio-vrm-anim', ver: 1, name: act, loop: a.loop, tracks: a.tracks };
+        if (Android.setAnim(act, JSON.stringify(o))) ok++;
+      }
+      vErr(''); refreshUsed();
+      $('#vUsed').textContent = 'Sent ' + ok + ' animations: ' + Object.keys(map).map(function (k) { return k + '=' + map[k]; }).join(', ');
     } catch (e) { vErr(errText(e)); }
   };
   $('#vUnuse').onclick = function () { if (hasApp && Android.removeAnim) { Android.removeAnim($('#vAct').value); refreshUsed(); } };
