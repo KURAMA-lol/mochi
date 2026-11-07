@@ -2,12 +2,15 @@ package com.sahil.chibi
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import org.json.JSONObject
@@ -20,6 +23,7 @@ object AgentBrowser {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var wv: TabView? = null
     @Volatile private var loadLatch: CountDownLatch? = null
+    @Volatile private var lastEls: List<String> = emptyList()
 
     class TabView(ctx: Context) : WebView(ctx) {
         override fun isShown(): Boolean = true
@@ -56,17 +60,40 @@ object AgentBrowser {
         val cur = wv
         if (cur != null) cur else {
             val w = TabView(ctx.applicationContext)
-            w.settings.javaScriptEnabled = true
-            w.settings.domStorageEnabled = true
-            w.settings.useWideViewPort = true
-            w.settings.loadWithOverviewMode = true
-            w.settings.mediaPlaybackRequiresUserGesture = false
+            val s = w.settings
+            s.javaScriptEnabled = true
+            s.domStorageEnabled = true
+            s.useWideViewPort = true
+            s.loadWithOverviewMode = true
+            s.mediaPlaybackRequiresUserGesture = false
+            s.javaScriptCanOpenWindowsAutomatically = true
+            s.setSupportMultipleWindows(true)
+            // look like normal Chrome, not an embedded WebView (some sites refuse WebViews)
+            s.userAgentString = s.userAgentString.replace("; wv)", ")").replace(" Version/4.0", "")
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(w, true)
             w.webViewClient = object : WebViewClient() {
-                override fun onPageFinished(v: WebView?, url: String?) { loadLatch?.countDown() }
+                override fun onPageFinished(v: WebView?, url: String?) {
+                    CookieManager.getInstance().flush()
+                    loadLatch?.countDown()
+                }
             }
-            w.webChromeClient = WebChromeClient()
+            w.webChromeClient = object : WebChromeClient() {
+                // popups and target=_blank open in the same tab
+                override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+                    val t = WebView(view.context)
+                    t.webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
+                            view.loadUrl(r.url.toString())
+                            return true
+                        }
+                    }
+                    val tr = resultMsg.obj as WebView.WebViewTransport
+                    tr.webView = t
+                    resultMsg.sendToTarget()
+                    return true
+                }
+            }
             relayout(ctx, w)
             wv = w
             w
@@ -82,6 +109,12 @@ object AgentBrowser {
                 relayout(ctx, w)
             }
         }
+    }
+
+    fun show(ctx: Context): String {
+        val i = Intent(ctx, BrowserActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(i)
+        return "Nana's browser is now on the user's screen. Tell the user what they should do there (log in, solve a captcha, type a password), then use browser_wait and browser_read."
     }
 
     fun loadUrl(ctx: Context, u: String) {
@@ -119,7 +152,7 @@ object AgentBrowser {
         val u = if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
         onMain { w.loadUrl(u) }
         l.await(25, TimeUnit.SECONDS)
-        Thread.sleep(700)
+        Thread.sleep(900)
         return snapshot(ctx)
     }
 
@@ -129,31 +162,73 @@ object AgentBrowser {
             val o = JSONObject(raw)
             val sb = StringBuilder()
             sb.append("Title: ").append(o.optString("title")).append("\nURL: ").append(o.optString("url"))
+                .append("\nScroll: ").append(o.optInt("sy")).append(" of ").append(o.optInt("sh")).append(" px (screen height ").append(o.optInt("vh")).append(")")
                 .append("\n\nPage text:\n").append(o.optString("text")).append("\n\nElements:\n")
             val a = o.getJSONArray("els")
-            for (i in 0 until a.length()) sb.append(a.getString(i)).append('\n')
+            val list = ArrayList<String>()
+            for (i in 0 until a.length()) { sb.append(a.getString(i)).append('\n'); list.add(a.getString(i)) }
+            lastEls = list
             sb.toString()
         } catch (e: Exception) {
             "Could not read the page yet: " + raw.take(200)
         }
     }
 
+    private fun labelOf(id: Int): String {
+        val s = lastEls.getOrNull(id) ?: return ""
+        val k = s.indexOf(": ")
+        if (k < 0) return ""
+        return s.substring(k + 2).substringBefore(" -> ").substringBefore(" name=").substringBefore(" (checked)").substringBefore(" (unchecked)").trim()
+    }
+
+    private fun clickJs(id: Int): String = unquote(js(ctx0(), "(function(id){var e=document.querySelector('[data-nid=\"'+id+'\"]');if(!e)return 'missing';e.removeAttribute('target');e.scrollIntoView({block:'center'});var r=e.getBoundingClientRect();var x=r.left+r.width/2,y=r.top+r.height/2;var t=document.elementFromPoint(x,y)||e;var o={bubbles:true,cancelable:true,view:window,clientX:x,clientY:y};['pointerdown','mousedown','pointerup','mouseup'].forEach(function(n){var C=n.indexOf('pointer')===0&&window.PointerEvent?PointerEvent:MouseEvent;try{t.dispatchEvent(new C(n,o))}catch(err){}});if(e.focus)e.focus();e.click();return 'clicked';})($id)"))
+
+    @Volatile private var appCtx: Context? = null
+    private fun ctx0(): Context = appCtx ?: throw RuntimeException("browser not started")
+
     fun click(ctx: Context, id: Int): String {
-        val r = unquote(js(ctx, "(function(id){var e=document.querySelector('[data-nid=\"'+id+'\"]');if(!e)return 'no such element, call browser_read again';e.removeAttribute('target');e.scrollIntoView({block:'center'});e.click();return 'clicked';})($id)"))
-        Thread.sleep(900)
+        appCtx = ctx.applicationContext
+        var r = clickJs(id)
+        if (r == "missing") {
+            // the page re-rendered and dropped the numbers: find the same thing again by its label
+            val lab = labelOf(id)
+            if (lab.isEmpty()) return "That element is gone. Call browser_read and pick the number again."
+            return clickText(ctx, lab)
+        }
+        Thread.sleep(1000)
         return r + "\n" + snapshot(ctx)
     }
 
+    fun clickText(ctx: Context, text: String): String {
+        appCtx = ctx.applicationContext
+        if (text.isBlank()) return "No text given."
+        snapshot(ctx)
+        val found = unquote(js(ctx, "(function(q){q=q.toLowerCase();var all=document.querySelectorAll('[data-nid]');var best=null;for(var i=0;i<all.length;i++){var e=all[i];var t=((e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||'')+'').trim().toLowerCase();if(t===q){best=e;break;}if(!best&&t.indexOf(q)>=0)best=e;}return best?best.getAttribute('data-nid'):'';})(" + JSONObject.quote(text) + ")"))
+        val id = found.toIntOrNull() ?: return "Nothing on the page contains '" + text + "'. Try browser_scroll, then read again."
+        val r = clickJs(id)
+        Thread.sleep(1000)
+        return "Clicked '" + text + "' (" + r + ")\n" + snapshot(ctx)
+    }
+
     fun type(ctx: Context, id: Int, text: String, submit: Boolean): String {
-        val code = "(function(id,text,submit){var e=document.querySelector('[data-nid=\"'+id+'\"]');if(!e)return 'no such element, call browser_read again';if(e.type==='password')return 'refused: password fields are off limits';e.focus();var p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(p,'value');if(d&&d.set)d.set.call(e,text);else e.value=text;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));if(submit){['keydown','keypress','keyup'].forEach(function(k){e.dispatchEvent(new KeyboardEvent(k,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}))});var f=e.form;if(f){try{f.requestSubmit()}catch(x){f.submit()}}}return 'typed';})($id," + JSONObject.quote(text) + "," + submit + ")"
+        appCtx = ctx.applicationContext
+        val code = "(function(id,text,submit){var e=document.querySelector('[data-nid=\"'+id+'\"]');if(!e)return 'missing';if(e.type==='password')return 'refused: password fields are off limits';e.scrollIntoView({block:'center'});e.focus();if(e.isContentEditable){document.execCommand('selectAll');document.execCommand('insertText',false,text);}else{var p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(p,'value');if(d&&d.set)d.set.call(e,text);else e.value=text;}e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));if(submit){['keydown','keypress','keyup'].forEach(function(k){e.dispatchEvent(new KeyboardEvent(k,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}))});var f=e.form;if(f){try{f.requestSubmit()}catch(x){f.submit()}}}return 'typed';})($id," + JSONObject.quote(text) + "," + submit + ")"
         val r = unquote(js(ctx, code))
-        if (submit) Thread.sleep(1200)
+        if (r == "missing") return "That element is gone. Call browser_read and pick the number again."
+        Thread.sleep(if (submit) 1500 else 400)
+        return r + "\n" + snapshot(ctx)
+    }
+
+    fun select(ctx: Context, id: Int, value: String): String {
+        val code = "(function(id,v){var e=document.querySelector('[data-nid=\"'+id+'\"]');if(!e||e.tagName!=='SELECT')return 'not a dropdown';v=v.toLowerCase();var hit=-1;for(var i=0;i<e.options.length;i++){var o=e.options[i];if(o.value.toLowerCase()===v||o.text.trim().toLowerCase()===v){hit=i;break;}if(hit<0&&o.text.toLowerCase().indexOf(v)>=0)hit=i;}if(hit<0)return 'no such option';e.selectedIndex=hit;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return 'selected '+e.options[hit].text;})($id," + JSONObject.quote(value) + ")"
+        val r = unquote(js(ctx, code))
+        Thread.sleep(400)
         return r + "\n" + snapshot(ctx)
     }
 
     fun scroll(ctx: Context, down: Boolean): String {
         js(ctx, "window.scrollBy(0," + (if (down) "" else "-") + "Math.round(innerHeight*0.8))")
-        Thread.sleep(300)
+        Thread.sleep(400)
         return snapshot(ctx)
     }
 
@@ -161,9 +236,14 @@ object AgentBrowser {
         val w = view(ctx)
         val ok = onMain { if (w.canGoBack()) { w.goBack(); true } else false }
         if (!ok) return "No earlier page."
-        Thread.sleep(900)
+        Thread.sleep(1000)
         return snapshot(ctx)
     }
 
-    private const val SNAP = """(function(){var els=[],out=[];document.querySelectorAll('[data-nid]').forEach(function(e){e.removeAttribute('data-nid')});var all=document.querySelectorAll('a[href],button,input,textarea,select,[role=button],[role=link],[onclick],summary');for(var i=0;i<all.length&&els.length<70;i++){var e=all[i];var r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;var cs=getComputedStyle(e);if(cs.visibility==='hidden'||cs.display==='none')continue;if(r.bottom<0||r.top>innerHeight*3)continue;var tag=e.tagName.toLowerCase();if(tag==='input'&&e.type==='hidden')continue;var t=(e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.title||'').trim().replace(/\s+/g,' ').slice(0,70);var kind=tag==='a'?'link':(tag==='input'||tag==='textarea')?('input'+(e.type?':'+e.type:'')):tag==='select'?'select':'button';e.setAttribute('data-nid',els.length);els.push(e);out.push('['+(els.length-1)+'] '+kind+': '+t+((tag==='a'&&e.href)?' -> '+e.href.slice(0,80):''));}var body=(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(0,2500);return JSON.stringify({title:document.title,url:location.href,text:body,els:out});})()"""
+    fun waitAndRead(ctx: Context, seconds: Int): String {
+        Thread.sleep(seconds.coerceIn(1, 15) * 1000L)
+        return snapshot(ctx)
+    }
+
+    private const val SNAP = """(function(){var els=[],out=[],seen=new Set();document.querySelectorAll('[data-nid]').forEach(function(e){e.removeAttribute('data-nid')});function vis(e){var r=e.getBoundingClientRect();if(r.width<2||r.height<2)return null;var cs=getComputedStyle(e);if(cs.visibility==='hidden'||cs.display==='none'||cs.opacity==='0')return null;if(r.bottom<-50||r.top>innerHeight*3)return null;return r;}function label(e){var t=(e.innerText||e.value||'').trim();if(!t)t=e.placeholder||e.getAttribute('aria-label')||e.title||e.alt||'';if(!t&&e.id){var l=document.querySelector('label[for='+JSON.stringify(e.id)+']');if(l)t=l.innerText;}if(!t&&e.labels&&e.labels[0])t=e.labels[0].innerText;return (t||'').trim().replace(/\s+/g,' ').slice(0,70);}function add(e,kind){if(seen.has(e)||els.length>=80)return;seen.add(e);e.setAttribute('data-nid',els.length);els.push(e);var x='';if(e.tagName==='A'&&e.href)x=' -> '+e.href.slice(0,80);if(e.name)x+=' name='+e.name;if(e.type==='checkbox'||e.type==='radio')x+=e.checked?' (checked)':' (unchecked)';out.push('['+(els.length-1)+'] '+kind+': '+label(e)+x);}var q=document.querySelectorAll('a[href],button,input,textarea,select,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=option],[onclick],[tabindex],[contenteditable=true]');for(var i=0;i<q.length;i++){var e=q[i];if(!vis(e))continue;var tag=e.tagName.toLowerCase();if(tag==='input'&&e.type==='hidden')continue;if(tag==='label'&&e.control)continue;var kind=tag==='a'?'link':(tag==='input'||tag==='textarea')?('input:'+(e.type||'text')):tag==='select'?'select':e.isContentEditable?'input:richtext':'button';add(e,kind);}if(els.length<60){var g=document.querySelectorAll('div,span,li,img,svg');for(var j=0;j<g.length&&j<900;j++){var e2=g[j];if(seen.has(e2))continue;if(!vis(e2))continue;if(getComputedStyle(e2).cursor!=='pointer')continue;if(e2.closest('[data-nid]'))continue;add(e2,'clickable');}}var body=(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(0,2500);return JSON.stringify({title:document.title,url:location.href,text:body,els:out,sy:Math.round(scrollY),sh:document.documentElement.scrollHeight,vh:innerHeight});})()"""
 }
