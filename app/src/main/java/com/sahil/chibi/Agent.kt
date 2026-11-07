@@ -26,6 +26,7 @@ object Agent {
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_type", "screen_scroll", "screen_back", "screen_home",
         "browser_click", "browser_type"
     )
+    private val ACTION_WORDS = Regex("""\b(open|go to|goto|click|tap|press|type|search|scroll|play|send|launch|start|close|swipe|select|find|visit|kholo|khol|jao|dabao|likho|bhejo|chalu)\b""", RegexOption.IGNORE_CASE)
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
     private val TAG_OPEN = Regex("""<tool>\s*(\{[\s\S]*\})""")
 
@@ -59,10 +60,28 @@ Rules:
         if (!enabled(ctx)) return Router.chat(conf, base, history, voice)
         val system = base + "\n\n" + DOC
         val msgs = ArrayList<Msg>(history)
+        val lastIdx = msgs.indexOfLast { it.role == "user" }
+        val actionish = lastIdx >= 0 && ACTION_WORDS.containsMatchIn(msgs[lastIdx].content)
+        if (actionish) {
+            msgs[lastIdx] = Msg("user", msgs[lastIdx].content +
+                "\n\n(System note: if this needs the phone or the browser, do it NOW with tool calls and reply with only the tool call. Do not just comment on what is on screen.)")
+        }
         var steps = 0
+        var nudges = 0
+        var lastName = ""
         while (true) {
             val res = Router.chat(conf, system, msgs, voice)
-            val call = parse(res.text) ?: return res
+            val call = parse(res.text)
+            if (call == null) {
+                if (actionish && nudges < 2 && (steps == 0 || lastName == "screen_read")) {
+                    nudges++
+                    msgs.add(Msg("assistant", res.text))
+                    msgs.add(Msg("user", "SYSTEM: You did not carry out the request. Reply now with ONLY a tool call (for example screen_tap_text, screen_tap, screen_read, browser_open, launch_app) to do what the user asked. Only if it is truly impossible, explain exactly why."))
+                    onStep("\uD83D\uDD27 trying again...")
+                    continue
+                }
+                return res
+            }
             if (steps >= MAX_STEPS) {
                 msgs.add(Msg("assistant", res.text))
                 msgs.add(Msg("user", "TOOL_RESULT: step limit reached. Do not call tools now. Tell the user what you did and what is left."))
@@ -70,6 +89,7 @@ Rules:
             }
             steps++
             val name = call.first
+            lastName = name
             val args = call.second
             onStep("\uD83D\uDD27 " + describe(name, args))
             val out = try { exec(ctx, name, args) } catch (e: Throwable) { "Error: " + (e.message ?: e.toString()) }
