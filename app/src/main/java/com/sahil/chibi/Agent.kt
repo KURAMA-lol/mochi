@@ -59,9 +59,22 @@ Rules:
         val base = Persona.system(conf)
         if (!enabled(ctx)) return Router.chat(conf, base, history, voice)
         val system = base + "\n\n" + DOC
-        val msgs = ArrayList<Msg>(history)
+        val hLast = history.indexOfLast { it.role == "user" }
+        val actionish = hLast >= 0 && ACTION_WORDS.containsMatchIn(history[hLast].content)
+        val msgs = ArrayList<Msg>()
+        if (actionish) {
+            // old chatter in the history teaches the model to just comment, so keep only the latest turns plus a worked example
+            msgs.add(Msg("user", "Example task: open the first chat"))
+            msgs.add(Msg("assistant", "<tool>{\"name\":\"screen_read\",\"args\":{}}</tool>"))
+            msgs.add(Msg("user", "TOOL_RESULT [screen_read]:\nForeground app: com.whatsapp\n[0] button: Search\n[1] button: Jabed Sigma Wala\n[2] button: Department Corner"))
+            msgs.add(Msg("assistant", "<tool>{\"name\":\"screen_tap_text\",\"args\":{\"text\":\"Jabed\"}}</tool>"))
+            msgs.add(Msg("user", "TOOL_RESULT [screen_tap_text]:\nTapped [1]."))
+            msgs.add(Msg("assistant", "[happy] Done, I opened the first chat."))
+            msgs.addAll(history.takeLast(3))
+        } else {
+            msgs.addAll(history)
+        }
         val lastIdx = msgs.indexOfLast { it.role == "user" }
-        val actionish = lastIdx >= 0 && ACTION_WORDS.containsMatchIn(msgs[lastIdx].content)
         if (actionish) {
             msgs[lastIdx] = Msg("user", msgs[lastIdx].content +
                 "\n\n(System note: if this needs the phone or the browser, do it NOW with tool calls and reply with only the tool call. Do not just comment on what is on screen.)")
