@@ -27,6 +27,8 @@ jobs:
         run: |
           git clone https://github.com/livliv-dev/player /tmp/livliv
           git -C /tmp/livliv checkout 91cd1f7b2cf2290977ccccbc2fe47dc555963045
+          sed -i 's/^    if (!text) return$/    return/' /tmp/livliv/src/mark.ts
+          grep -n '^    return$' /tmp/livliv/src/mark.ts
           mkdir -p app/src/main/assets/nana/model
           cp -r /tmp/livliv/characters/d03/. app/src/main/assets/nana/model/
           rm -f app/src/main/assets/nana/model/cover.webp app/src/main/assets/nana/model/avatar.webp

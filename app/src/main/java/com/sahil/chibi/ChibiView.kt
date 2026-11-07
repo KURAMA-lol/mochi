@@ -168,11 +168,20 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
 
     override fun onInterceptTouchEvent(ev: android.view.MotionEvent): Boolean = wv != null
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (wv != null) { removeCallbacks(stateTick); postDelayed(stateTick, 100) }
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(stateTick)
-        wv?.destroy()
-        wv = null
         super.onDetachedFromWindow()
+    }
+
+    fun release() {
+        removeCallbacks(stateTick)
+        try { wv?.destroy() } catch (e: Exception) {}
+        wv = null
     }
 
     override fun onDraw(c: Canvas) {

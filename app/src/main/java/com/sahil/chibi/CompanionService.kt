@@ -250,8 +250,8 @@ class CompanionService : Service() {
         cfg = ConfigStore.load(this)
         val c = ChibiView(this)
         c.pixel = cfg.persona.style != "smooth"
-        val w = dp((cfg.persona.size * (if (ChibiView.has3d(this)) 1.7f else 0.8f)).toInt())
-        val h = dp(cfg.persona.size)
+        val w = dp((cfg.persona.size * 1.25f).toInt())
+        val h = dp((cfg.persona.size * 1.45f).toInt())
         lp = overlayLp(
             w, h,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -262,7 +262,7 @@ class CompanionService : Service() {
         val (sw, sh) = screen()
         val st = getSharedPreferences("chibi_state", MODE_PRIVATE)
         lp.x = st.getInt("x", sw - w - dp(16))
-        lp.y = st.getInt("y", sh - h - dp(120))
+        lp.y = sh - h
         clampPos()
         c.setOnTouchListener { _, e -> onChibiTouch(e) }
         chibi = c
@@ -296,6 +296,7 @@ class CompanionService : Service() {
         closePanel()
         hideBubble()
         detachChibi()
+        chibi?.release()
         chibi = null
         hidden = false
         panel = null
@@ -312,6 +313,17 @@ class CompanionService : Service() {
         hidden = false
         attachChibi()
         refreshNotification()
+    }
+
+    private var falling = false
+    private var fallV = 0f
+
+    private fun floorY(): Int = (screen().second - lp.height).coerceAtLeast(0)
+
+    private fun startFall() {
+        if (panelOpen || lp.y >= floorY()) { falling = false; return }
+        falling = true; fallV = 0f
+        chibi?.action = "drag"
     }
 
     private fun clampPos() {
@@ -355,8 +367,9 @@ class CompanionService : Service() {
                     dragging = false
                     c.action = "idle"
                     nextDecision = SystemClock.uptimeMillis() + 2500
+                    startFall()
                     getSharedPreferences("chibi_state", MODE_PRIVATE).edit()
-                        .putInt("x", lp.x).putInt("y", if (panelOpen) preY else lp.y).apply()
+                        .putInt("x", lp.x).apply()
                 } else if (e.actionMasked == MotionEvent.ACTION_UP && !longFired) {
                     if (panelOpen) closePanel() else openPanel()
                 }
@@ -398,6 +411,19 @@ class CompanionService : Service() {
         if (talkUntil in 1..now) { c.talking = false; talkUntil = 0 }
         if (moodResetAt in 1..now) { c.mood = "neutral"; moodResetAt = 0 }
         if (dragging || panelOpen) return
+
+        if (falling) {
+            fallV += dp(2600) * dt
+            val floor = floorY()
+            var ny = lp.y + fallV * dt
+            if (ny >= floor) {
+                if (fallV > dp(450)) { fallV = -fallV * 0.28f; ny = floor.toFloat() }
+                else { falling = false; ny = floor.toFloat(); c.action = "idle"; nextDecision = now + 1500 }
+            }
+            lp.y = ny.toInt(); fx = lp.x.toFloat(); fy = lp.y.toFloat()
+            updateChibiPos()
+            return
+        }
 
         if (ventStart != 0L) {
             updateVent(now, c)
@@ -442,8 +468,8 @@ class CompanionService : Service() {
         val (sw, sh) = screen()
         val minX = -dp(10).toFloat()
         val maxX = (sw - lp.width + dp(10)).coerceAtLeast(-dp(10)).toFloat()
-        val minY = 0f
-        val maxY = (sh - lp.height).coerceAtLeast(0).toFloat()
+        val minY = (sh - lp.height).coerceAtLeast(0).toFloat()
+        val maxY = minY
         val r = Random.nextFloat()
         return when {
             r < 0.3f -> (if (Random.nextBoolean()) minX else maxX) to (if (Random.nextBoolean()) minY else maxY)
@@ -466,7 +492,7 @@ class CompanionService : Service() {
         val maxX = (sw - lp.width + dp(10)).coerceAtLeast(minX)
         val maxY = (sh - lp.height).coerceAtLeast(0)
         ventX = Random.nextInt(minX, maxX + 1)
-        ventY = Random.nextInt(0, maxY + 1)
+        ventY = maxY
         ventMoved = false
         ventStart = now
         c.action = "vent"
@@ -695,6 +721,7 @@ class CompanionService : Service() {
         if (pv != null && panelAttached) { try { wm.removeView(pv) } catch (ex: Exception) {}; panelAttached = false }
         lp.y = preY
         updateChibiPos()
+        startFall()
         nextDecision = SystemClock.uptimeMillis() + 2000
     }
 
