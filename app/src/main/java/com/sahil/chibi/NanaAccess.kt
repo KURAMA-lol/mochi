@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 
 /** Lets Nana read and operate the screen (only when the user turns this service on in Accessibility settings). */
 class NanaAccess : AccessibilityService() {
@@ -23,8 +24,25 @@ class NanaAccess : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
+    /** The app on screen, never Nana's own windows (chat panel, bubble, floating character). */
+    private fun targetRoot(): AccessibilityNodeInfo? {
+        try {
+            var best: AccessibilityNodeInfo? = null
+            var bestLayer = -1
+            for (w in windows) {
+                if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                val r = w.root ?: continue
+                if (r.packageName?.toString() == packageName) continue
+                if (w.layer > bestLayer) { bestLayer = w.layer; best = r }
+            }
+            if (best != null) return best
+        } catch (e: Exception) {}
+        val r = rootInActiveWindow
+        return if (r != null && r.packageName?.toString() != packageName) r else null
+    }
+
     @Synchronized fun read(): String {
-        val root = rootInActiveWindow ?: return "No active window (screen locked, or this app blocks reading)."
+        val root = targetRoot() ?: return "No other app is on screen right now (only Nana's own windows). Use launch_app to open one, then screen_read again."
         nodes.clear()
         val sb = StringBuilder("Foreground app: ").append(root.packageName).append("\n")
         walk(root, sb)
@@ -83,7 +101,7 @@ class NanaAccess : AccessibilityService() {
     }
 
     fun scroll(down: Boolean): String {
-        val root = rootInActiveWindow ?: return "No active window."
+        val root = targetRoot() ?: return "No other app is on screen."
         val s = findScrollable(root) ?: return "Nothing scrollable here."
         val act = if (down) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
         return if (s.performAction(act)) "Scrolled." else "Could not scroll."
