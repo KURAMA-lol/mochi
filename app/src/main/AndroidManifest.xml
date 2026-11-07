@@ -11,6 +11,10 @@
 
     <queries>
         <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
         <intent>
@@ -49,6 +53,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".BrowserActivity"
+            android:exported="false"
+            android:label="Nana browser"
+            android:windowSoftInputMode="adjustResize" />
+
+        <service
+            android:name=".NanaAccess"
+            android:exported="false"
+            android:label="Nana screen control"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/nana_access" />
+        </service>
 
         <service
             android:name=".CompanionService"

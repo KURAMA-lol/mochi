@@ -772,7 +772,7 @@ class CompanionService : Service() {
         val snapshot = history.takeLast(conf.persona.history).toList()
         Thread {
             try {
-                val res = Router.chat(conf, Persona.system(conf), snapshot, voice)
+                val res = Agent.run(this, conf, snapshot, voice) { s -> main.post { typing?.text = s } }
                 main.post { onReply(res, voice) }
             } catch (e: Exception) {
                 main.post { onError(e.message ?: e.toString()) }

@@ -64,6 +64,16 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     </div>
     <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap her on screen to chat; drag her up and she drops back down; long-press to poke her.</p>
   </div>
+  <h2>Tools &amp; screen control</h2>
+  <div class="card">
+    <label style="display:flex;align-items:center"><input type="checkbox" id="agOn" onchange="agSave()">Let Nana use tools (web, browser, screen)</label>
+    <label style="display:flex;align-items:center"><input type="checkbox" id="agAct" onchange="agSave()">Allow actions (open apps, tap, type, click)</label>
+    <div class="btns">
+      <button class="b ghost" onclick="Android.openAccessibility()">Enable screen control</button>
+      <button class="b ghost" onclick="Android.openBrowser()">Open Nana's browser</button>
+    </div>
+    <p class="mut">Ask things like "open YouTube and search lo-fi", "what's on my screen?" or "find the weather in Delhi". Nana never types passwords and is told to ask before sending or buying. Turn screen control on in Accessibility settings, under Nana.</p>
+  </div>
   <h2>Other ways to call her</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
@@ -306,7 +316,7 @@ function tab(id){
 function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
-  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running');
+  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control');
 }
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
 function imp(){
@@ -457,6 +467,11 @@ function loadStats(){
 
 function renderAll(){ refreshStatus(); renderProviders(); renderRoute(); renderPersona(); }
 renderAll(); tab('home');
+</script>
+<script>
+function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;}catch(x){}}
+function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked)}catch(x){}}
+window.addEventListener('load',agLoad);
 </script>
 </body>
 </html>

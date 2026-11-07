@@ -209,6 +209,7 @@ class MainActivity : Activity() {
                 .put("mic", checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
                 .put("notif", notif)
                 .put("running", CompanionService.running)
+                .put("access", NanaAccess.inst != null)
                 .toString()
         }
 
@@ -218,6 +219,15 @@ class MainActivity : Activity() {
                     Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
                 )
             }
+        }
+
+        @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
+        @JavascriptInterface fun setAgent(on: Boolean, act: Boolean) { Agent.save(this@MainActivity, on, act) }
+        @JavascriptInterface fun openAccessibility() {
+            runOnUiThread { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        }
+        @JavascriptInterface fun openBrowser() {
+            runOnUiThread { startActivity(Intent(this@MainActivity, BrowserActivity::class.java)) }
         }
 
         @JavascriptInterface fun requestPerms() { runOnUiThread { askRuntimePerms() } }
