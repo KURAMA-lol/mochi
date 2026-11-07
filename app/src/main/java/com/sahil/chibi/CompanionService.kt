@@ -198,7 +198,7 @@ class CompanionService : Service() {
     private fun createChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CH, "Hina companion", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CH, "Nana companion", NotificationManager.IMPORTANCE_LOW)
         )
     }
 
@@ -217,7 +217,7 @@ class CompanionService : Service() {
         return Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("${cfg.persona.name} is on your phone")
-            .setContentText(if (hidden) "Hidden - tap Show to bring him back" else "Tap him to chat")
+            .setContentText(if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(act("Call", actionPi(1, ACT_SUMMON)))
@@ -551,9 +551,9 @@ class CompanionService : Service() {
             r < 0.76f -> { c.action = "wave"; dur = 2200 }
             r < 0.86f -> {
                 c.action = "sus"; dur = Random.nextLong(3000, 5000)
-                if (Random.nextBoolean()) say("...sus", "neutral")
+                if (Random.nextBoolean()) say("Hm? What was that?", "neutral")
             }
-            r < 0.93f && walking -> { startVent(now, c); dur = 2600 }
+            r < 0.93f -> { c.action = "sit"; dur = Random.nextLong(3000, 6000) }
             else -> {
                 if (now - lastInteract > 90_000) { c.action = "sleep"; dur = Random.nextLong(12_000, 25_000) }
                 else c.action = "idle"
@@ -581,12 +581,12 @@ class CompanionService : Service() {
         if (b == null) {
             b = TextView(this).apply {
                 textSize = 14f
-                setTextColor(0xFF241B3A.toInt())
+                setTextColor(0xFF0E2A2B.toInt())
                 setPadding(dp(12), dp(8), dp(12), dp(8))
                 maxWidth = dp(230)
                 background = GradientDrawable().apply {
                     setColor(0xFFFFFFFF.toInt()); cornerRadius = dp(16).toFloat()
-                    setStroke(dp(2), 0xFFFF8FB8.toInt())
+                    setStroke(dp(2), 0xFF5EEAD4.toInt())
                 }
             }
             bubble = b
@@ -641,7 +641,7 @@ class CompanionService : Service() {
         val root = PanelLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(12), dp(10), dp(12), dp(10))
-        root.background = GradientDrawable().apply { setColor(0xF2211A36.toInt()); cornerRadius = dp(22).toFloat() }
+        root.background = GradientDrawable().apply { setColor(0xF213282B.toInt()); cornerRadius = dp(22).toFloat() }
         root.onBack = { closePanel() }
 
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -730,11 +730,11 @@ class CompanionService : Service() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val t = TextView(this).apply {
             text = msg; textSize = 14.5f
-            setTextColor(if (user) 0xFFFFFFFF.toInt() else 0xFF241B3A.toInt())
+            setTextColor(if (user) 0xFFFFFFFF.toInt() else 0xFF0E2A2B.toInt())
             setPadding(dp(12), dp(8), dp(12), dp(8))
             maxWidth = (screen().first * 0.72f).toInt()
             background = GradientDrawable().apply {
-                setColor(if (user) 0xFF7E6BFF.toInt() else 0xFFFFE6F0.toInt()); cornerRadius = dp(16).toFloat()
+                setColor(if (user) 0xFFF59E6C.toInt() else 0xFFD9FBF4.toInt()); cornerRadius = dp(16).toFloat()
             }
         }
         box.addView(t)
@@ -840,7 +840,7 @@ class CompanionService : Service() {
 
     private fun startListening() {
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            addMsg("I need mic permission. Open the Hina app and tap 'Grant mic'.", false, null); return
+            addMsg("I need mic permission. Open the Nana app and tap 'Grant mic'.", false, null); return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             addMsg("No speech recognizer found on this phone (needs the Google app).", false, null); return

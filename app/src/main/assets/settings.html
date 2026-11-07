@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Hina</title>
+<title>Nana</title>
 <style>
-:root{--bg:#15101f;--card:#211a36;--card2:#2a2145;--tx:#f4f0ff;--mut:#a79fc4;--ac:#ff8fb8;--ac2:#7e6bff;--ok:#6fe3a0;--bad:#ff6b7d;--line:#352c55}
+:root{--bg:#0c1b1d;--card:#13282b;--card2:#1a3438;--tx:#eafaf6;--mut:#8fb3ae;--ac:#5eead4;--ac2:#f59e6c;--ok:#7ef0b0;--bad:#ff7a8a;--line:#244247}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif;padding-bottom:80px}
-header{padding:16px 16px 6px;display:flex;align-items:center;gap:10px}
-header h1{font-size:20px;margin:0}
+html{background:transparent}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif;padding-bottom:80px;min-height:100vh;border-radius:28px 28px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.35)}
+header{padding:18px 18px 4px;display:flex;align-items:center;gap:10px}
+header h1{font-size:22px;margin:0;letter-spacing:.3px;color:var(--ac)}
 header small{color:var(--mut)}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1b1530;border-top:1px solid var(--line);z-index:5}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0a1618;border-top:1px solid var(--line);z-index:5}
 nav button{flex:1;background:none;border:0;color:var(--mut);padding:12px 0 14px;font-size:12px}
 nav button.on{color:var(--ac);font-weight:600}
 nav button span{display:block;font-size:19px}
 section{display:none;padding:8px 14px}
 section.on{display:block}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:10px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px 16px;margin:12px 0}
 h2{font-size:15px;margin:14px 2px 4px;color:var(--ac)}
 label{display:block;color:var(--mut);font-size:12px;margin:10px 0 3px}
 input,select,textarea{width:100%;background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
@@ -25,13 +25,13 @@ textarea{min-height:120px}
 input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
 input[type=range]{padding:0}
 .row{display:flex;gap:8px}.row>*{flex:1}
-button.b{background:var(--ac2);color:#fff;border:0;border-radius:12px;padding:11px 14px;font:inherit;font-weight:600}
-button.b.pink{background:var(--ac);color:#2a1030}
+button.b{background:var(--ac2);color:#2a1206;border:0;border-radius:14px;padding:11px 14px;font:inherit;font-weight:600}
+button.b.pink{background:var(--ac);color:#03211f}
 button.b.ghost{background:var(--card2);color:var(--tx);border:1px solid var(--line)}
-button.b.red{background:#4a2030;color:#ffb0bb}
+button.b.red{background:#3b1d22;color:#ffb0bb}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.chip{display:inline-block;padding:4px 10px;border-radius:99px;font-size:12px;margin:3px 4px 3px 0;background:#3a1f35;color:var(--bad)}
-.chip.ok{background:#17382b;color:var(--ok)}
+.chip{display:inline-block;padding:4px 10px;border-radius:99px;font-size:12px;margin:3px 4px 3px 0;background:#3b1d22;color:var(--bad)}
+.chip.ok{background:#12372f;color:var(--ok)}
 .mut{color:var(--mut);font-size:12.5px}
 details.p{background:var(--card);border:1px solid var(--line);border-radius:16px;margin:10px 0;padding:0 14px}
 details.p summary{padding:13px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:8px}
@@ -47,7 +47,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 </style>
 </head>
 <body>
-<header><div style="font-size:30px">🌸</div><div><h1>Hina</h1><small>your tiny phone companion</small></div></header>
+<header><div><h1>Nana</h1><small>your tiny phone companion</small></div></header>
 
 <!-- HOME -->
 <section id="home" class="on">
@@ -58,17 +58,17 @@ th{color:var(--mut);font-weight:500;font-size:12px}
       <button class="b ghost" onclick="Android.requestPerms()">2 · Mic + notifications</button>
     </div>
     <div class="btns">
-      <button class="b pink" onclick="Android.start()">Start Hina</button>
-      <button class="b" onclick="Android.summon()">Call him</button>
+      <button class="b pink" onclick="Android.start()">Start Nana</button>
+      <button class="b" onclick="Android.summon()">Call her</button>
       <button class="b red" onclick="Android.stop()">Stop</button>
     </div>
-    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap him on screen to chat; drag him anywhere; long-press to poke him.</p>
+    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap her on screen to chat; drag her up and she drops back down; long-press to poke her.</p>
   </div>
-  <h2>Other ways to call him</h2>
+  <h2>Other ways to call her</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
-    • Quick Settings tile: edit your tiles and add <b>Call Hina</b><br>
-    • Home-screen icon <b>Call Hina</b> (long-press it and drag it to your home screen)
+    • Quick Settings tile: edit your tiles and add <b>Call Nana</b><br>
+    • Home-screen icon <b>Call Nana</b> (long-press it and drag it to your home screen)
   </div>
   <h2>Backup / restore settings</h2>
   <div class="card">
@@ -271,7 +271,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 if (!window.Android) {
   let store = localStorage.getItem('cfg');
   window.Android = {
-    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Hina',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12,style:'pixel'}}),
+    getConfig: () => store || JSON.stringify({providers:[],router:{strategy:'priority',retries:1,cooldownSec:60,failThreshold:2,fallback:true,rules:[]},persona:{name:'Nana',userName:'Sahil',prompt:'You are {name}...',size:130,walking:true,idleChatter:true,aiChatterMin:0,ttsMode:'voice',voiceLang:'en-IN',pitch:1.35,history:12,style:'pixel'}}),
     saveConfig: j => { store = j; localStorage.setItem('cfg', j); return true },
     getStatus: () => JSON.stringify({overlay:false,mic:true,notif:true,running:false}),
     openOverlaySettings(){}, requestPerms(){}, start(){}, summon(){}, stop(){},
@@ -306,7 +306,7 @@ function tab(id){
 function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
-  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Hina running');
+  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running');
 }
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
 function imp(){

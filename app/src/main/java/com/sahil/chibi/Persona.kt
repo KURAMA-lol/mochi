@@ -11,25 +11,24 @@ object Persona {
             .replace("{user}", cfg.persona.userName)
 
     private val IDLE = listOf(
-        "neutral" to "...sus.",
-        "smug" to "Vent check. Nobody saw that.",
-        "excited" to "Emergency meeting! ...just kidding. Hi!",
-        "happy" to "Task complete: wandering around your phone.",
-        "neutral" to "Who is the impostor? Not me. Probably.",
-        "sleepy" to "Crewmates need sleep too, bro.",
+        "neutral" to "Hmm... what are you up to?",
+        "happy" to "I'm right here if you need me~",
+        "excited" to "Ooh, let's do something fun!",
         "happy" to "Padhai ho gayi kya? Thoda break le lo!",
-        "smug" to "I saw you open that app again. Sus.",
-        "shy" to "Bro... were you staring at me?",
-        "neutral" to "Drink some water, crewmate.",
-        "excited" to "Tap me! I'm definitely not the impostor!"
+        "sleepy" to "Aaaah... a little sleepy today.",
+        "smug" to "I saw you open that app again~",
+        "shy" to "Eh? Were you looking at me?",
+        "neutral" to "Drink some water, okay?",
+        "excited" to "Tap me! Let's chat!",
+        "happy" to "Nana is on duty~"
     )
 
     private val POKE = listOf(
-        "angry" to "Hey! Stop poking the crewmate!",
-        "smug" to "Why so sus? You're the one poking me.",
-        "happy" to "Hehe, okay, one more is fine.",
-        "excited" to "AAH! Emergency meeting!",
-        "shy" to "B-bro... that tickles."
+        "angry" to "Hey! Stop poking me!",
+        "smug" to "Hehe, you keep poking me, huh?",
+        "happy" to "Okay okay, one more is fine.",
+        "excited" to "Kyaa! That surprised me!",
+        "shy" to "N-no... that tickles."
     )
 
     fun idleLine(): Pair<String, String> = IDLE[Random.nextInt(IDLE.size)]

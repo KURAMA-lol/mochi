@@ -14,6 +14,14 @@ import android.webkit.WebView
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
@@ -21,6 +29,101 @@ import org.json.JSONObject
 /** Hosts the settings UI (assets/settings.html) in a WebView and bridges it to the native router/service. */
 class MainActivity : Activity() {
     private lateinit var web: WebView
+    private lateinit var nana: ChibiView
+    private lateinit var header: FrameLayout
+    private lateinit var bubble: TextView
+    private val ui = Handler(Looper.getMainLooper())
+    private var lastLook = 0L
+    private val hideBubbleRun = Runnable { bubble.animate().alpha(0f).setDuration(250).start() }
+    private val pokeLines = listOf(
+        "Hehe, that tickles!", "Yes? I'm listening~", "Don't poke too much!", "Nana is here~",
+        "Kyaa! You surprised me!", "Want to chat? Press Start below!", "Padhai kar rahe ho na?"
+    )
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    private fun sayHome(text: String) {
+        bubble.text = text
+        bubble.animate().cancel()
+        bubble.alpha = 1f
+        ui.removeCallbacks(hideBubbleRun)
+        ui.postDelayed(hideBubbleRun, 3200)
+    }
+
+    private fun buildUi() {
+        val dm = resources.displayMetrics
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            fitsSystemWindows = true
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF0B3033.toInt(), 0xFF071416.toInt()))
+        }
+        window.statusBarColor = 0xFF0B3033.toInt()
+        window.navigationBarColor = 0xFF0C1B1D.toInt()
+        header = FrameLayout(this)
+        val hh = (dm.heightPixels * 0.33f).toInt().coerceIn(dp(230), dp(330))
+        root.addView(header, LinearLayout.LayoutParams(-1, hh))
+        val glow = View(this).apply {
+            background = GradientDrawable().apply {
+                gradientType = GradientDrawable.RADIAL_GRADIENT
+                gradientRadius = dp(170).toFloat()
+                setGradientCenter(0.5f, 0.75f)
+                colors = intArrayOf(0x665EEAD4, 0x00000000)
+            }
+        }
+        header.addView(glow, FrameLayout.LayoutParams(-1, -1))
+        nana = ChibiView(this)
+        nana.action = "idle"
+        val nh = hh - dp(18)
+        val nw = (nh * 0.86f).toInt()
+        header.addView(nana, FrameLayout.LayoutParams(nw, nh, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
+        nana.setOnClickListener {
+            nana.poke()
+            sayHome(pokeLines.random())
+        }
+        bubble = TextView(this).apply {
+            textSize = 14f
+            setTextColor(0xFF0E2A2B.toInt())
+            setPadding(dp(14), dp(9), dp(14), dp(9))
+            maxWidth = (dm.widthPixels * 0.7f).toInt()
+            background = GradientDrawable().apply {
+                setColor(0xFFEFFEFA.toInt()); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFF5EEAD4.toInt())
+            }
+            alpha = 0f
+        }
+        header.addView(bubble, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(14) })
+        root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.viewTreeObserver.addOnGlobalLayoutListener {
+            val r = Rect(); root.getWindowVisibleDisplayFrame(r)
+            val kb = dm.heightPixels - r.bottom > dm.heightPixels * 0.18f
+            header.visibility = if (kb) View.GONE else View.VISIBLE
+        }
+        setContentView(root)
+        val who = try { ConfigStore.load(this).persona.userName } catch (e: Exception) { "" }
+        ui.postDelayed({ sayHome(if (who.isBlank()) "Hi! I'm Nana~" else "Hi $who! I'm Nana~") }, 1200)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val a = ev.actionMasked
+        if ((a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_MOVE) && ::nana.isInitialized && header.visibility == View.VISIBLE) {
+            val now = System.currentTimeMillis()
+            if (a == MotionEvent.ACTION_DOWN || now - lastLook > 60) {
+                lastLook = now
+                val loc = IntArray(2); nana.getLocationOnScreen(loc)
+                val cx = loc[0] + nana.width / 2f
+                val cy = loc[1] + nana.height * 0.3f
+                val hw = resources.displayMetrics.widthPixels / 2f
+                val hh = resources.displayMetrics.heightPixels / 2f
+                nana.lookAt(((ev.rawX - cx) / hw * 1.4f).coerceIn(-1f, 1f), (-(ev.rawY - cy) / hh * 1.4f).coerceIn(-1f, 1f))
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onDestroy() {
+        ui.removeCallbacksAndMessages(null)
+        if (::nana.isInitialized) nana.release()
+        super.onDestroy()
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,9 +131,9 @@ class MainActivity : Activity() {
         web = WebView(this)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.setBackgroundColor(0xFF15101F.toInt())
+        web.setBackgroundColor(0)
         web.addJavascriptInterface(Bridge(), "Android")
-        setContentView(web)
+        buildUi()
         web.loadUrl("file:///android_asset/settings.html")
         // ask for mic + notification permission up front (overlay permission needs the settings screen)
         askRuntimePerms()

@@ -178,6 +178,9 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         super.onDetachedFromWindow()
     }
 
+    fun lookAt(nx: Float, ny: Float) { wv?.evaluateJavascript("window.H&&H.look($nx,$ny)", null) }
+    fun poke() { wv?.evaluateJavascript("window.H&&H.poke()", null) }
+
     fun release() {
         removeCallbacks(stateTick)
         try { wv?.destroy() } catch (e: Exception) {}

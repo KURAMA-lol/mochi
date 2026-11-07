@@ -19,10 +19,16 @@ function apply() {
   if (st.a === 'walk' || st.a === 'run') P.lookAt(st.r ? 0.9 : -0.9, 0.05);
   else if (st.a !== 'sus') P.lookAt(null);
 }
-window.H = { s: function (a, r, t, m) { st.a = a; st.r = r; st.t = t; st.m = m || 'neutral'; apply(); } };
+let lookUntil = 0;
+window.H = {
+  s: function (a, r, t, m) { st.a = a; st.r = r; st.t = t; st.m = m || 'neutral'; apply(); },
+  look: function (x, y) { if (!P || st.a === 'sleep') return; P.lookAt(x, y); lookUntil = performance.now() + 2200; },
+  poke: function () { if (!P) return; try { P.act(Math.random() < 0.5 ? 'hop' : 'shy'); P.setExpression('smile'); } catch (e) {} setTimeout(apply, 1600); }
+};
 function loop(now) {
   requestAnimationFrame(loop);
   if (!P) return;
+  if (lookUntil && now > lookUntil) { lookUntil = 0; if (st.a !== 'sus' && st.a !== 'walk' && st.a !== 'run') P.lookAt(null); }
   const t = (now - t0) / 1000;
   if (st.t) { P.params.mouthOpen = Math.max(0, 0.5 + 0.45 * Math.sin(t * 13) * Math.sin(t * 3.1 + 1)); P.params.vowel = Math.sin(t * 5) * 0.7; }
   else P.params.mouthOpen = 0;
