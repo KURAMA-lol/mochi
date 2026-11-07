@@ -23,6 +23,20 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - name: Fetch LivLiv Player and Nana (not stored in this repo)
+        run: |
+          git clone https://github.com/livliv-dev/player /tmp/livliv
+          git -C /tmp/livliv checkout 91cd1f7b2cf2290977ccccbc2fe47dc555963045
+          mkdir -p app/src/main/assets/nana/model
+          cp -r /tmp/livliv/characters/d03/. app/src/main/assets/nana/model/
+          rm -f app/src/main/assets/nana/model/cover.webp app/src/main/assets/nana/model/avatar.webp
+          cp /tmp/livliv/characters/LICENSE.md app/src/main/assets/nana/LICENSE-characters.md
+          cp /tmp/livliv/LICENSE app/src/main/assets/nana/LICENSE-player.txt
+          cp /tmp/livliv/NOTICE app/src/main/assets/nana/NOTICE-player.txt
+          npm install -g bun
+          bun build /tmp/livliv/src/index.ts --outfile app/src/main/assets/nana/player.js --minify --target browser
+          ls -la app/src/main/assets/nana app/src/main/assets/nana/model
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 

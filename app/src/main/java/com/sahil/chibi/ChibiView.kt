@@ -8,14 +8,19 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Base64
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import java.io.File
 import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Character view. If a VRM model was picked in settings it shows the animated 3D model,
- * otherwise (or if loading fails) the static reference sprite with an eye blink.
+ * Character view. Shows Nana (LivLiv Player, a 2.5D character) in a transparent WebView.
+ * Assets live in assets/nana/ and are served to the page from https://hina.local/.
+ * If the player cannot start, a static sprite is drawn instead.
  * Public vars are set by CompanionService.
  */
 class ChibiView(ctx: Context) : FrameLayout(ctx) {
@@ -24,44 +29,17 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     @Volatile var facingRight = true
     @Volatile var talking = false
     @Volatile var pixel = false
-    @Volatile var yaw = 0f      // body turn (deg) while moving, set by the service
-    @Volatile var vsx = 1f      // vent squash/stretch scale
+    @Volatile var yaw = 0f
+    @Volatile var vsx = 1f
     @Volatile var vsy = 1f
     @Volatile var vopen = 0f    // vent opening 0..1
     @Volatile var vdy = 0f      // character vertical offset in px (down = into the vent)
 
     companion object {
         @Volatile var lastError: String = ""
-        fun modelFile(c: Context) = File(c.filesDir, "model.vrm")
-        /** Uses the picked model, otherwise the bundled default (assets/default.vrm) if the app ships one. */
-        fun charId(c: Context): String =
-            c.getSharedPreferences("char_cfg", Context.MODE_PRIVATE).getString("id", "amongus") ?: "amongus"
-
-        fun modelPath(c: Context, slug: String): File {
-            val d = File(c.filesDir, "models"); d.mkdirs()
-            return File(d, slug + ".vrm")
-        }
-
-        fun currentModel(c: Context): File {
-            val id = charId(c)
-            return if (id.startsWith("model:")) modelPath(c, id.substring(6)) else modelFile(c)
-        }
-
-        fun has3d(c: Context): Boolean {
-            val id = charId(c)
-            if (id.startsWith("model:")) return modelPath(c, id.substring(6)).exists()
-            if (id != "amongus") return false
-            val f = modelFile(c)
-            if (!f.exists()) {
-                try {
-                    c.assets.open("default.vrm").use { i -> f.outputStream().use { o -> i.copyTo(o) } }
-                } catch (e: Exception) { f.delete() }
-            }
-            return f.exists()
-        }
+        fun charId(c: Context): String = "nana"
+        fun has3d(c: Context): Boolean = true
     }
-
-    private var gl: GlView? = null
 
     private fun load(name: String): Bitmap? = try {
         val s = context.assets.open(name).bufferedReader().use { it.readText() }.trim()
@@ -77,36 +55,86 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     private var blinkUntil = 0L
     private var pendingDouble = false
 
-    private var pc: PixelChar? = null
-    private var wv: android.webkit.WebView? = null
+    private var wv: WebView? = null
     private var lastS = ""
     private val stateTick: Runnable = object : Runnable {
         override fun run() {
             val w = wv ?: return
-            val s = action + "|" + facingRight + "|" + talking
+            val m = mood.replace("'", "")
+            val s = action + "|" + facingRight + "|" + talking + "|" + m
             if (s != lastS) {
                 lastS = s
-                w.evaluateJavascript("window.PX_S && PX_S('" + action + "'," + facingRight + "," + talking + ")", null)
+                w.evaluateJavascript("window.H && H.s('" + action.replace("'", "") + "'," + facingRight + "," + talking + ",'" + m + "')", null)
             }
-            postDelayed(this, 150)
+            postDelayed(this, 120)
         }
+    }
+
+    inner class NanaBridge {
+        @JavascriptInterface fun err(m: String) {
+            lastError = m.take(200)
+            post { fallback() }
+        }
+        @JavascriptInterface fun ready() { lastError = "" }
     }
 
     init {
         setWillNotDraw(false)
-        pc = when (charId(ctx)) { "lumi" -> Lumi(); "webb" -> Webb(); "custom" -> Custom(ctx).takeIf { it.ok() }; else -> null }
-        loadMascot(ctx)
-        if (has3d(ctx)) {
-            val g = GlView(ctx, this, currentModel(ctx))
-            gl = g
-            addView(g, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        startNana()
+    }
+
+    private fun mime(p: String): String = when {
+        p.endsWith(".html") -> "text/html"
+        p.endsWith(".js") -> "text/javascript"
+        p.endsWith(".json") -> "application/json"
+        p.endsWith(".webp") -> "image/webp"
+        p.endsWith(".png") -> "image/png"
+        else -> "text/plain"
+    }
+
+    private fun reply(mt: String, data: ByteArray, code: Int): WebResourceResponse =
+        WebResourceResponse(mt, "UTF-8", code, if (code == 200) "OK" else "Not Found",
+            mapOf("Access-Control-Allow-Origin" to "*"), java.io.ByteArrayInputStream(data))
+
+    private fun serve(u: android.net.Uri): WebResourceResponse {
+        if (u.host != "hina.local") return reply("text/plain", ByteArray(0), 404)
+        var p = (u.path ?: "/").trimStart('/')
+        if (p.isEmpty()) p = "index.html"
+        if (p.contains("..")) return reply("text/plain", ByteArray(0), 404)
+        return try {
+            val data = context.assets.open("nana/" + p).use { it.readBytes() }
+            reply(mime(p), data, 200)
+        } catch (e: Exception) { reply("text/plain", ByteArray(0), 404) }
+    }
+
+    private fun startNana() {
+        try {
+            val w = WebView(context)
+            w.setBackgroundColor(0)
+            w.isVerticalScrollBarEnabled = false
+            w.isHorizontalScrollBarEnabled = false
+            w.overScrollMode = OVER_SCROLL_NEVER
+            w.settings.javaScriptEnabled = true
+            w.settings.allowFileAccess = false
+            w.addJavascriptInterface(NanaBridge(), "HinaNative")
+            w.webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = serve(request.url)
+            }
+            addView(w, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            w.loadUrl("https://hina.local/index.html")
+            wv = w
+            postDelayed(stateTick, 300)
+        } catch (e: Throwable) {
+            lastError = (e.message ?: e.toString()).take(200)
+            wv = null
         }
     }
 
-    /** Called when the 3D model could not be loaded: drop back to the sprite. */
+    /** Called when the player could not start: drop back to the sprite. */
     fun fallback() {
-        gl?.let { removeView(it) }
-        gl = null
+        removeCallbacks(stateTick)
+        wv?.let { try { removeView(it); it.destroy() } catch (e: Throwable) { } }
+        wv = null
         invalidate()
     }
 
@@ -138,40 +166,6 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         c.restore()
     }
 
-    /** Named mascots from Pixel Studio ("mascot:<slug>"): pixel frames are drawn natively, code mascots run in a transparent WebView. */
-    private fun loadMascot(ctx: Context) {
-        val id = charId(ctx)
-        if (!id.startsWith("mascot:")) return
-        val json = try { Mascots.get(ctx, id.substring(7)) } catch (e: Throwable) { null } ?: return
-        val o = try { org.json.JSONObject(json) } catch (e: Throwable) { return }
-        if (o.optString("type") == "pixel") {
-            pc = Custom(Mascots.bitmap(o.optString("f1")), Mascots.bitmap(o.optString("f2"))).takeIf { it.ok() }
-        } else if (o.optString("type") == "code") {
-            startCode(json)
-        }
-    }
-
-    private fun startCode(json: String) {
-        try {
-            val w = android.webkit.WebView(context)
-            w.setBackgroundColor(0)
-            w.isVerticalScrollBarEnabled = false
-            w.isHorizontalScrollBarEnabled = false
-            w.settings.javaScriptEnabled = true
-            w.webViewClient = object : android.webkit.WebViewClient() {
-                override fun onPageFinished(v: android.webkit.WebView, u: String) {
-                    v.evaluateJavascript("window.PX_RUN && PX_RUN(" + org.json.JSONObject.quote(json) + ")", null)
-                }
-            }
-            addView(w, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            w.loadUrl("file:///android_asset/studio.html#run")
-            wv = w
-            postDelayed(stateTick, 300)
-        } catch (e: Throwable) {
-            wv = null
-        }
-    }
-
     override fun onInterceptTouchEvent(ev: android.view.MotionEvent): Boolean = wv != null
 
     override fun onDetachedFromWindow() {
@@ -182,21 +176,7 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     }
 
     override fun onDraw(c: Canvas) {
-        if (gl != null || wv != null) return
-        val pcl = pc
-        if (pcl != null) {
-            val s = minOf(width / pcl.w, height / pcl.h)
-            if (s >= 1) {
-                c.save()
-                if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
-                c.translate((width - pcl.w * s) / 2f, (height - pcl.h * s).toFloat())
-                c.scale(s.toFloat(), s.toFloat())
-                pcl.draw(Px(c), SystemClock.uptimeMillis() / 1000f, action, talking)
-                c.restore()
-            }
-            postInvalidateDelayed(40)
-            return
-        }
+        if (wv != null) return
         val base = open ?: return
         val now = SystemClock.uptimeMillis()
         if (now >= nextBlink && now >= blinkUntil) {

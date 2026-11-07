@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#c{position:fixed;left:0;top:0;width:100%;height:100%;display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { Player } from './player.js';
+const c = document.getElementById('c');
+let P = null, t0 = performance.now(), lastAct = 0, lastLook = 0, lookDir = 1;
+const st = { a: 'idle', r: true, t: false, m: 'neutral' };
+function fail(e) { try { HinaNative.err(String((e && e.message) || e)); } catch (x) {} }
+const EX = { happy: 'smile', excited: 'smile', love: 'smile', sad: 'sad', angry: 'angry', shy: 'shy' };
+function apply() {
+  if (!P) return;
+  P.setAway(st.a === 'sleep');
+  let ex = EX[st.m] || null;
+  if (st.a === 'wave') ex = 'smile';
+  try { P.setExpression(ex); } catch (e) {}
+  P.view.y = st.a === 'sit' ? -0.06 : 0;
+  if (st.a === 'walk' || st.a === 'run') P.lookAt(st.r ? 0.9 : -0.9, 0.05);
+  else if (st.a !== 'sus') P.lookAt(null);
+}
+window.H = { s: function (a, r, t, m) { st.a = a; st.r = r; st.t = t; st.m = m || 'neutral'; apply(); } };
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (!P) return;
+  const t = (now - t0) / 1000;
+  if (st.t) { P.params.mouthOpen = Math.max(0, 0.5 + 0.45 * Math.sin(t * 13) * Math.sin(t * 3.1 + 1)); P.params.vowel = Math.sin(t * 5) * 0.7; }
+  else P.params.mouthOpen = 0;
+  const iv = st.a === 'walk' ? 550 : st.a === 'run' ? 350 : st.a === 'drag' ? 500 : st.a === 'wave' ? 1200 : 0;
+  if (iv && now - lastAct > iv) { lastAct = now; P.act(st.a === 'drag' ? 'shake' : st.a === 'wave' ? 'tilt' : 'hop'); }
+  if (st.a === 'sus' && now - lastLook > 1300) { lastLook = now; lookDir = -lookDir; P.lookAt(lookDir * 0.9, 0.1); }
+}
+try {
+  P = new Player(c, { followPointer: false, maxPixelRatio: 2 });
+  await P.load('model/');
+  apply();
+  requestAnimationFrame(loop);
+  try { HinaNative.ready(); } catch (x) {}
+} catch (e) { fail(e); }
+</script></body></html>

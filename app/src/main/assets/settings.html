@@ -143,121 +143,13 @@ th{color:var(--mut);font-weight:500;font-size:12px}
   </div>
   <div class="card">
     <label>Character</label>
-    <div class="btns" id="chrBtns">
-      <button class="b" data-id="amongus" onclick="chrSet('amongus')">Among Us (3D)</button>
-      <button class="b" data-id="lumi" onclick="chrSet('lumi')">Lumi (jellyfish)</button>
-      <button class="b" data-id="webb" onclick="chrSet('webb')">Webb (spider hero)</button>
-      <button class="b" data-id="custom" onclick="chrSet('custom')">My mascot</button>
-    </div>
-  </div>
-  <div class="card">
-    <label>My 3D models</label>
-    <div id="myMdl" class="mut" style="font-size:13px;margin:4px 0">No saved 3D models yet. Pixel Studio > VRM tab > load a model > Use in Hina.</div>
-    <div id="mdlErr" style="color:#ff8a8a;font-size:12px;margin-top:6px"></div>
-  </div>
-  <div class="card">
-    <label>Pixel Studio</label>
-    <div class="mut" style="margin:4px 0 8px;font-size:13px">Import an image, paste pixel code, animate, and save mascots with names.</div>
-    <div class="btns"><button class="b" onclick="location.href='studio.html'">Open Pixel Studio</button></div>
-    <div id="myMasc" style="margin-top:10px"></div>
-  </div>
-  <div class="card">
-    <label>Make your own mascot</label>
-    <div class="mut" style="margin:4px 0 8px;font-size:13px">Draw a 32x32 pixel character. Frame 1 is the normal look, frame 2 is optional (used for blinking and talking). Save, and he becomes your companion.</div>
-    <div style="max-width:320px;margin:0 auto">
-      <canvas id="mc" width="32" height="32" style="width:100%;aspect-ratio:1;image-rendering:pixelated;touch-action:none;border-radius:10px;background-color:#1f2140;background-image:conic-gradient(#2a2d4a 25%,#1f2140 0 50%,#2a2d4a 0 75%,#1f2140 0);background-size:20px 20px"></canvas>
-    </div>
-    <div id="mcPal" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;justify-content:center"></div>
-    <div class="btns" style="flex-wrap:wrap">
-      <input type="color" id="mcCol" value="#ff4d6d" style="width:44px;height:40px;border:0;background:none" oninput="MC.color=this.value;MC.tool='pen';mcTools()">
-      <button class="b ghost" data-t="pen" onclick="MC.tool='pen';mcTools()">Pen</button>
-      <button class="b ghost" data-t="erase" onclick="MC.tool='erase';mcTools()">Eraser</button>
-      <button class="b ghost" data-t="fill" onclick="MC.tool='fill';mcTools()">Fill</button>
-      <button class="b ghost" data-t="mirror" onclick="MC.mirror=!MC.mirror;mcTools()">Mirror</button>
-    </div>
-    <div class="btns" style="flex-wrap:wrap;margin-top:8px">
-      <button class="b ghost" data-fr="0" onclick="mcFrame(0)">Frame 1</button>
-      <button class="b ghost" data-fr="1" onclick="mcFrame(1)">Frame 2</button>
-      <button class="b ghost" onclick="mcCopy()">Copy 1 to 2</button>
-      <button class="b ghost" onclick="mcUndo()">Undo</button>
-      <button class="b ghost" onclick="mcClear()">Clear</button>
-      <button class="b ghost" onclick="try{Android.pickMascotImage()}catch(e){}">Import image</button>
-    </div>
-    <div class="btns" style="margin-top:10px"><button class="b" onclick="mcSave()">Save as my mascot</button></div>
-  </div>
-  <div class="card">
-    <label>3D character (VRM model)</label>
-    <div id="mdlInfo" style="color:var(--mut);font-size:13px;margin:4px 0 8px">Using the default sprite.</div>
-    <button onclick="Android.pickModel()" style="width:100%;padding:12px;border-radius:12px;border:0;background:var(--ac2);color:#fff;font:inherit">Pick a .vrm file</button>
-    <button onclick="Android.removeModel();setTimeout(mdl,400)" style="width:100%;padding:10px;margin-top:8px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--mut);font:inherit">Reset to default model</button>
+    <div style="font-size:15px;margin:6px 0">Nana</div>
+    <div class="mut" style="font-size:12px">Characters: LivLiv (livliv.ai). Shown with LivLiv Player (Apache-2.0). Free for personal, non-commercial use; not for sale or redistribution.</div>
+    <div id="nanaErr" style="color:#ff8a8a;font-size:12px;margin-top:6px"></div>
   </div>
   <script>
-  var MC={cur:0,tool:'pen',color:'#ff4d6d',mirror:false,f:[null,null],undo:[],down:false};
-  function mcHex(c){return [parseInt(c.substr(1,2),16),parseInt(c.substr(3,2),16),parseInt(c.substr(5,2),16)];}
-  function mcRender(){MC.x.clearRect(0,0,32,32);MC.x.drawImage(MC.f[MC.cur],0,0);}
-  function mcTools(){document.querySelectorAll('[data-t]').forEach(function(b){var t=b.getAttribute('data-t');var on=t=='mirror'?MC.mirror:MC.tool==t;b.style.outline=on?'2px solid #fff':'none';});
-    document.querySelectorAll('[data-fr]').forEach(function(b){b.style.outline=(+b.getAttribute('data-fr')==MC.cur)?'2px solid #fff':'none';});}
-  function mcSnap(){var x=MC.f[MC.cur].getContext('2d');MC.undo.push([MC.cur,x.getImageData(0,0,32,32)]);if(MC.undo.length>30)MC.undo.shift();}
-  function mcUndo(){var u=MC.undo.pop();if(!u)return;MC.f[u[0]].getContext('2d').putImageData(u[1],0,0);MC.cur=u[0];mcRender();mcTools();}
-  function mcClear(){mcSnap();MC.f[MC.cur].getContext('2d').clearRect(0,0,32,32);mcRender();}
-  function mcFrame(i){MC.cur=i;mcRender();mcTools();}
-  function mcCopy(){mcSnap();var x=MC.f[1].getContext('2d');x.clearRect(0,0,32,32);x.drawImage(MC.f[0],0,0);MC.cur=1;mcRender();mcTools();}
-  function mcLoad(i,src){var im=new Image();im.onload=function(){var x=MC.f[i].getContext('2d');x.clearRect(0,0,32,32);x.drawImage(im,0,0,32,32);mcRender();};im.src=src;}
-  function mcCell(e){var r=MC.cv.getBoundingClientRect();return [Math.floor((e.clientX-r.left)/r.width*32),Math.floor((e.clientY-r.top)/r.height*32)];}
-  function mcPaint(cx,cy){var x=MC.f[MC.cur].getContext('2d');
-    function put(px,py){if(px<0||py<0||px>31||py>31)return;if(MC.tool=='erase')x.clearRect(px,py,1,1);else{x.fillStyle=MC.color;x.fillRect(px,py,1,1);}}
-    put(cx,cy);if(MC.mirror)put(31-cx,cy);}
-  function mcFill(cx,cy){var x=MC.f[MC.cur].getContext('2d');var id=x.getImageData(0,0,32,32),d=id.data;
-    if(cx<0||cy<0||cx>31||cy>31)return;var i0=(cy*32+cx)*4,t=[d[i0],d[i0+1],d[i0+2],d[i0+3]],n=mcHex(MC.color);n.push(255);
-    if(t[0]==n[0]&&t[1]==n[1]&&t[2]==n[2]&&t[3]==255)return;
-    var st=[[cx,cy]];function same(i){return d[i]==t[0]&&d[i+1]==t[1]&&d[i+2]==t[2]&&d[i+3]==t[3];}
-    while(st.length){var p=st.pop(),px=p[0],py=p[1];if(px<0||py<0||px>31||py>31)continue;var i=(py*32+px)*4;if(!same(i))continue;
-      d[i]=n[0];d[i+1]=n[1];d[i+2]=n[2];d[i+3]=255;st.push([px+1,py],[px-1,py],[px,py+1],[px,py-1]);}
-    x.putImageData(id,0,0);}
-  function mcSave(){var x0=MC.f[0].getContext('2d').getImageData(0,0,32,32).data,has=false;for(var i=3;i<x0.length;i+=4){if(x0[i]>0){has=true;break;}}
-    if(!has){alert('Draw something on Frame 1 first.');return;}
-    var d1=MC.f[0].toDataURL('image/png').split(',')[1];var x1=MC.f[1].getContext('2d').getImageData(0,0,32,32).data,h2=false;
-    for(var j=3;j<x1.length;j+=4){if(x1[j]>0){h2=true;break;}}
-    var d2=h2?MC.f[1].toDataURL('image/png').split(',')[1]:'';
-    try{Android.saveMascot(d1,d2);}catch(e){alert('Save works only inside the app.');return;}chrShow('custom');}
-  function mcInit(){var cv=document.getElementById('mc');if(!cv)return;MC.cv=cv;MC.x=cv.getContext('2d');
-    for(var i=0;i<2;i++){var c=document.createElement('canvas');c.width=32;c.height=32;MC.f[i]=c;}
-    var pal=['#000000','#ffffff','#ff4d6d','#ff9f1c','#ffd166','#06d6a0','#118ab2','#7b5cff','#8d5524','#f1c27d','#3a2f7a','#9aa0b4','#e63946','#1d3557','#a8dadc','#2b2d42'];
-    var pe=document.getElementById('mcPal');pal.forEach(function(c){var b=document.createElement('button');b.style.cssText='width:30px;height:30px;border-radius:8px;border:2px solid rgba(0,0,0,.4);background:'+c;b.onclick=function(){MC.color=c;MC.tool='pen';mcTools();};pe.appendChild(b);});
-    cv.addEventListener('pointerdown',function(e){cv.setPointerCapture(e.pointerId);MC.down=true;mcSnap();var p=mcCell(e);if(MC.tool=='fill')mcFill(p[0],p[1]);else mcPaint(p[0],p[1]);mcRender();});
-    cv.addEventListener('pointermove',function(e){if(!MC.down||MC.tool=='fill')return;var p=mcCell(e);mcPaint(p[0],p[1]);mcRender();});
-    var up=function(){MC.down=false;};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
-    window.onMascotImg=function(src){mcSnap();mcLoad(MC.cur,src);};
-    try{var j=JSON.parse(Android.loadMascot());if(j.f1)mcLoad(0,j.f1);if(j.f2)mcLoad(1,j.f2);}catch(e){}
-    mcRender();mcTools();}
-  setTimeout(mcInit,150);
-  function mmList(){var box=document.getElementById('myMasc');if(!box)return;box.innerHTML='';
-    try{var a=JSON.parse(Android.listMascots()),cur=Android.getChar();
-      if(!a.length){box.innerHTML='<div class="mut" style="font-size:13px">No saved mascots yet.</div>';return;}
-      a.forEach(function(m){var b=document.createElement('button');b.className='b ghost';b.style.margin='3px';b.textContent=m.name;
-        if(cur=='mascot:'+m.slug)b.style.outline='2px solid #fff';
-        b.onclick=function(){Android.useMascot(m.slug);chrShow('');setTimeout(mmList,600);};box.appendChild(b);});
-    }catch(x){}}
-  setTimeout(mmList,500);
-  function chrShow(id){document.querySelectorAll('#chrBtns button').forEach(function(b){b.style.outline=b.getAttribute('data-id')==id?'2px solid #fff':'none';});}
-  function chrSet(id){try{Android.setChar(id);}catch(x){} chrShow(id);setTimeout(mdList,300);}
-    function mdList(){var box=document.getElementById('myMdl');if(!box)return;
-      try{var a=JSON.parse(Android.listModels()),cur=Android.getChar();box.innerHTML='';
-        if(!a.length)box.innerHTML='<div class="mut" style="font-size:13px">No saved 3D models yet. Pixel Studio > VRM tab > load a model > Use in Hina.</div>';
-        a.forEach(function(m){var w=document.createElement('div');w.style.margin='4px 0';
-          var b=document.createElement('button');b.className='b ghost';b.textContent=m.name+' ('+m.kb+' KB)';
-          if(cur=='model:'+m.slug)b.style.outline='2px solid #fff';
-          b.onclick=function(){Android.useModel(m.slug);chrShow('');setTimeout(mdList,600);};
-          var d=document.createElement('button');d.className='b ghost';d.textContent='Delete';d.style.marginLeft='6px';
-          var armed=false;d.onclick=function(){if(!armed){armed=true;d.textContent='Tap again';setTimeout(function(){armed=false;d.textContent='Delete';},2500);return;}Android.deleteModel(m.slug);setTimeout(mdList,600);};
-          w.appendChild(b);w.appendChild(d);box.appendChild(w);});
-        var i=JSON.parse(Android.modelInfo());document.getElementById('mdlErr').textContent=i.error?('3D load failed, using sprite: '+i.error):'';
-      }catch(x){}}
-    setTimeout(mdList,500);setInterval(mdList,4000);
-  setTimeout(function(){try{chrShow(Android.getChar());}catch(x){}},300);
-  function mdl(){try{var i=JSON.parse(Android.modelInfo());var e=document.getElementById('mdlInfo');
-   e.textContent=i.has?('3D model active ('+i.sizeKb+' KB)'+(i.error?(' - failed, using sprite: '+i.error):'')):'Using the default sprite.';}catch(x){}}
-  window.onModel=mdl;setTimeout(mdl,300);
+  function nanaErr(){try{var i=JSON.parse(Android.modelInfo());document.getElementById('nanaErr').textContent=i.error?('Nana could not start, showing the plain sprite: '+i.error):'';}catch(x){}}
+  setTimeout(nanaErr,500);setInterval(nanaErr,4000);
   </script>
   <div class="card" style="display:none">
     <label>Character style</label>
