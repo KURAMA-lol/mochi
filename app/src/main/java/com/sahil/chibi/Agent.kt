@@ -23,7 +23,7 @@ object Agent {
     fun cfgJson(c: Context): String = JSONObject().put("on", enabled(c)).put("act", actions(c)).toString()
 
     private val ACTIONS = setOf(
-        "launch_app", "open_url", "screen_tap", "screen_type", "screen_scroll", "screen_back", "screen_home",
+        "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_type", "screen_scroll", "screen_back", "screen_home",
         "browser_click", "browser_type"
     )
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
@@ -42,7 +42,11 @@ Tools:
 - browser_click {"id":n} ; browser_type {"id":n,"text":"...","submit":true|false} ; browser_scroll {"direction":"down"|"up"} ; browser_back {}
 - launch_app {"name":"YouTube"} : open an app on the phone. open_url {"url":"..."} : open a link in the user's own apps.
 - screen_read {} : numbered elements of whatever is on the phone screen right now (needs screen control enabled).
+- screen_tap_text {"text":"Jabed"} : taps the first thing on screen whose label contains that text (easiest way to tap).
 - screen_tap {"id":n} ; screen_type {"id":n,"text":"..."} ; screen_scroll {"direction":"down"|"up"} ; screen_back {} ; screen_home {}
+
+How to work: when the user asks you to DO something, do it with tools step by step until it is finished. Their request is already the permission, so do not describe the screen and then ask whether to continue. Phone tasks: screen_read first, then tap or type, then screen_read to check, and answer only when done (or truly stuck). screen_* tools act on the apps on the phone; browser_* tools act only on Nana's own browser.
+Example. User: "open the first chat". You: <tool>{"name":"screen_read","args":{}}</tool> then, seeing the chat list, you: <tool>{"name":"screen_tap","args":{"id":12}}</tool> then you read again and finally say "Done, opened it."
 
 Rules:
 - Element numbers change whenever the page or screen changes: read again before using a number.
@@ -109,6 +113,7 @@ Rules:
             "browser_back" -> AgentBrowser.back(ctx)
             "screen_read" -> acc { it.read() }
             "screen_tap" -> acc { it.tap(args.optInt("id", -1)) }
+            "screen_tap_text" -> acc { it.tapText(args.optString("text")) }
             "screen_type" -> acc { it.type(args.optInt("id", -1), args.optString("text")) }
             "screen_scroll" -> acc { it.scroll(down) }
             "screen_back" -> acc { it.back() }

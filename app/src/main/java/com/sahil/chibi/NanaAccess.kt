@@ -42,6 +42,7 @@ class NanaAccess : AccessibilityService() {
     }
 
     @Synchronized fun read(): String {
+        nodes.clear()
         val root = targetRoot() ?: return "No other app is on screen right now (only Nana's own windows). Use launch_app to open one, then screen_read again."
         nodes.clear()
         val sb = StringBuilder("Foreground app: ").append(root.packageName).append("\n")
@@ -88,6 +89,15 @@ class NanaAccess : AccessibilityService() {
         val p = Path().apply { moveTo(x, y) }
         val g = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(p, 0, 60)).build()
         return dispatchGesture(g, null, null)
+    }
+
+    @Synchronized fun tapText(q: String): String {
+        read()
+        val low = q.lowercase().trim()
+        if (low.isEmpty()) return "No text given."
+        val i = nodes.indexOfFirst { (it.text?.toString() ?: it.contentDescription?.toString() ?: "").lowercase().contains(low) }
+        if (i < 0) return "Nothing on screen contains '" + q + "'. Try screen_scroll, then screen_read."
+        return tap(i)
     }
 
     @Synchronized fun type(id: Int, text: String): String {
