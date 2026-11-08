@@ -24,6 +24,18 @@ input,select,textarea{width:100%;background:var(--card2);color:var(--tx);border:
 textarea{min-height:120px}
 input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
 input[type=range]{padding:0}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;margin:0;border-bottom:1px solid var(--line);color:var(--tx);font-size:14.5px}
+.sw:last-of-type{border-bottom:0}
+.sw small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.sw input[type=checkbox]{-webkit-appearance:none;appearance:none;width:48px;height:28px;min-width:48px;border-radius:99px;background:#2a4549;border:0;position:relative;padding:0;margin:0;transform:none;transition:background .2s}
+.sw input[type=checkbox]::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#cfe6e2;transition:left .2s}
+.sw input[type=checkbox]:checked{background:var(--ac)}
+.sw input[type=checkbox]:checked::after{left:24px;background:#03211f}
+.btns.g>*{flex:1 1 40%}
+.btns.g .wide{flex:1 1 100%}
+button.b{min-height:46px}
+.stat{display:flex;align-items:center;gap:8px;font-size:13px;margin:2px 0 10px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--bad)}.dot.ok{background:var(--ok)}
 .row{display:flex;gap:8px}.row>*{flex:1}
 button.b{background:var(--ac2);color:#2a1206;border:0;border-radius:14px;padding:11px 14px;font:inherit;font-weight:600}
 button.b.pink{background:var(--ac);color:#03211f}
@@ -53,28 +65,29 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 <section id="home" class="on">
   <div class="card">
     <div id="chips"></div>
-    <div class="btns">
+    <div class="btns g">
       <button class="b ghost" onclick="Android.openOverlaySettings()">1 · Allow overlay</button>
       <button class="b ghost" onclick="Android.requestPerms()">2 · Mic + notifications</button>
     </div>
-    <div class="btns">
-      <button class="b pink" onclick="Android.start()">Start Nana</button>
+    <div class="btns g">
+      <button class="b pink wide" onclick="Android.start()">Start Nana</button>
       <button class="b" onclick="Android.summon()">Call her</button>
       <button class="b red" onclick="Android.stop()">Stop</button>
     </div>
-    <p class="mut">First add at least one API key in the <b>APIs</b> tab. Tap her on screen to chat; drag her up and she drops back down; long-press to poke her.</p>
+    <p class="mut">Add an API key in the <b>APIs</b> tab first. Tap her to chat, hold to poke, drag up and she drops down.</p>
   </div>
   <h2>Tools &amp; screen control</h2>
   <div class="card">
-    <label style="display:flex;align-items:center"><input type="checkbox" id="agOn" onchange="agSave()">Let Nana use tools (web, browser, screen)</label>
-    <label style="display:flex;align-items:center"><input type="checkbox" id="agAct" onchange="agSave()">Allow actions (open apps, tap, type, click)</label>
-    <label style="display:flex;align-items:center"><input type="checkbox" id="kbOn" onchange="agSave()">Move aside when the keyboard opens (needs screen control)</label>
-    <label style="display:flex;align-items:center"><input type="checkbox" id="askOn" onchange="agSave()">Ask me (Allow / Deny) before risky actions: send, post, pay, delete</label>
-    <div class="btns">
-      <button class="b ghost" onclick="Android.openAccessibility()">Enable screen control</button>
-      <button class="b ghost" onclick="Android.openBrowser()">Open Nana's browser</button>
+    <div class="stat"><span id="scDot" class="dot"></span><span id="scTxt">Checking screen control...</span></div>
+    <label class="sw"><span>Use tools<small>web, her browser, phone screen</small></span><input type="checkbox" id="agOn" onchange="agSave()"></label>
+    <label class="sw"><span>Allow actions<small>open apps, tap, type, click</small></span><input type="checkbox" id="agAct" onchange="agSave()"></label>
+    <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
+    <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
+    <div class="btns g">
+      <button class="b ghost" onclick="Android.openAccessibility()">Screen control settings</button>
+      <button class="b ghost" onclick="Android.openBrowser()">Open her browser</button>
     </div>
-    <p class="mut">Ask things like "open YouTube and search lo-fi", "what's on my screen?" or "find the weather in Delhi". Nana never types passwords and is told to ask before sending or buying. Turn screen control on in Accessibility settings, under Nana.</p>
+    <p class="mut">Try: "open YouTube and search lo-fi", "what's on my screen?". She never types passwords. If screen control shows red, turn Nana ON in Accessibility settings.</p>
   </div>
   <h2>Other ways to call her</h2>
   <div class="card mut">
@@ -337,6 +350,7 @@ function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
   $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control');
+  try { var d=document.getElementById('scDot'); if(d){d.className='dot'+(s.access?' ok':'');document.getElementById('scTxt').textContent=s.access?'Screen control is ON':'Screen control is OFF - tap Screen control settings and turn Nana on'} } catch (e) {}
   try { memLoad(); agLoad(); } catch (e) {}
 }
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
