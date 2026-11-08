@@ -74,7 +74,7 @@ class MainActivity : Activity() {
         nana = ChibiView(this)
         nana.action = "idle"
         val nh = hh - dp(18)
-        val nw = (nh * 1.3f).toInt().coerceAtMost(dm.widthPixels)
+        val nw = (nh * 0.86f).toInt()
         header.addView(nana, FrameLayout.LayoutParams(nw, nh, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
         nana.setOnClickListener {
             nana.poke()
@@ -210,6 +210,7 @@ class MainActivity : Activity() {
                 .put("notif", notif)
                 .put("running", CompanionService.running)
                 .put("access", NanaAccess.inst != null)
+                .put("notifAccess", NanaNotifs.inst != null)
                 .toString()
         }
 
@@ -223,6 +224,15 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
         @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
+        @JavascriptInterface fun setWake(on: Boolean) {
+            Agent.setWake(this@MainActivity, on)
+            if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE)
+        }
+        @JavascriptInterface fun getReminders(): String = Reminders.json(this@MainActivity)
+        @JavascriptInterface fun cancelReminder(id: String) { id.toLongOrNull()?.let { Reminders.cancelId(this@MainActivity, it) } }
+        @JavascriptInterface fun openNotifAccess() {
+            runOnUiThread { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
         @JavascriptInterface fun getLog(): String = AuditLog.json(this@MainActivity)
         @JavascriptInterface fun clearLog() { AuditLog.clear(this@MainActivity) }
         @JavascriptInterface fun getMemory(): String = Memory.json(this@MainActivity)

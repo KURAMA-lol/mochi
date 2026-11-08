@@ -114,12 +114,16 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:20px 4px 
     <label class="sw"><span>Allow actions<small>open apps, tap, type, click</small></span><input type="checkbox" id="agAct" onchange="agSave()"></label>
     <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
     <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
+    <label class="sw"><span>Hey Nana<small>say "Nana, ..." and she wakes up (screen on only, uses mic + battery)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
     <div class="btns g">
       <button class="b ghost" onclick="Android.openAccessibility()">Screen control settings</button>
+      <button class="b ghost" onclick="Android.openNotifAccess()">Notification access</button>
       <button class="b ghost" onclick="Android.openBrowser()">Open her browser</button>
     </div>
     <p class="mut">Try: "open YouTube and search lo-fi", "what's on my screen?". She never types passwords. If screen control shows red, turn Nana ON in Accessibility settings.</p>
   </div>
+  <h2>Reminders</h2>
+  <div class="card"><div id="remList" class="mut">None. Say: "remind me in 30 min to drink water".</div></div>
   <h2>Other ways to call her</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
@@ -383,7 +387,7 @@ function tab(id){
 function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
-  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control');
+  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control') + c(s.notifAccess,'notification access');
   try { var d=document.getElementById('scDot'); if(d){d.className='dot'+(s.access?' ok':'');document.getElementById('scTxt').textContent=s.access?'Screen control is ON':'Screen control is OFF - tap Screen control settings and turn Nana on'} } catch (e) {}
   try { memLoad(); agLoad(); } catch (e) {}
 }
@@ -538,9 +542,11 @@ function renderAll(){ refreshStatus(); renderProviders(); renderRoute(); renderP
 renderAll(); tab('home');
 </script>
 <script>
-function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;logLoad();}catch(x){}}
+function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
 function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid #0001">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
+function wakeSave(){try{Android.setWake(document.getElementById('wakeOn').checked)}catch(x){}}
+function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.1)"><span style="flex:1;color:var(--tx)">'+esc(r.text)+'<br><small>'+new Date(r.at).toLocaleString()+'</small></span><button class="b red" style="padding:6px 12px;min-height:0" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">✕</button></div>'}).join('')}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
 function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){el.textContent='Could not load memory: '+x}}
 function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved \u2713':r;i.value='';memLoad()}

@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -61,6 +62,7 @@ class CompanionService : Service() {
         const val ACT_TOGGLE = "chibi.toggle"
         const val ACT_STOP = "chibi.stop"
         const val ACT_RELOAD = "chibi.reload"
+        const val ACT_WAKE = "chibi.wake"
         private const val CH = "chibi_channel"
         private const val NID = 1
         @Volatile var running = false
@@ -168,6 +170,7 @@ class CompanionService : Service() {
         when (intent?.action) {
             ACT_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACT_RELOAD -> { rebuildChibi() }
+            ACT_WAKE -> { endWake() }
             ACT_TOGGLE -> {
                 ensureChibi()
                 if (hidden) showChibi() else hideChibi()
@@ -179,11 +182,13 @@ class CompanionService : Service() {
             }
             else -> { ensureChibi(); if (hidden) showChibi() }
         }
+        scheduleWake(1500)
         return START_STICKY
     }
 
     override fun onDestroy() {
         running = false
+        endWake()
         AgentBrowser.onUse = null
         Agent.approver = null
         hideBrowserFloat()
@@ -1086,7 +1091,60 @@ class CompanionService : Service() {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chibi")
     }
 
+    // ---- "Hey Nana" wake word: listens in short rounds while the screen is on ----
+    private var wakeSr: SpeechRecognizer? = null
+    private val WAKE = Regex("\\bnana\\b[,.!?\\s]*(.*)$", RegexOption.IGNORE_CASE)
+
+    private fun scheduleWake(delay: Long) { main.postDelayed({ startWake() }, delay) }
+
+    private fun endWake() {
+        val s = wakeSr ?: return
+        wakeSr = null
+        try { s.cancel(); s.destroy() } catch (ex: Exception) {}
+    }
+
+    private fun startWake() {
+        if (!running || !Agent.wake(this) || wakeSr != null || recognizer != null) return
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isInteractive || typing != null) { scheduleWake(4000); return }
+        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        wakeSr = sr
+        sr.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onError(error: Int) {
+                endWake()
+                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) return
+                scheduleWake(if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 3000 else 500)
+            }
+            override fun onResults(results: Bundle?) {
+                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
+                val m = WAKE.find(t)
+                endWake()
+                if (m == null) { scheduleWake(300); return }
+                val rest = m.groupValues[1].trim()
+                ensureChibi()
+                if (hidden) showChibi()
+                if (!panelOpen) openPanel()
+                if (rest.length >= 3) sendUserText(rest, true) else startListening()
+            }
+        })
+        val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, cfg.persona.voiceLang)
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+        try { sr.startListening(i) } catch (ex: Exception) { endWake(); scheduleWake(5000) }
+    }
+
     private fun startListening() {
+        endWake()
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             addMsg("I need mic permission. Open the Nana app and tap 'Grant mic'.", false, null); return
         }
@@ -1127,5 +1185,6 @@ class CompanionService : Service() {
         recognizer = null
         try { sr.stopListening(); sr.destroy() } catch (ex: Exception) {}
         micBtn?.text = "🎙"
+        scheduleWake(1500)
     }
 }
