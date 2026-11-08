@@ -154,6 +154,7 @@ class CompanionService : Service() {
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         cfg = ConfigStore.load(this)
         createChannel()
+        loadChat()
         tts = TextToSpeech(this) { st ->
             if (st == TextToSpeech.SUCCESS) { ttsReady = true; applyTts() }
         }
@@ -871,53 +872,154 @@ class CompanionService : Service() {
         setPadding(dp(10), dp(6), dp(10), dp(6)); setOnClickListener { onClick() }
     }
 
+    private var sendBtn: TextView? = null
+    private var subtitle: TextView? = null
+
+    private fun glass(fill: Int, stroke: Int, r: Int) = GradientDrawable().apply {
+        setColor(fill); cornerRadius = dp(r).toFloat(); setStroke(dp(1), stroke)
+    }
+
+    private fun roundBtn(label: String, fill: Int, txt: Int = 0xFFFFFFFF.toInt(), onClick: () -> Unit) = TextView(this).apply {
+        text = label; textSize = 17f; setTextColor(txt); gravity = Gravity.CENTER
+        background = glass(fill, 0x33FFFFFF, 20)
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply { leftMargin = dp(6) }
+    }
+
+    private fun refreshBusy() {
+        val busy = typing != null
+        subtitle?.text = if (busy) "working on it..." else "online"
+        subtitle?.setTextColor(if (busy) 0xFFF59E6C.toInt() else 0xFF8FF5E3.toInt())
+        val empty = (input?.text?.toString()?.trim() ?: "").isEmpty()
+        sendBtn?.text = if (busy && empty) "■" else "➤"
+    }
+
+    private fun md(s: String): CharSequence {
+        val sb = android.text.SpannableStringBuilder()
+        val re = Regex("\\*\\*(.+?)\\*\\*|`([^`]+)`")
+        var last = 0
+        for (m in re.findAll(s)) {
+            sb.append(s.substring(last, m.range.first))
+            val st = sb.length
+            if (m.groupValues[1].isNotEmpty()) {
+                sb.append(m.groupValues[1])
+                sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, sb.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            } else {
+                sb.append(m.groupValues[2])
+                sb.setSpan(android.text.style.TypefaceSpan("monospace"), st, sb.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sb.setSpan(android.text.style.BackgroundColorSpan(0x33FFFFFF), st, sb.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            last = m.range.last + 1
+        }
+        sb.append(s.substring(last))
+        return sb
+    }
+
+    private fun saveChat() {
+        try {
+            val a = org.json.JSONArray()
+            history.takeLast(40).forEach { a.put(org.json.JSONObject().put("r", it.role).put("c", it.content)) }
+            getSharedPreferences("chat", Context.MODE_PRIVATE).edit().putString("h", a.toString()).apply()
+        } catch (ex: Exception) {}
+    }
+
+    private fun loadChat() {
+        try {
+            val a = org.json.JSONArray(getSharedPreferences("chat", Context.MODE_PRIVATE).getString("h", "[]"))
+            for (i in 0 until a.length()) { val o = a.getJSONObject(i); history.add(Msg(o.getString("r"), o.getString("c"))) }
+        } catch (ex: Exception) {}
+    }
+
+    private fun clearChat() {
+        history.clear(); saveChat()
+        listCol?.removeAllViews()
+        addMsg("Fresh start! What's up, ${cfg.persona.userName}?", false, null)
+    }
+
+    private fun chip(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label; textSize = 12.5f; setTextColor(0xFFEAFAF6.toInt())
+        setPadding(dp(12), dp(7), dp(12), dp(7))
+        background = glass(0x1FFFFFFF, 0x33FFFFFF, 16)
+        setOnClickListener { onClick() }
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(6) }
+    }
+
+    private fun fill(text: String) {
+        val et = input ?: return
+        et.setText(text); et.setSelection(text.length); et.requestFocus()
+    }
+
     private fun buildPanel() {
         val root = PanelLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setPadding(dp(12), dp(10), dp(12), dp(10))
-        root.background = GradientDrawable().apply { setColor(0xF213282B.toInt()); cornerRadius = dp(22).toFloat() }
+        root.setPadding(dp(14), dp(12), dp(14), dp(12))
+        root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xD8143538.toInt(), 0xD80A1618.toInt())).apply {
+            cornerRadius = dp(26).toFloat(); setStroke(dp(1), 0x40FFFFFF)
+        }
         root.onBack = { closePanel() }
 
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val title = TextView(this).apply {
+        val titleCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        titleCol.addView(TextView(this).apply {
             text = cfg.persona.name; textSize = 17f; setTextColor(0xFFFFFFFF.toInt()); typeface = Typeface.DEFAULT_BOLD
-        }
-        header.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(tvBtn("⚙") {
+        })
+        val sub = TextView(this).apply { text = "online"; textSize = 11f; setTextColor(0xFF8FF5E3.toInt()) }
+        titleCol.addView(sub)
+        header.addView(titleCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(roundBtn("🧹", 0x1FFFFFFF) { clearChat() })
+        header.addView(roundBtn("⚙", 0x1FFFFFFF) {
             closePanel()
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         })
-        header.addView(tvBtn("✕") { closePanel() })
+        header.addView(roundBtn("✕", 0x1FFFFFFF) { closePanel() })
         root.addView(header)
 
         val sc = ScrollView(this)
+        sc.isVerticalScrollBarEnabled = false
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         sc.addView(col)
         root.addView(sc, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
+        val chipScroll = android.widget.HorizontalScrollView(this)
+        chipScroll.isHorizontalScrollBarEnabled = false
+        val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        chips.addView(chip("👀 My screen") { sendUserText("What's on my screen right now?", false) })
+        chips.addView(chip("🔔 Notifications") { sendUserText("Read my recent notifications", false) })
+        chips.addView(chip("⏰ Remind me") { fill("Remind me in 30 minutes to ") })
+        chips.addView(chip("🔍 Search web") { fill("Search the web for ") })
+        chips.addView(chip("📱 Open app") { fill("Open ") })
+        chips.addView(chip("🔋 Phone status") { sendUserText("What's my battery and the time?", false) })
+        chipScroll.addView(chips)
+        root.addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val et = EditText(this).apply {
-            hint = "Say something..."
+            hint = "Message Nana..."
             setHintTextColor(0x88FFFFFF.toInt()); setTextColor(0xFFFFFFFF.toInt()); textSize = 15f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             imeOptions = EditorInfo.IME_ACTION_SEND
             maxLines = 3
-            setPadding(dp(14), dp(8), dp(14), dp(8))
-            background = GradientDrawable().apply { setColor(0x26FFFFFF); cornerRadius = dp(20).toFloat() }
+            setPadding(dp(16), dp(9), dp(16), dp(9))
+            background = glass(0x1FFFFFFF, 0x40FFFFFF, 22)
             setOnEditorActionListener { _, id, _ ->
                 if (id == EditorInfo.IME_ACTION_SEND) { doSend(false); true } else false
             }
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) { refreshBusy() }
+            })
         }
-        val mic = tvBtn("🎙") { if (recognizer == null) startListening() else stopListening() }
-        val send = tvBtn("➤") { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }
+        val mic = roundBtn("🎙", 0x1FFFFFFF) { if (recognizer == null) startListening() else stopListening() }
+        val send = roundBtn("➤", 0xFF5EEAD4.toInt(), 0xFF03211F.toInt()) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }
         row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(mic); row.addView(send)
         root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
 
-        panel = root; scroll = sc; listCol = col; input = et; micBtn = mic
+        panel = root; scroll = sc; listCol = col; input = et; micBtn = mic; sendBtn = send; subtitle = sub
         val (sw, sh) = screen()
         panelLp = WindowManager.LayoutParams(
-            sw - dp(16), (sh * 0.46f).toInt(),
+            sw - dp(16), (sh * 0.5f).toInt(),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
@@ -925,8 +1027,13 @@ class CompanionService : Service() {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             y = dp(8)
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            if (Build.VERSION.SDK_INT >= 31) {
+                try { flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; blurBehindRadius = dp(26) } catch (ex: Throwable) {}
+            }
         }
         if (history.isEmpty()) addMsg("Hi ${cfg.persona.userName}! What's up?", false, null)
+        else history.takeLast(16).forEach { addMsg(it.content, it.role == "user", null) }
+        refreshBusy()
     }
 
     private fun openPanel() {
@@ -963,21 +1070,38 @@ class CompanionService : Service() {
         val col = listCol ?: return
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val t = TextView(this).apply {
-            text = msg; textSize = 14.5f
-            setTextColor(if (user) 0xFFFFFFFF.toInt() else 0xFF0E2A2B.toInt())
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            maxWidth = (screen().first * 0.72f).toInt()
-            background = GradientDrawable().apply {
-                setColor(if (user) 0xFFF59E6C.toInt() else 0xFFD9FBF4.toInt()); cornerRadius = dp(16).toFloat()
+            setText(md(msg), TextView.BufferType.SPANNABLE)
+            textSize = 14.5f
+            setTextColor(0xFFFFFFFF.toInt())
+            setLinkTextColor(0xFF8FF5E3.toInt())
+            setPadding(dp(13), dp(9), dp(13), dp(9))
+            maxWidth = (screen().first * 0.74f).toInt()
+            val r = dp(18).toFloat(); val k = dp(5).toFloat()
+            background = if (user) GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xFFF59E6C.toInt(), 0xFFE9778F.toInt())).apply {
+                cornerRadii = floatArrayOf(r, r, r, r, k, k, r, r)
+            } else GradientDrawable().apply {
+                setColor(0x2EFFFFFF); setStroke(dp(1), 0x40FFFFFF); cornerRadii = floatArrayOf(k, k, r, r, r, r, r, r)
+            }
+            android.text.util.Linkify.addLinks(this, android.text.util.Linkify.WEB_URLS)
+            setOnLongClickListener {
+                try {
+                    (getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                        .setPrimaryClip(android.content.ClipData.newPlainText("Nana", msg))
+                    android.widget.Toast.makeText(this@CompanionService, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+                } catch (ex: Exception) {}
+                true
             }
         }
         box.addView(t)
-        if (meta != null) box.addView(TextView(this).apply {
-            text = meta; textSize = 10f; setTextColor(0x99FFFFFF.toInt()); setPadding(dp(6), dp(2), dp(6), 0)
+        val stamp = java.text.SimpleDateFormat("h:mm a", Locale.getDefault()).format(java.util.Date())
+        box.addView(TextView(this).apply {
+            text = if (meta != null) "$stamp · $meta" else stamp
+            textSize = 10f; setTextColor(0x88FFFFFF.toInt()); setPadding(dp(6), dp(2), dp(6), 0)
+            gravity = if (user) Gravity.END else Gravity.START
         })
         col.addView(box, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = if (user) Gravity.END else Gravity.START; topMargin = dp(6) })
+        ).apply { gravity = if (user) Gravity.END else Gravity.START; topMargin = dp(8) })
         scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
     }
 
@@ -994,7 +1118,7 @@ class CompanionService : Service() {
     private fun stopTask() {
         Agent.stop()
         cancelApproval()
-        typing?.let { listCol?.removeView(it) }; typing = null
+        typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy()
         addMsg("Okay, ruk gayi.", false, null)
         chibi?.mood = "neutral"
     }
@@ -1007,14 +1131,17 @@ class CompanionService : Service() {
             return
         }
         // a new message while she is still working interrupts the old task
-        if (typing != null) { Agent.stop(); cancelApproval(); typing?.let { listCol?.removeView(it) }; typing = null }
+        if (typing != null) { Agent.stop(); cancelApproval(); typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy() }
         addMsg(text, true, null)
         history.add(Msg("user", text))
+        saveChat()
         while (history.size > 60) history.removeAt(0)
         val t = TextView(this).apply {
-            this.text = "..."; textSize = 14f; setTextColor(0xCCFFFFFF.toInt()); setPadding(dp(8), dp(6), dp(8), dp(2))
+            this.text = "thinking..."; textSize = 13f; setTextColor(0xCCEAFAF6.toInt()); setPadding(dp(13), dp(8), dp(13), dp(8))
+            background = glass(0x1FFFFFFF, 0x33FFFFFF, 16)
         }
         typing = t
+        refreshBusy()
         listCol?.addView(t)
         scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
         chibi?.mood = "neutral"
@@ -1040,16 +1167,17 @@ class CompanionService : Service() {
     }
 
     private fun onReply(res: Router.Result, voice: Boolean) {
-        typing?.let { listCol?.removeView(it) }; typing = null
+        typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy()
         val (mood, clean) = parseMood(res.text)
         history.add(Msg("assistant", clean))
+        saveChat()
         addMsg(clean, false, "via ${res.provider.name} · ${res.ms}ms")
         val mode = cfg.persona.ttsMode
         say(clean, mood, spoken = mode == "always" || (mode == "voice" && voice))
     }
 
     private fun onError(msg: String) {
-        typing?.let { listCol?.removeView(it) }; typing = null
+        typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy()
         addMsg("⚠ $msg", false, null)
         say("Something went wrong...", "sad")
     }
