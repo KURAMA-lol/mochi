@@ -56,10 +56,41 @@ td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
 th{color:var(--mut);font-weight:500;font-size:12px}
 .rule{background:var(--card2);border-radius:12px;padding:10px;margin:8px 0}
 .order span{display:inline-block;background:var(--ac2);border-radius:8px;padding:3px 9px;margin:3px 4px 3px 0;font-size:13px}
+
+/* ---- liquid glass ---- */
+body{background:radial-gradient(420px 320px at 90% 0%,rgba(94,234,212,.26),transparent 70%),radial-gradient(380px 340px at -5% 38%,rgba(245,158,108,.18),transparent 70%),radial-gradient(420px 420px at 100% 85%,rgba(130,150,255,.18),transparent 70%),#0a1719;background-attachment:fixed;padding-bottom:30px}
+header{position:sticky;top:0;z-index:6;padding:12px 14px;margin:0;background:rgba(10,23,25,.45);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);border-bottom:1px solid rgba(255,255,255,.12);border-radius:28px 28px 0 0}
+header h1{font-size:19px;line-height:1.1}
+header small{display:block;font-size:12px}
+#menuBtn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:0;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+#menuBtn i{display:block;width:20px;height:2.5px;border-radius:2px;background:var(--tx)}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}
+#scrim.on{opacity:1;pointer-events:auto}
+nav{top:0;bottom:0;right:auto;left:0;width:76%;max-width:290px;flex-direction:column;padding:22px 12px;gap:6px;z-index:10;transform:translateX(-108%);transition:transform .28s cubic-bezier(.2,.8,.2,1);background:rgba(12,30,33,.55);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);border:0;border-right:1px solid rgba(255,255,255,.18);box-shadow:inset -1px 0 0 rgba(255,255,255,.08),12px 0 40px rgba(0,0,0,.45);border-radius:0 26px 26px 0}
+nav.open{transform:none}
+nav .dh{font-size:22px;font-weight:700;color:var(--ac);padding:8px 12px 16px}
+nav .dh small{display:block;font-size:12px;font-weight:400;color:var(--mut);margin-top:2px}
+nav button{flex:none;display:flex;align-items:center;gap:12px;text-align:left;padding:14px 14px;border-radius:16px;font-size:15px;color:var(--tx);border:1px solid transparent}
+nav button span{display:inline-block;width:30px;font-size:21px}
+nav button.on{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.28);color:var(--ac)}
+.card,details.p,.rule{background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.16);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 10px 28px rgba(0,0,0,.28)}
+.card{border-radius:24px;padding:16px 16px}
+input,select,textarea{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
+button.b{border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 14px rgba(0,0,0,.25)}
+button.b.pink{background:linear-gradient(160deg,#8ff5e3,#3fd6bd);color:#03211f}
+button.b.ghost{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+button.b.red{background:rgba(255,100,120,.18);border:1px solid rgba(255,120,140,.35);color:#ffc2cb}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:20px 4px 2px;opacity:.9}
+.chip{background:rgba(255,90,110,.16);border:1px solid rgba(255,120,140,.25)}
+.chip.ok{background:rgba(94,234,160,.14);border:1px solid rgba(126,240,176,.28)}
+.sw{border-bottom:1px solid rgba(255,255,255,.1)}
+.sw input[type=checkbox]{background:rgba(255,255,255,.16);box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+.sw input[type=checkbox]:checked{background:linear-gradient(160deg,#8ff5e3,#3fd6bd)}
 </style>
 </head>
 <body>
-<header><div><h1>Nana</h1><small>your tiny phone companion</small></div></header>
+<header><button id="menuBtn" onclick="toggleMenu()" aria-label="Menu"><i></i><i></i><i></i></button><div><h1>Nana</h1><small id="pgName">Home</small></div></header>
+<div id="scrim" onclick="toggleMenu(false)"></div>
 
 <!-- HOME -->
 <section id="home" class="on">
@@ -335,13 +366,16 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 // ---------- tabs ----------
 const tabs = [['home','🏠','Home'],['prov','🔌','APIs'],['route','🧭','Routing'],['pers','🎀','Her'],['stats','📊','Stats'],['mem','🧠','Memory']];
-$('nav').innerHTML = tabs.map(t => `<button data-t="${t[0]}" onclick="tab('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
+$('nav').innerHTML = '<div class="dh">Nana<small>your tiny phone companion</small></div>' + tabs.map(t => `<button data-t="${t[0]}" onclick="tab('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
+function toggleMenu(f){ const o = (f === undefined) ? !$('nav').classList.contains('open') : f; $('nav').classList.toggle('open', o); $('scrim').classList.toggle('on', o); }
 function tab(id){
   document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === id));
   if (id === 'stats') loadStats();
   if (id === 'mem') memLoad();
   if (id === 'route') renderRoute();
+  const tt = tabs.find(t => t[0] === id); if (tt && $('pgName')) $('pgName').textContent = tt[2];
+  toggleMenu(false);
   window.scrollTo(0,0);
 }
 
@@ -508,7 +542,6 @@ function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAg
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
 function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid #0001">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
 function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){el.textContent='Could not load memory: '+x}}
 function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved \u2713':r;i.value='';memLoad()}
 window.addEventListener('load',function(){agLoad();memLoad();logLoad()});
