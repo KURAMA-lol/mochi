@@ -41,6 +41,20 @@ class NanaAccess : AccessibilityService() {
         return if (r != null && r.packageName?.toString() != packageName) r else null
     }
 
+    /** Top edge of the on-screen keyboard, or null when it is hidden. */
+    fun imeTop(): Int? {
+        try {
+            for (w in windows) {
+                if (w.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD) {
+                    val r = Rect()
+                    w.getBoundsInScreen(r)
+                    if (r.height() > 120) return r.top
+                }
+            }
+        } catch (e: Exception) {}
+        return null
+    }
+
     @Synchronized fun read(): String {
         nodes.clear()
         val root = targetRoot() ?: return "No other app is on screen right now (only Nana's own windows). Use launch_app to open one, then screen_read again."

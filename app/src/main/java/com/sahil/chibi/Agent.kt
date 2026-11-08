@@ -19,8 +19,9 @@ object Agent {
     private fun prefs(c: Context) = c.getSharedPreferences("agent_cfg", Context.MODE_PRIVATE)
     fun enabled(c: Context): Boolean = prefs(c).getBoolean("on", true)
     fun actions(c: Context): Boolean = prefs(c).getBoolean("act", true)
-    fun save(c: Context, on: Boolean, act: Boolean) { prefs(c).edit().putBoolean("on", on).putBoolean("act", act).apply() }
-    fun cfgJson(c: Context): String = JSONObject().put("on", enabled(c)).put("act", actions(c)).toString()
+    fun kbAside(c: Context): Boolean = prefs(c).getBoolean("kb", true)
+    fun save(c: Context, on: Boolean, act: Boolean, kb: Boolean) { prefs(c).edit().putBoolean("on", on).putBoolean("act", act).putBoolean("kb", kb).apply() }
+    fun cfgJson(c: Context): String = JSONObject().put("on", enabled(c)).put("act", actions(c)).put("kb", kbAside(c)).toString()
 
     private val ACTIONS = setOf(
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_type", "screen_scroll", "screen_back", "screen_home",
@@ -36,6 +37,7 @@ The result comes back in the next message as TOOL_RESULT. Then call another tool
 
 Tools:
 - device_status {} : time and battery.
+- remember {"fact":"..."} : save an important, lasting fact about the user (name, school, exams, routine, likes, people, goals, their own phone number). forget {"match":"..."} : delete remembered facts containing that text. Never remember passwords, codes, card or ID numbers, and skip trivia.
 - web_search {"query":"..."} : search results (title, url, snippet).
 - web_read {"url":"..."} : quick plain text of a page (no JavaScript).
 - browser_open {"url":"..."} : open a page in Nana's own browser. Returns page text and numbered elements [n].
@@ -51,6 +53,8 @@ How to work: when the user asks you to DO something, do it with tools step by st
 Example. User: "open the first chat". You: <tool>{"name":"screen_read","args":{}}</tool> then, seeing the chat list, you: <tool>{"name":"screen_tap","args":{"id":12}}</tool> then you read again and finally say "Done, opened it."
 
 Rules:
+- Questions about what is on the screen or in the browser: call screen_read / browser_read first. Never answer from earlier messages.
+- Only say a task is done if the latest read confirms it. If a reference is ambiguous ("my number", "my friend"), use the remembered facts and the screen; if still unsure, ask ONE short question instead of guessing.
 - Element numbers change whenever the page or screen changes: read again before using a number.
 - Signing up or logging in: ask the user for any details you need (name, email, birthday...) and fill the form with browser_type. You cannot type passwords, OTPs or solve captchas: use browser_show and ask the user to do that step, then continue with browser_wait and browser_read. Keep going through the form step by step without asking about every click.
 - Never type passwords, card numbers or one-time codes. Ask the user first before sending messages, buying, posting, deleting or anything that cannot be undone.
@@ -58,7 +62,7 @@ Rules:
 - Use tools only when they help. Tool-call replies have no mood tag. Your final answer follows your normal persona and starts with the mood tag."""
 
     fun run(ctx: Context, conf: AppConfig, history: List<Msg>, voice: Boolean, onStep: (String) -> Unit): Router.Result {
-        val base = Persona.system(conf)
+        val base = Persona.system(conf) + Memory.block(ctx, conf.persona.userName)
         if (!enabled(ctx)) return Router.chat(conf, base, history, voice)
         val system = base + "\n\n" + DOC
         val hLast = history.indexOfLast { it.role == "user" }
@@ -136,6 +140,8 @@ Rules:
         val down = args.optString("direction", "down") != "up"
         val out = when (name) {
             "device_status" -> status(ctx)
+            "remember" -> Memory.add(ctx, args.optString("fact"))
+            "forget" -> Memory.forget(ctx, args.optString("match"))
             "web_search" -> webSearch(args.optString("query"))
             "web_read" -> webRead(args.optString("url"))
             "launch_app" -> launch(ctx, args.optString("name"))

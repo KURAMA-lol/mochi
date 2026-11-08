@@ -316,6 +316,17 @@ class CompanionService : Service() {
     }
 
     private var falling = false
+    private var lastTapAt = 0L
+    private var kbUp = false
+    private var kbSavedX = 0
+    private var kbTop = 0
+    private var kbCheckAt = 0L
+
+    private fun setTouchable(t: Boolean) {
+        lp.flags = if (t) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        else lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        updateChibiPos()
+    }
     private var fallV = 0f
 
     private fun floorY(): Int = (screen().second - lp.height).coerceAtLeast(0)
@@ -371,7 +382,11 @@ class CompanionService : Service() {
                     getSharedPreferences("chibi_state", MODE_PRIVATE).edit()
                         .putInt("x", lp.x).apply()
                 } else if (e.actionMasked == MotionEvent.ACTION_UP && !longFired) {
-                    if (panelOpen) closePanel() else openPanel()
+                    if (panelOpen) closePanel() else {
+                        val nowT = SystemClock.uptimeMillis()
+                        if (nowT - lastTapAt < 380) { lastTapAt = 0; openPanel() }
+                        else { lastTapAt = nowT; val (pm, pt) = Persona.pokeLine(); say(pt, pm); chibi?.poke() }
+                    }
                 }
             }
         }
@@ -381,8 +396,7 @@ class CompanionService : Service() {
     private val longPress = Runnable {
         if (!moved) {
             longFired = true
-            val (m, t) = Persona.pokeLine()
-            say(t, m)
+            if (!panelOpen) openPanel()
         }
     }
 
@@ -411,6 +425,35 @@ class CompanionService : Service() {
         if (talkUntil in 1..now) { c.talking = false; talkUntil = 0 }
         if (moodResetAt in 1..now) { c.mood = "neutral"; moodResetAt = 0 }
         if (dragging || panelOpen) return
+
+        if (now >= kbCheckAt) {
+            kbCheckAt = now + 300
+            val top = if (Agent.kbAside(this)) NanaAccess.inst?.imeTop() else null
+            if (top != null) {
+                kbTop = top
+                if (!kbUp) {
+                    kbUp = true; kbSavedX = lp.x; falling = false
+                    hideBubble(); setTouchable(false); c.action = "idle"
+                }
+            } else if (kbUp) {
+                kbUp = false
+                setTouchable(true)
+                lp.x = kbSavedX
+                fx = lp.x.toFloat(); fy = lp.y.toFloat()
+                startFall()
+            }
+        }
+        if (kbUp) {
+            // keyboard is open: slide to the right edge, standing on the keyboard, and ignore touches
+            val (sw, _) = screen()
+            val tx2 = sw - (lp.width * 0.3f).toInt()
+            val ty2 = (kbTop - lp.height).coerceAtLeast(0)
+            lp.x += ((tx2 - lp.x) * 0.25f).toInt()
+            lp.y += ((ty2 - lp.y) * 0.25f).toInt()
+            fx = lp.x.toFloat(); fy = lp.y.toFloat()
+            updateChibiPos()
+            return
+        }
 
         if (falling) {
             fallV += dp(2600) * dt
