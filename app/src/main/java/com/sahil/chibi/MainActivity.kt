@@ -222,7 +222,9 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
-        @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean) { Agent.save(this@MainActivity, on, act, kb) }
+        @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
+        @JavascriptInterface fun getLog(): String = AuditLog.json(this@MainActivity)
+        @JavascriptInterface fun clearLog() { AuditLog.clear(this@MainActivity) }
         @JavascriptInterface fun getMemory(): String = Memory.json(this@MainActivity)
         @JavascriptInterface fun addMemory(t: String): String = Memory.add(this@MainActivity, t)
         @JavascriptInterface fun deleteMemory(i: Int) { Memory.removeAt(this@MainActivity, i) }

@@ -157,6 +157,7 @@ class CompanionService : Service() {
         }
         running = true
         AgentBrowser.onUse = { main.post { showBrowserFloat() } }
+        Agent.approver = { what -> requestApproval(what) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -184,12 +185,73 @@ class CompanionService : Service() {
     override fun onDestroy() {
         running = false
         AgentBrowser.onUse = null
+        Agent.approver = null
         hideBrowserFloat()
         main.removeCallbacksAndMessages(null)
         stopListening()
         try { tts?.shutdown() } catch (ex: Exception) {}
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         super.onDestroy()
+    }
+
+    /** Blocks the agent thread until the user taps Allow or Deny (90 s timeout counts as Deny). */
+    private fun requestApproval(what: String): Boolean {
+        if (!Settings.canDrawOverlays(this)) return false
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var allowed = false
+        var card: LinearLayout? = null
+        main.post {
+            try {
+                val c = LinearLayout(this)
+                c.orientation = LinearLayout.VERTICAL
+                c.setPadding(dp(16), dp(14), dp(16), dp(14))
+                c.background = GradientDrawable().apply { setColor(0xFF0C1B1D.toInt()); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFFFF8A7A.toInt()) }
+                val t = TextView(this)
+                t.text = "Nana wants to:\n" + what
+                t.setTextColor(0xFFEAFAF6.toInt())
+                t.textSize = 15f
+                c.addView(t)
+                val row = LinearLayout(this)
+                row.orientation = LinearLayout.HORIZONTAL
+                row.setPadding(0, dp(12), 0, 0)
+                fun btn(label: String, bg: Int, ok: Boolean) {
+                    val b = TextView(this)
+                    b.text = label
+                    b.gravity = Gravity.CENTER
+                    b.setTextColor(0xFF08161A.toInt())
+                    b.typeface = Typeface.DEFAULT_BOLD
+                    b.textSize = 15f
+                    b.background = GradientDrawable().apply { setColor(bg); cornerRadius = dp(12).toFloat() }
+                    b.setOnClickListener {
+                        allowed = ok
+                        try { wm.removeView(c) } catch (ex: Exception) {}
+                        card = null
+                        latch.countDown()
+                    }
+                    val lpb = LinearLayout.LayoutParams(0, dp(44), 1f)
+                    lpb.setMargins(dp(4), 0, dp(4), 0)
+                    row.addView(b, lpb)
+                }
+                btn("Deny", 0xFFFF8A7A.toInt(), false)
+                btn("Allow", 0xFF5EEAD4.toInt(), true)
+                c.addView(row)
+                val (sw, sh) = screen()
+                val l = WindowManager.LayoutParams(
+                    (sw * 0.92f).toInt(), WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT
+                )
+                l.gravity = Gravity.TOP or Gravity.START
+                l.x = (sw - l.width) / 2
+                l.y = (sh * 0.42f).toInt()
+                wm.addView(c, l)
+                card = c
+            } catch (ex: Exception) { latch.countDown() }
+        }
+        val got = latch.await(90, java.util.concurrent.TimeUnit.SECONDS)
+        if (!got) { main.post { card?.let { try { wm.removeView(it) } catch (ex: Exception) {} } } }
+        return got && allowed
     }
 
     private fun safeRemove(v: View?) {

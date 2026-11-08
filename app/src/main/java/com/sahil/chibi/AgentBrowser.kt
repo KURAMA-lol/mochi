@@ -163,14 +163,15 @@ object AgentBrowser {
         return snapshot(ctx)
     }
 
-    fun snapshot(ctx: Context): String {
-        val raw = unquote(js(ctx, SNAP))
+    fun snapshot(ctx: Context, offset: Int = 0): String {
+        val raw = unquote(js(ctx, SNAP.replace("__OFF__", offset.coerceAtLeast(0).toString())))
         return try {
             val o = JSONObject(raw)
             val sb = StringBuilder()
             sb.append("Title: ").append(o.optString("title")).append("\nURL: ").append(o.optString("url"))
                 .append("\nScroll: ").append(o.optInt("sy")).append(" of ").append(o.optInt("sh")).append(" px (screen height ").append(o.optInt("vh")).append(")")
-                .append("\n\nPage text:\n").append(o.optString("text")).append("\n\nElements:\n")
+                .append(if (o.optInt("sy") <= 2) " [at TOP]" else "").append(if (o.optInt("sy") + o.optInt("vh") >= o.optInt("sh") - 2) " [at BOTTOM]" else " [more below]")
+                .append("\n\nPage text").append(if (o.optInt("off") > 0) " (from char " + o.optInt("off") + ")" else "").append(":\n").append(o.optString("text")).append("\n\nElements:\n")
             val a = o.getJSONArray("els")
             val list = ArrayList<String>()
             for (i in 0 until a.length()) { sb.append(a.getString(i)).append('\n'); list.add(a.getString(i)) }
@@ -181,7 +182,7 @@ object AgentBrowser {
         }
     }
 
-    private fun labelOf(id: Int): String {
+    fun labelOf(id: Int): String {
         val s = lastEls.getOrNull(id) ?: return ""
         val k = s.indexOf(": ")
         if (k < 0) return ""
@@ -234,9 +235,26 @@ object AgentBrowser {
     }
 
     fun scroll(ctx: Context, down: Boolean): String {
-        js(ctx, "window.scrollBy(0," + (if (down) "" else "-") + "Math.round(innerHeight*0.8))")
+        val dir = if (down) "" else "-"
+        val moved = unquote(js(ctx, "(function(){var b=scrollY;window.scrollBy(0," + dir + "Math.round(innerHeight*0.8));if(Math.abs(scrollY-b)>2)return 'page';var best=null,bh=0;document.querySelectorAll('*').forEach(function(e){var s=getComputedStyle(e);if((s.overflowY==='auto'||s.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+20&&e.clientHeight>bh){best=e;bh=e.clientHeight}});if(best){var c=best.scrollTop;best.scrollBy(0," + dir + "Math.round(best.clientHeight*0.8));if(Math.abs(best.scrollTop-c)>2)return 'inner'}return 'none'})()"))
         Thread.sleep(400)
-        return snapshot(ctx)
+        val head = if (moved == "none") "Nothing moved: already at the " + (if (down) "bottom" else "top") + " of the page (or it does not scroll).\n" else "Scrolled " + (if (down) "down" else "up") + ".\n"
+        return head + snapshot(ctx)
+    }
+
+    fun scrollTo(ctx: Context, text: String): String {
+        if (text.isBlank()) return "No text given."
+        val r = unquote(js(ctx, "(function(q){q=q.toLowerCase();var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);var n;while(n=w.nextNode()){if(n.nodeValue.toLowerCase().indexOf(q)>=0&&n.parentElement){var r0=n.parentElement.getBoundingClientRect();if(r0.width>1&&r0.height>1){n.parentElement.scrollIntoView({block:'center'});return 'found'}}}return 'none'})(" + JSONObject.quote(text) + ")"))
+        Thread.sleep(400)
+        return (if (r == "found") "Scrolled to '" + text + "'.\n" else "'" + text + "' is not on this page.\n") + snapshot(ctx)
+    }
+
+    fun clickXY(ctx: Context, x: Int, y: Int): String {
+        appCtx = ctx.applicationContext
+        if (x < 0 || y < 0) return "Give x and y (page pixels, from the top-left of the visible page)."
+        val r = unquote(js(ctx, "(function(x,y){var t=document.elementFromPoint(x,y);if(!t)return 'nothing there (outside the page)';var o={bubbles:true,cancelable:true,view:window,clientX:x,clientY:y};['pointerdown','mousedown','pointerup','mouseup'].forEach(function(n){var C=n.indexOf('pointer')===0&&window.PointerEvent?PointerEvent:MouseEvent;try{t.dispatchEvent(new C(n,o))}catch(err){}});if(t.focus)t.focus();t.click();return 'clicked '+t.tagName.toLowerCase()})($x,$y)"))
+        Thread.sleep(900)
+        return r + "\n" + snapshot(ctx)
     }
 
     fun back(ctx: Context): String {
@@ -252,5 +270,5 @@ object AgentBrowser {
         return snapshot(ctx)
     }
 
-    private const val SNAP = """(function(){var els=[],out=[],seen=new Set();document.querySelectorAll('[data-nid]').forEach(function(e){e.removeAttribute('data-nid')});function vis(e){var r=e.getBoundingClientRect();if(r.width<2||r.height<2)return null;var cs=getComputedStyle(e);if(cs.visibility==='hidden'||cs.display==='none'||cs.opacity==='0')return null;if(r.bottom<-50||r.top>innerHeight*3)return null;return r;}function label(e){var t=(e.innerText||e.value||'').trim();if(!t)t=e.placeholder||e.getAttribute('aria-label')||e.title||e.alt||'';if(!t&&e.id){var l=document.querySelector('label[for='+JSON.stringify(e.id)+']');if(l)t=l.innerText;}if(!t&&e.labels&&e.labels[0])t=e.labels[0].innerText;return (t||'').trim().replace(/\s+/g,' ').slice(0,70);}function add(e,kind){if(seen.has(e)||els.length>=80)return;seen.add(e);e.setAttribute('data-nid',els.length);els.push(e);var x='';if(e.tagName==='A'&&e.href)x=' -> '+e.href.slice(0,80);if(e.name)x+=' name='+e.name;if(e.type==='checkbox'||e.type==='radio')x+=e.checked?' (checked)':' (unchecked)';out.push('['+(els.length-1)+'] '+kind+': '+label(e)+x);}var q=document.querySelectorAll('a[href],button,input,textarea,select,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=option],[onclick],[tabindex],[contenteditable=true]');for(var i=0;i<q.length;i++){var e=q[i];if(!vis(e))continue;var tag=e.tagName.toLowerCase();if(tag==='input'&&e.type==='hidden')continue;if(tag==='label'&&e.control)continue;var kind=tag==='a'?'link':(tag==='input'||tag==='textarea')?('input:'+(e.type||'text')):tag==='select'?'select':e.isContentEditable?'input:richtext':'button';add(e,kind);}if(els.length<60){var g=document.querySelectorAll('div,span,li,img,svg');for(var j=0;j<g.length&&j<900;j++){var e2=g[j];if(seen.has(e2))continue;if(!vis(e2))continue;if(getComputedStyle(e2).cursor!=='pointer')continue;if(e2.closest('[data-nid]'))continue;add(e2,'clickable');}}var body=(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(0,2500);return JSON.stringify({title:document.title,url:location.href,text:body,els:out,sy:Math.round(scrollY),sh:document.documentElement.scrollHeight,vh:innerHeight});})()"""
+    private const val SNAP = """(function(){var els=[],out=[],seen=new Set();document.querySelectorAll('[data-nid]').forEach(function(e){e.removeAttribute('data-nid')});function vis(e){var r=e.getBoundingClientRect();if(r.width<2||r.height<2)return null;var cs=getComputedStyle(e);if(cs.visibility==='hidden'||cs.display==='none'||cs.opacity==='0')return null;if(r.bottom<-50||r.top>innerHeight*3)return null;return r;}function label(e){var t=(e.innerText||e.value||'').trim();if(!t)t=e.placeholder||e.getAttribute('aria-label')||e.title||e.alt||'';if(!t&&e.id){var l=document.querySelector('label[for='+JSON.stringify(e.id)+']');if(l)t=l.innerText;}if(!t&&e.labels&&e.labels[0])t=e.labels[0].innerText;return (t||'').trim().replace(/\s+/g,' ').slice(0,70);}function add(e,kind){if(seen.has(e)||els.length>=80)return;seen.add(e);e.setAttribute('data-nid',els.length);els.push(e);var x='';if(e.tagName==='A'&&e.href)x=' -> '+e.href.slice(0,80);if(e.name)x+=' name='+e.name;if(e.type==='checkbox'||e.type==='radio')x+=e.checked?' (checked)':' (unchecked)';out.push('['+(els.length-1)+'] '+kind+': '+label(e)+x);}var q=document.querySelectorAll('a[href],button,input,textarea,select,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=option],[onclick],[tabindex],[contenteditable=true]');for(var i=0;i<q.length;i++){var e=q[i];if(!vis(e))continue;var tag=e.tagName.toLowerCase();if(tag==='input'&&e.type==='hidden')continue;if(tag==='label'&&e.control)continue;var kind=tag==='a'?'link':(tag==='input'||tag==='textarea')?('input:'+(e.type||'text')):tag==='select'?'select':e.isContentEditable?'input:richtext':'button';add(e,kind);}if(els.length<60){var g=document.querySelectorAll('div,span,li,img,svg');for(var j=0;j<g.length&&j<900;j++){var e2=g[j];if(seen.has(e2))continue;if(!vis(e2))continue;if(getComputedStyle(e2).cursor!=='pointer')continue;if(e2.closest('[data-nid]'))continue;add(e2,'clickable');}}var body=(document.body?document.body.innerText:'').replace(/\n{3,}/g,'\n\n').slice(__OFF__,__OFF__+2500);return JSON.stringify({title:document.title,url:location.href,text:body,els:out,sy:Math.round(scrollY),sh:document.documentElement.scrollHeight,vh:innerHeight,off:__OFF__});})()"""
 }
