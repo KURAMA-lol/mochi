@@ -63,6 +63,7 @@ class CompanionService : Service() {
         const val ACT_STOP = "chibi.stop"
         const val ACT_RELOAD = "chibi.reload"
         const val ACT_WAKE = "chibi.wake"
+        const val ACT_SAY = "chibi.say"
         private const val CH = "chibi_channel"
         private const val NID = 1
         @Volatile var running = false
@@ -172,6 +173,11 @@ class CompanionService : Service() {
             ACT_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACT_RELOAD -> { rebuildChibi() }
             ACT_WAKE -> { endWake() }
+            ACT_SAY -> {
+                ensureChibi(); if (hidden) showChibi()
+                val t = intent?.getStringExtra("text") ?: ""
+                if (t.isNotBlank()) { addMsg("⏰ " + t, false, null); say(t, "happy", spoken = true) }
+            }
             ACT_TOGGLE -> {
                 ensureChibi()
                 if (hidden) showChibi() else hideChibi()

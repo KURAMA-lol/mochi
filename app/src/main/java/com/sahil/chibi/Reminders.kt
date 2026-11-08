@@ -50,22 +50,48 @@ object Reminders {
         return "Reminder set for " + fmt(at) + ": " + text
     }
 
-    /** args: text + either minutes (from now) or at "HH:mm" (24h, today or tomorrow) with optional date "yyyy-MM-dd". */
+    /** args: text + a time. Accepts minutes / seconds / hours (numbers or text like "1 min"), or at/time/when like "18:30", "6pm", "6:30 pm". */
     fun fromArgs(c: Context, args: JSONObject): String {
-        val text = args.optString("text")
-        val mins = args.optDouble("minutes", -1.0)
-        if (mins > 0) return add(c, text, System.currentTimeMillis() + (mins * 60000).toLong())
-        val at = args.optString("at")
-        val m = Regex("(\\d{1,2}):(\\d{2})").find(at) ?: return "Give minutes (from now) or at \"HH:mm\" in 24-hour time."
-        val cal = Calendar.getInstance()
-        val date = args.optString("date")
-        val d = Regex("(\\d{4})-(\\d{2})-(\\d{2})").find(date)
-        if (d != null) cal.set(d.groupValues[1].toInt(), d.groupValues[2].toInt() - 1, d.groupValues[3].toInt())
-        cal.set(Calendar.HOUR_OF_DAY, m.groupValues[1].toInt())
-        cal.set(Calendar.MINUTE, m.groupValues[2].toInt())
-        cal.set(Calendar.SECOND, 0)
-        if (d == null && cal.timeInMillis <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1)
-        return add(c, text, cal.timeInMillis)
+        val text = args.optString("text", args.optString("message", args.optString("label", ""))).trim()
+        val now = System.currentTimeMillis()
+        val rel = Regex("(\\d+(?:\\.\\d+)?)\\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\\b", RegexOption.IGNORE_CASE)
+        fun relMs(v: Double, u: String): Long = when (u.lowercase().first()) { 's' -> (v * 1000).toLong(); 'h' -> (v * 3600000).toLong(); else -> (v * 60000).toLong() }
+        // numeric fields
+        for ((k, unit) in listOf("seconds" to "s", "minutes" to "m", "hours" to "h")) {
+            if (args.has(k)) {
+                val raw = args.opt(k).toString()
+                val num = raw.toDoubleOrNull()
+                if (num != null && num > 0) return add(c, text, now + relMs(num, unit))
+                val m = rel.find(raw)
+                if (m != null) return add(c, text, now + relMs(m.groupValues[1].toDouble(), m.groupValues[2]))
+            }
+        }
+        // text fields
+        for (k in listOf("at", "time", "when", "in", "after", "delay")) {
+            val v = args.optString(k, "").trim()
+            if (v.isEmpty()) continue
+            val abs = Regex("(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?", RegexOption.IGNORE_CASE).find(v)
+            if (abs != null && (v.contains(":") || abs.groupValues[3].isNotEmpty())) {
+                var h = abs.groupValues[1].toInt()
+                val mi = abs.groupValues[2].ifEmpty { "0" }.toInt()
+                val ap = abs.groupValues[3].lowercase()
+                if (ap == "pm" && h < 12) h += 12
+                if (ap == "am" && h == 12) h = 0
+                if (h in 0..23 && mi in 0..59) {
+                    val cal = Calendar.getInstance()
+                    val d = Regex("(\\d{4})-(\\d{2})-(\\d{2})").find(args.optString("date"))
+                    if (d != null) cal.set(d.groupValues[1].toInt(), d.groupValues[2].toInt() - 1, d.groupValues[3].toInt())
+                    cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, mi); cal.set(Calendar.SECOND, 0)
+                    if (d == null && cal.timeInMillis <= now) cal.add(Calendar.DAY_OF_YEAR, 1)
+                    return add(c, text, cal.timeInMillis)
+                }
+            }
+            val m = rel.find(v)
+            if (m != null) return add(c, text, now + relMs(m.groupValues[1].toDouble(), m.groupValues[2]))
+            val bare = v.toDoubleOrNull()
+            if (bare != null && bare > 0 && (k == "in" || k == "after" || k == "delay")) return add(c, text, now + (bare * 60000).toLong())
+        }
+        return "I could not read the time. Call set_reminder again with minutes (a number, e.g. 1) or at \"HH:mm\" in 24-hour time."
     }
 
     fun list(c: Context): String {
@@ -125,6 +151,9 @@ object Reminders {
             save(c, out)
         } catch (e: Exception) {}
         AuditLog.add(c, "Reminder fired: " + text)
+        if (CompanionService.running) {
+            try { c.startForegroundService(Intent(c, CompanionService::class.java).setAction(CompanionService.ACT_SAY).putExtra("text", text)) } catch (e: Exception) {}
+        }
     }
 }
 

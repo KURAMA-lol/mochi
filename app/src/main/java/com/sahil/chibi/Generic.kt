@@ -19,8 +19,9 @@ import java.net.URLEncoder
 object Generic {
     fun call(p: Provider, system: String, msgs: List<Msg>): String {
         val lastUser = msgs.lastOrNull { it.role == "user" }?.content ?: ""
-        val prompt = if (p.promptMode == "last") lastUser else buildPrompt(system, msgs)
         val post = p.method.equals("POST", ignoreCase = true)
+        // a GET puts everything in the URL, so keep it short (servers answer 414 "Request-URI Too Large" past ~8 KB)
+        val prompt = if (p.promptMode == "last") lastUser else buildPrompt(if (post) system else fit(system, 3300), msgs, if (post) 2500 else 900, if (post) 100000 else 500)
 
         fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
         fun esc(s: String): String { val q = JSONObject.quote(s); return q.substring(1, q.length - 1) }
@@ -45,12 +46,21 @@ object Generic {
         return extract(raw, p.responsePath)
     }
 
-    private fun buildPrompt(system: String, msgs: List<Msg>): String {
+    /** Shrinks the system prompt: keeps the start (persona), swaps the long tool manual for the short one. */
+    private fun fit(system: String, limit: Int): String {
+        if (system.length <= limit) return system
+        val k = system.indexOf("You can use tools.")
+        val head = if (k > 0) system.substring(0, k) else system
+        val tools = if (k > 0) Agent.DOC_LITE else ""
+        return head.take((limit - tools.length - 10).coerceAtLeast(400)) + "\n\n" + tools
+    }
+
+    private fun buildPrompt(system: String, msgs: List<Msg>, cap: Int = 2500, perLine: Int = 100000): String {
         val lines = ArrayList<String>()
         var size = 0
         for (m in msgs.asReversed()) {
-            val l = (if (m.role == "user") "User: " else "You: ") + m.content
-            if (size + l.length > 2500 && lines.isNotEmpty()) break
+            val l = (if (m.role == "user") "User: " else "You: ") + m.content.take(perLine)
+            if (size + l.length > cap && lines.isNotEmpty()) break
             lines.add(0, l); size += l.length
         }
         return system + "\n\nConversation so far:\n" + lines.joinToString("\n") + "\nYou:"

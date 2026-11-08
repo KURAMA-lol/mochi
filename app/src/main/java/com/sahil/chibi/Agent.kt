@@ -109,6 +109,8 @@ object Agent {
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
     private val TAG_OPEN = Regex("""<tool>\s*(\{[\s\S]*\})""")
 
+    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. One call at a time. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query}; web_read{url}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact}."
+
     private const val DOC = """You can use tools. To use one, reply with ONLY a tool call and nothing else, exactly like:
 <tool>{"name":"TOOL_NAME","args":{...}}</tool>
 The result comes back in the next message as TOOL_RESULT. Then call another tool, or give your final answer. One tool call at a time. When you are done, or no tool is needed, answer normally WITHOUT any <tool> tag.
@@ -116,6 +118,7 @@ The result comes back in the next message as TOOL_RESULT. Then call another tool
 Tools:
 - device_status {} : time and battery.
 - remember {"fact":"..."} : save an important, lasting fact about the user (name, school, exams, routine, likes, people, goals, their own phone number). forget {"match":"..."} : delete remembered facts containing that text. Never remember passwords, codes, card or ID numbers, and skip trivia.
+- For set_reminder, "text" is the exact words Nana will show/say to the user at that time, written TO the user (e.g. "Good morning, Sahil!"), never an instruction.
 - set_reminder {"text":"call mom","minutes":30} or {"text":"...","at":"18:30","date":"2026-11-10"} (24h time, date optional): Nana notifies the user then. list_reminders {} ; cancel_reminder {"match":"..."}. Use device_status first to know the current time.
 - flashlight {"on":true|false} ; set_volume {"level":0-100,"stream":"music"|"ring"|"alarm"} ; dial {"number":"98..."} : opens the dialer with the number typed (the user presses call).
 - set_alarm {"hour":6,"minute":30,"label":"wake up"} : a real alarm in the phone's clock app. set_timer {"seconds":300,"label":"tea"}.
