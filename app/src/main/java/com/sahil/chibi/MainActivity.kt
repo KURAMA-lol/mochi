@@ -228,6 +228,14 @@ class MainActivity : Activity() {
             Agent.setWake(this@MainActivity, on)
             if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE)
         }
+        @JavascriptInterface fun openAssistSettings() {
+            runOnUiThread {
+                val tries = listOf(Settings.ACTION_VOICE_INPUT_SETTINGS, Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS, Settings.ACTION_SETTINGS)
+                for (a in tries) {
+                    try { startActivity(Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); break } catch (e: Exception) {}
+                }
+            }
+        }
         @JavascriptInterface fun getReminders(): String = Reminders.json(this@MainActivity)
         @JavascriptInterface fun cancelReminder(id: String) { id.toLongOrNull()?.let { Reminders.cancelId(this@MainActivity, it) } }
         @JavascriptInterface fun openNotifAccess() {

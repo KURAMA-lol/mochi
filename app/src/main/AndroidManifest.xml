@@ -104,6 +104,29 @@
         </receiver>
 
         <service
+            android:name=".NanaAssistService"
+            android:exported="true"
+            android:label="Nana"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".NanaSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+
+        <service
+            android:name=".NanaRecognitionService"
+            android:exported="true"
+            android:label="Nana" />
+
+        <service
             android:name=".SummonTileService"
             android:exported="true"
             android:icon="@drawable/ic_tile"

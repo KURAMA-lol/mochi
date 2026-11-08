@@ -404,7 +404,7 @@ class CompanionService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         try { nm.deleteNotificationChannel("chibi_channel") } catch (ex: Exception) {}
         nm.createNotificationChannel(
-            NotificationChannel(CH, "Nana companion", NotificationManager.IMPORTANCE_LOW).apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC }
+            NotificationChannel(CH, "Nana companion", NotificationManager.IMPORTANCE_LOW)
         )
     }
 
@@ -418,19 +418,15 @@ class CompanionService : Service() {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        fun act(label: String, pi: PendingIntent): Notification.Action {
-            val b = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_tile), label, pi)
-            if (Build.VERSION.SDK_INT >= 31) b.setAuthenticationRequired(false)
-            return b.build()
-        }
+        fun act(label: String, pi: PendingIntent) =
+            Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_tile), label, pi).build()
         return Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("${cfg.persona.name} is on your phone")
             .setContentText(if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
             .setContentIntent(open)
             .setOngoing(true)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .addAction(act("Talk", actionPi(1, ACT_TALK)))
+            .addAction(act("Call", actionPi(1, ACT_SUMMON)))
             .addAction(act(if (hidden) "Show" else "Hide", actionPi(2, ACT_TOGGLE)))
             .addAction(act("Stop", actionPi(3, ACT_STOP)))
             .build()
