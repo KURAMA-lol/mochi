@@ -29,29 +29,54 @@ object Agent {
     /** Set by the overlay service: shows an Allow / Deny card and blocks until the user answers. */
     @Volatile var approver: ((String) -> Boolean)? = null
 
-    private val RISKY = Regex("\\b(send|post|pay|buy|purchase|order|checkout|delete|remove|erase|transfer|publish|tweet|share|confirm|unsend|uninstall|sign ?out|log ?out|subscribe|donate|book|reply|forward|bhej|bhejo)\\b", RegexOption.IGNORE_CASE)
-    private val SENSITIVE_PKG = Regex("whatsapp|telegram|messag|mms|gmail|\\.mail|signal|instagram|snapchat|facebook|twitter|paytm|phonepe|gpay|upi|bank|wallet|pay|amazon|flipkart|swiggy|zomato", RegexOption.IGNORE_CASE)
+    private val ALWAYS_ASK = Regex("\\b(pay|buy|purchase|order|checkout|transfer|donate|place order)\\b", RegexOption.IGNORE_CASE)
+    private val SEND_WORDS = Regex("\\b(send|post|publish|tweet|reply|forward)\\b", RegexOption.IGNORE_CASE)
+    private val DEL_WORDS = Regex("\\b(delete|erase|remove|uninstall|unsend|sign ?out|log ?out)\\b", RegexOption.IGNORE_CASE)
+    private val REQ_SEND = Regex("send|bhej|post|message|msg|text|reply|likh|tweet|publish|share|forward", RegexOption.IGNORE_CASE)
+    private val REQ_DEL = Regex("delete|remove|hata|uninstall|clear|erase|log ?out|sign ?out", RegexOption.IGNORE_CASE)
+    private val REQ_SEARCH = Regex("search|find|dhund|look|play|khol|open", RegexOption.IGNORE_CASE)
+    private val MSG_PKG = Regex("whatsapp|telegram|messag|mms|signal|instagram|snapchat|facebook|twitter|gmail|\\.mail", RegexOption.IGNORE_CASE)
+    private val PAY_PKG = Regex("paytm|phonepe|gpay|upi|bank|wallet|\\.pay|amazon|flipkart|swiggy|zomato", RegexOption.IGNORE_CASE)
+
+    @Volatile private var gen = 0
+    @Volatile private var active = false
+    @Volatile private var curRequest = ""
+    private val approved = HashSet<String>()
+    class Interrupted : RuntimeException()
+
+    /** Cancels whatever task is running (a newer run also cancels the older one). */
+    fun stop() { gen++ }
+
+    /** Only things that are really irreversible or that the user did not ask for need approval. */
+    private fun labelRisk(lab: String): Boolean {
+        if (lab.isBlank()) return false
+        if (ALWAYS_ASK.containsMatchIn(lab)) return true
+        if (SEND_WORDS.containsMatchIn(lab)) return !REQ_SEND.containsMatchIn(curRequest)
+        if (DEL_WORDS.containsMatchIn(lab)) return !REQ_DEL.containsMatchIn(curRequest)
+        return false
+    }
 
     /** Returns a short description if this call must be approved by the user first, else null. */
     private fun risk(name: String, args: JSONObject): String? {
         val pkg = NanaAccess.inst?.foregroundPkg() ?: ""
-        val sensitive = SENSITIVE_PKG.containsMatchIn(pkg)
-        return when (name) {
+        val app = pkg.substringAfterLast('.')
+        val r = when (name) {
             "screen_tap_text", "screen_tap", "screen_long_press" -> {
                 val id = args.optInt("id", -1)
                 val lab = args.optString("text").ifEmpty { if (id >= 0) NanaAccess.inst?.labelOf(id) ?: "" else "" }
-                if (RISKY.containsMatchIn(lab) || (sensitive && Regex("send|submit|pay|post", RegexOption.IGNORE_CASE).containsMatchIn(lab))) "Tap '" + lab.take(40) + "' in " + pkg.substringAfterLast('.') else null
+                if (labelRisk(lab)) "Tap '" + lab.take(40) + "' in " + app else null
             }
-            "screen_tap_xy" -> if (sensitive) "Tap the screen at (" + args.optInt("x") + "," + args.optInt("y") + ") in " + pkg.substringAfterLast('.') else null
-            "screen_type" -> if (args.optBoolean("submit", false) && sensitive) "Type '" + args.optString("text").take(50) + "' and press enter in " + pkg.substringAfterLast('.') else null
+            "screen_tap_xy" -> if (PAY_PKG.containsMatchIn(pkg) || (MSG_PKG.containsMatchIn(pkg) && !REQ_SEND.containsMatchIn(curRequest))) "Tap the screen at (" + args.optInt("x") + "," + args.optInt("y") + ") in " + app else null
+            "screen_type" -> if (args.optBoolean("submit", false) && MSG_PKG.containsMatchIn(pkg) && !REQ_SEND.containsMatchIn(curRequest) && !REQ_SEARCH.containsMatchIn(curRequest)) "Type '" + args.optString("text").take(50) + "' and press enter in " + app else null
             "browser_click_text", "browser_click" -> {
                 val id = args.optInt("id", -1)
                 val lab = args.optString("text").ifEmpty { if (id >= 0) AgentBrowser.labelOf(id) else "" }
-                if (RISKY.containsMatchIn(lab)) "Click '" + lab.take(40) + "' on the web page" else null
+                if (labelRisk(lab)) "Click '" + lab.take(40) + "' on the web page" else null
             }
-            "browser_click_xy" -> null
             else -> null
         }
+        if (r != null && r in approved) return null
+        return r
     }
 
     private val ACTIONS = setOf(
@@ -130,6 +155,13 @@ How to work:
             msgs[lastIdx] = Msg("user", msgs[lastIdx].content +
                 "\n\n(System note: if this needs the phone or the browser, do it NOW with tool calls and reply with only the tool call. Do exactly this request only.)")
         }
+        val my: Int
+        val prevReq: String
+        synchronized(this) { prevReq = if (active) curRequest else ""; my = ++gen; active = true; curRequest = request; approved.clear() }
+        if (prevReq.isNotEmpty() && lastIdx >= 0) {
+            msgs[lastIdx] = Msg("user", msgs[lastIdx].content + "\n\n(System note: the user interrupted your previous task (\"" + prevReq.take(80) + "\") with this new message. Stop the old task. If this message corrects or changes it, apply the change; if it is a new task, do only the new one. Check the screen first.)")
+        }
+        try {
         var steps = 0
         var nudges = 0
         var checks = 0
@@ -138,7 +170,9 @@ How to work:
         val done = ArrayList<String>()
         val evidence = ArrayList<String>()
         while (true) {
+            if (gen != my) throw Interrupted()
             val res = Router.chat(conf, system, msgs, voice)
+            if (gen != my) throw Interrupted()
             val call = parse(res.text)
             if (call == null) {
                 val asking = res.text.contains("?") && Regex("(should i|shall i|do you want me|kya main|karun\\?|want me to|can you (tell|give|share|send)|please (tell|give|share|provide)|bata do|batao)", RegexOption.IGNORE_CASE).containsMatchIn(res.text)
@@ -182,11 +216,14 @@ How to work:
             val sig = name + args.toString()
             val times = (sigs[sig] ?: 0) + 1
             sigs[sig] = times
+            if (gen != my) throw Interrupted()
             val risky = if (ask(ctx)) risk(name, args) else null
             var denied = false
             if (risky != null) {
                 val ap = approver
                 denied = ap == null || !ap(risky)
+                if (gen != my) throw Interrupted()
+                if (!denied) approved.add(risky)
                 AuditLog.add(ctx, (if (denied) "DENIED: " else "APPROVED: ") + risky)
             }
             val out = if (denied) {
@@ -203,6 +240,7 @@ How to work:
             msgs.add(Msg("assistant", res.text))
             msgs.add(Msg("user", "TOOL_RESULT [" + name + "]:\n" + out.take(4000) + log))
         }
+        } finally { if (gen == my) active = false }
     }
 
     private fun review(conf: AppConfig, request: String, evidence: List<String>, answer: String): String? {

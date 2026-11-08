@@ -195,11 +195,22 @@ class CompanionService : Service() {
     }
 
     /** Blocks the agent thread until the user taps Allow or Deny (90 s timeout counts as Deny). */
+    @Volatile private var apLatch: java.util.concurrent.CountDownLatch? = null
+    @Volatile private var apCard: View? = null
+
+    private fun cancelApproval() {
+        val l = apLatch; val cd = apCard
+        apLatch = null; apCard = null
+        main.post { if (cd != null) try { wm.removeView(cd) } catch (ex: Exception) {} }
+        l?.countDown()
+    }
+
     private fun requestApproval(what: String): Boolean {
         if (!Settings.canDrawOverlays(this)) return false
         val latch = java.util.concurrent.CountDownLatch(1)
         var allowed = false
         var card: LinearLayout? = null
+        apLatch = latch
         main.post {
             try {
                 val c = LinearLayout(this)
@@ -247,6 +258,7 @@ class CompanionService : Service() {
                 l.y = (sh * 0.42f).toInt()
                 wm.addView(c, l)
                 card = c
+                apCard = c
             } catch (ex: Exception) { latch.countDown() }
         }
         val got = latch.await(90, java.util.concurrent.TimeUnit.SECONDS)
@@ -892,7 +904,7 @@ class CompanionService : Service() {
             }
         }
         val mic = tvBtn("🎙") { if (recognizer == null) startListening() else stopListening() }
-        val send = tvBtn("➤") { doSend(false) }
+        val send = tvBtn("➤") { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }
         row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(mic); row.addView(send)
         root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
@@ -972,8 +984,25 @@ class CompanionService : Service() {
         sendUserText(text, voice)
     }
 
+    private val STOP = Regex("^\\s*(stop|ruk|ruko|ruk ja|cancel|rehne do|rehne de|chhod do|chod do|band kar|nahi rehne do)\\b[\\s.!]*$", RegexOption.IGNORE_CASE)
+
+    private fun stopTask() {
+        Agent.stop()
+        cancelApproval()
+        typing?.let { listCol?.removeView(it) }; typing = null
+        addMsg("Okay, ruk gayi.", false, null)
+        chibi?.mood = "neutral"
+    }
+
     private fun sendUserText(text: String, voice: Boolean) {
         wake()
+        if (STOP.containsMatchIn(text)) {
+            addMsg(text, true, null)
+            if (typing != null) stopTask() else addMsg("Kuch chal hi nahi raha tha.", false, null)
+            return
+        }
+        // a new message while she is still working interrupts the old task
+        if (typing != null) { Agent.stop(); cancelApproval(); typing?.let { listCol?.removeView(it) }; typing = null }
         addMsg(text, true, null)
         history.add(Msg("user", text))
         while (history.size > 60) history.removeAt(0)
@@ -987,10 +1016,12 @@ class CompanionService : Service() {
         val conf = ConfigStore.load(this)
         cfg = conf
         val snapshot = history.takeLast(conf.persona.history).toList()
+        val myTyping = t
         Thread {
             try {
-                val res = Agent.run(this, conf, snapshot, voice) { s -> main.post { typing?.text = s } }
-                main.post { onReply(res, voice) }
+                val res = Agent.run(this, conf, snapshot, voice) { s -> main.post { if (typing === myTyping) myTyping.text = s } }
+                main.post { if (typing === myTyping) onReply(res, voice) }
+            } catch (e: Agent.Interrupted) {
             } catch (e: Exception) {
                 main.post { onError(e.message ?: e.toString()) }
             }
@@ -1074,11 +1105,12 @@ class CompanionService : Service() {
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 stopListening()
+                input?.setText("")
                 if (!text.isNullOrBlank()) sendUserText(text, true)
             }
             override fun onPartialResults(partialResults: Bundle?) {
                 val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!text.isNullOrBlank()) input?.setText(text)
+                if (!text.isNullOrBlank() && recognizer != null) input?.setText(text)
             }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
