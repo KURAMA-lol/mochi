@@ -17,6 +17,7 @@ import java.util.Locale
 
 /** Reminders that survive restarts. They fire as a notification, even when Nana is not running. */
 object Reminders {
+    @Volatile private var curRep = ""
     private const val CH = "nana_reminders"
     private fun prefs(c: Context) = c.getSharedPreferences("reminders", Context.MODE_PRIVATE)
     private fun load(c: Context): JSONArray = try { JSONArray(prefs(c).getString("list", "[]")) } catch (e: Exception) { JSONArray() }
@@ -39,19 +40,23 @@ object Reminders {
         }
     }
 
-    fun add(c: Context, text: String, at: Long): String {
+    fun add(c: Context, text: String, at: Long, rep: String = ""): String {
         if (text.isBlank()) return "No reminder text given."
         if (at <= System.currentTimeMillis()) return "That time is already in the past."
         val a = load(c)
         val id = System.currentTimeMillis()
-        a.put(JSONObject().put("id", id).put("text", text.take(200)).put("at", at))
+        val rep2 = if (rep.isNotEmpty()) rep else curRep
+        curRep = ""
+        a.put(JSONObject().put("id", id).put("text", text.take(200)).put("at", at).put("rep", rep2))
         save(c, a)
         schedule(c, id, text, at)
-        return "Reminder set for " + fmt(at) + ": " + text
+        return "Reminder set for " + fmt(at) + (if (rep2.isNotEmpty()) " (repeats " + rep2 + ")" else "") + ": " + text
     }
 
     /** args: text + a time. Accepts minutes / seconds / hours (numbers or text like "1 min"), or at/time/when like "18:30", "6pm", "6:30 pm". */
     fun fromArgs(c: Context, args: JSONObject): String {
+        val rp = args.optString("repeat", "").lowercase().let { if (it.startsWith("day") || it == "daily") "daily" else if (it.startsWith("week")) "weekly" else "" }
+        curRep = rp
         val text = args.optString("text", args.optString("message", args.optString("label", ""))).trim()
         val now = System.currentTimeMillis()
         val rel = Regex("(\\d+(?:\\.\\d+)?)\\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\\b", RegexOption.IGNORE_CASE)
@@ -147,7 +152,18 @@ object Reminders {
         try {
             val a = load(c)
             val out = JSONArray()
-            for (i in 0 until a.length()) if (a.getJSONObject(i).getLong("id") != id) out.put(a.getJSONObject(i))
+            for (i in 0 until a.length()) {
+                val o = a.getJSONObject(i)
+                if (o.getLong("id") != id) { out.put(o); continue }
+                val rp = o.optString("rep", "")
+                if (rp.isNotEmpty()) {
+                    var next = o.getLong("at")
+                    val step = if (rp == "weekly") 7L * 86400000L else 86400000L
+                    while (next <= System.currentTimeMillis()) next += step
+                    o.put("at", next); out.put(o)
+                    schedule(c, id, o.getString("text"), next)
+                }
+            }
             save(c, out)
         } catch (e: Exception) {}
         AuditLog.add(c, "Reminder fired: " + text)
