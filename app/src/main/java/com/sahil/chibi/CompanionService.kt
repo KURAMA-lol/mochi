@@ -34,6 +34,7 @@ import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -155,6 +156,7 @@ class CompanionService : Service() {
             if (st == TextToSpeech.SUCCESS) { ttsReady = true; applyTts() }
         }
         running = true
+        AgentBrowser.onUse = { main.post { showBrowserFloat() } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -181,6 +183,8 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         running = false
+        AgentBrowser.onUse = null
+        hideBrowserFloat()
         main.removeCallbacksAndMessages(null)
         stopListening()
         try { tts?.shutdown() } catch (ex: Exception) {}
@@ -191,6 +195,114 @@ class CompanionService : Service() {
     private fun safeRemove(v: View?) {
         if (v == null) return
         try { wm.removeView(v) } catch (ex: Exception) {}
+    }
+
+    // ------------------------------------------------------------ floating browser
+
+    private var bfCard: LinearLayout? = null
+    private var bfLp: WindowManager.LayoutParams? = null
+    private var bfHolder: FrameLayout? = null
+    private var bfBig = false
+    private var bfFocusable = false
+
+    private fun bfFlags(focusable: Boolean): Int {
+        var f = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        if (!focusable) f = f or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        return f
+    }
+
+    private fun setBfFocusable(f: Boolean) {
+        val card = bfCard ?: return
+        val l = bfLp ?: return
+        if (bfFocusable == f) return
+        bfFocusable = f
+        l.flags = bfFlags(f)
+        try { wm.updateViewLayout(card, l) } catch (ex: Exception) {}
+    }
+
+    /** Nana's browser as a small floating window above every app, the keyboard and the chat. */
+    private fun showBrowserFloat() {
+        if (bfCard != null) return
+        if (!Settings.canDrawOverlays(this)) return
+        val (sw, sh) = screen()
+        val card = LinearLayout(this)
+        card.orientation = LinearLayout.VERTICAL
+        card.background = GradientDrawable().apply {
+            setColor(0xFF0C1B1D.toInt()); cornerRadius = dp(16).toFloat(); setStroke(dp(2), 0xFF5EEAD4.toInt())
+        }
+        card.clipToOutline = true
+        val bar = LinearLayout(this)
+        bar.orientation = LinearLayout.HORIZONTAL
+        bar.gravity = Gravity.CENTER_VERTICAL
+        bar.setPadding(dp(12), dp(6), dp(6), dp(6))
+        val title = TextView(this)
+        title.text = "Nana's browser"
+        title.setTextColor(0xFF5EEAD4.toInt())
+        title.textSize = 13f
+        title.typeface = Typeface.DEFAULT_BOLD
+        bar.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val size = TextView(this)
+        size.text = "\u2922"
+        size.setTextColor(0xFFEAFAF6.toInt())
+        size.textSize = 17f
+        size.setPadding(dp(12), dp(4), dp(12), dp(4))
+        size.setOnClickListener { toggleBfSize() }
+        bar.addView(size)
+        val close = TextView(this)
+        close.text = "\u2715"
+        close.setTextColor(0xFFEAFAF6.toInt())
+        close.textSize = 17f
+        close.setPadding(dp(12), dp(4), dp(12), dp(4))
+        close.setOnClickListener { hideBrowserFloat() }
+        bar.addView(close)
+        card.addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val holder = FrameLayout(this)
+        card.addView(holder, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        val w = (sw * 0.94f).toInt()
+        val h = (sh * 0.36f).toInt()
+        val l = overlayLp(w, h, bfFlags(false))
+        l.x = (sw - w) / 2
+        l.y = dp(56)
+        bfLp = l; bfCard = card; bfHolder = holder; bfBig = false; bfFocusable = false
+        var dx = 0f; var dy = 0f; var sx = 0; var sy = 0
+        bar.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { dx = e.rawX; dy = e.rawY; sx = l.x; sy = l.y; setBfFocusable(false) }
+                MotionEvent.ACTION_MOVE -> {
+                    l.x = sx + (e.rawX - dx).toInt(); l.y = sy + (e.rawY - dy).toInt()
+                    try { wm.updateViewLayout(card, l) } catch (ex: Exception) {}
+                }
+            }
+            true
+        }
+        val web = AgentBrowser.view(this)
+        (web.parent as? android.view.ViewGroup)?.removeView(web)
+        holder.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // touching the page lets the keyboard work for it
+        web.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) setBfFocusable(true)
+            false
+        }
+        try { wm.addView(card, l) } catch (ex: Exception) { bfCard = null; bfHolder = null }
+    }
+
+    private fun toggleBfSize() {
+        val l = bfLp ?: return
+        val card = bfCard ?: return
+        val (_, sh) = screen()
+        bfBig = !bfBig
+        l.height = (sh * (if (bfBig) 0.72f else 0.36f)).toInt()
+        try { wm.updateViewLayout(card, l) } catch (ex: Exception) {}
+    }
+
+    private fun hideBrowserFloat() {
+        val card = bfCard ?: return
+        try { bfHolder?.removeAllViews() } catch (ex: Exception) {}
+        try { wm.removeView(card) } catch (ex: Exception) {}
+        bfCard = null; bfHolder = null
+        AgentBrowser.release(this)
     }
 
     // ------------------------------------------------------------ notification
@@ -446,7 +558,7 @@ class CompanionService : Service() {
         if (kbUp) {
             // keyboard is open: slide to the right edge, standing on the keyboard, and ignore touches
             val (sw, _) = screen()
-            val tx2 = sw - (lp.width * 0.3f).toInt()
+            val tx2 = sw - lp.width + dp(8)
             val ty2 = (kbTop - lp.height).coerceAtLeast(0)
             lp.x += ((tx2 - lp.x) * 0.25f).toInt()
             lp.y += ((ty2 - lp.y) * 0.25f).toInt()

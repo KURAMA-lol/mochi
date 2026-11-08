@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -114,14 +115,36 @@ class NanaAccess : AccessibilityService() {
         return tap(i)
     }
 
-    @Synchronized fun type(id: Int, text: String): String {
-        val n = nodes.getOrNull(id) ?: return "No element [$id]. Call screen_read again."
-        if (n.isPassword) return "Refused: password fields are off limits."
-        if (!n.isEditable) return "[$id] is not a text field."
-        n.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    private fun inputNode(): AccessibilityNodeInfo? {
+        val root = targetRoot() ?: return null
+        val f = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (f != null && f.isEditable) return f
+        return nodes.firstOrNull { it.isEditable }
+    }
+
+    fun foregroundPkg(): String? = targetRoot()?.packageName?.toString()
+
+    /** Types into the given field (or the focused / first text field), replacing old text; submit presses search/enter. */
+    @Synchronized fun type(id: Int, text: String, submit: Boolean = false): String {
+        var n: AccessibilityNodeInfo? = nodes.getOrNull(id)
+        if (n == null) { read(); n = inputNode() }
+        var t = n ?: return "No text field found on screen. Tap the search bar first, then type."
+        if (t.isPassword) return "Refused: password fields are off limits."
+        if (!t.isFocused) {
+            t.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            Thread.sleep(500)
+            read()
+            val again = inputNode()
+            if (again != null) t = again
+        }
+        if (t.isPassword) return "Refused: password fields are off limits."
         val b = Bundle()
         b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-        return if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) "Typed." else "Typing failed."
+        if (!t.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return "Typing failed."
+        if (!submit) return "Typed '" + text.take(40) + "' (old text replaced)."
+        Thread.sleep(350)
+        val sent = Build.VERSION.SDK_INT >= 30 && t.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        return if (sent) "Typed '" + text.take(40) + "' and pressed search/enter." else "Typed '" + text.take(40) + "' but could not press enter: tap the search button."
     }
 
     fun scroll(down: Boolean): String {

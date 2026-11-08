@@ -75,13 +75,6 @@ th{color:var(--mut);font-weight:500;font-size:12px}
     </div>
     <p class="mut">Ask things like "open YouTube and search lo-fi", "what's on my screen?" or "find the weather in Delhi". Nana never types passwords and is told to ask before sending or buying. Turn screen control on in Accessibility settings, under Nana.</p>
   </div>
-  <h2>Memory</h2>
-  <div class="card">
-    <div id="memList" class="mut">Nothing yet.</div>
-    <div class="row" style="margin-top:8px"><input id="memNew" placeholder="Tell Nana something to remember..."><button class="b pink" style="flex:0 0 auto" onclick="memAdd()">Add</button></div>
-    <div class="btns"><button class="b red" onclick="if(confirm('Forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
-    <p class="mut">Nana saves important things you tell her (name, exams, likes, your number). She never stores passwords or card numbers. Tap &#10005; to remove one.</p>
-  </div>
   <h2>Other ways to call her</h2>
   <div class="card mut">
     • Notification buttons: <b>Call / Hide / Stop</b><br>
@@ -96,6 +89,21 @@ th{color:var(--mut);font-weight:500;font-size:12px}
       <button class="b ghost" onclick="imp()">Import</button>
     </div>
     <p class="mut">Contains your API keys. Keep it private.</p>
+  </div>
+</section>
+
+<!-- MEMORY -->
+<section id="mem">
+  <h2>What Nana remembers <span id="memCount" class="mut"></span></h2>
+  <div class="card">
+    <div id="memList" class="mut">Loading...</div>
+  </div>
+  <div class="card">
+    <label>Add something for her to remember</label>
+    <div class="row"><input id="memNew" placeholder="e.g. My number is 93877..., exam on 12th"><button class="b pink" style="flex:0 0 auto" onclick="memAdd()">Add</button></div>
+    <div id="memMsg" class="mut" style="margin-top:6px"></div>
+    <div class="btns"><button class="b red" onclick="if(confirm('Forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
+    <p class="mut">Nana also saves important things you tell her while chatting. She never stores passwords, codes or card numbers. Tap the cross to remove one.</p>
   </div>
 </section>
 
@@ -310,12 +318,13 @@ function save(){ clearTimeout(timer); timer = setTimeout(() => Android.saveConfi
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
 // ---------- tabs ----------
-const tabs = [['home','🏠','Home'],['prov','🔌','APIs'],['route','🧭','Routing'],['pers','🎀','Her'],['stats','📊','Stats']];
+const tabs = [['home','🏠','Home'],['prov','🔌','APIs'],['route','🧭','Routing'],['pers','🎀','Her'],['stats','📊','Stats'],['mem','🧠','Memory']];
 $('nav').innerHTML = tabs.map(t => `<button data-t="${t[0]}" onclick="tab('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
 function tab(id){
   document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === id));
   if (id === 'stats') loadStats();
+  if (id === 'mem') memLoad();
   if (id === 'route') renderRoute();
   window.scrollTo(0,0);
 }
@@ -325,6 +334,7 @@ function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
   const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
   $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control');
+  try { memLoad(); agLoad(); } catch (e) {}
 }
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
 function imp(){
@@ -480,8 +490,8 @@ renderAll(); tab('home');
 function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;}catch(x){}}
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked)}catch(x){}}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
-function memLoad(){try{if(!Android.getMemory)return;var a=JSON.parse(Android.getMemory());var el=document.getElementById('memList');if(!a.length){el.textContent='Nothing yet.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){}}
-function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;try{var r=Android.addMemory(t);if(r!=='Remembered.')alert(r)}catch(x){}i.value='';memLoad()}
+function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){el.textContent='Could not load memory: '+x}}
+function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved \u2713':r;i.value='';memLoad()}
 window.addEventListener('load',function(){agLoad();memLoad()});
 </script>
 </body>

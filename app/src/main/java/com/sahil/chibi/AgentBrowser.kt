@@ -24,6 +24,8 @@ object AgentBrowser {
     @Volatile private var wv: TabView? = null
     @Volatile private var loadLatch: CountDownLatch? = null
     @Volatile private var lastEls: List<String> = emptyList()
+    /** Set by the floating companion: shows the floating browser window when the agent uses the browser. */
+    @Volatile var onUse: (() -> Unit)? = null
 
     class TabView(ctx: Context) : WebView(ctx) {
         override fun isShown(): Boolean = true
@@ -112,6 +114,11 @@ object AgentBrowser {
     }
 
     fun show(ctx: Context): String {
+        val cb = onUse
+        if (cb != null) {
+            cb()
+            return "Nana's browser is now floating on the user's screen (drag it by the title bar, resize with the arrow, close with the cross). If the user must act there (log in, captcha, password), tell them, then use browser_wait and browser_read."
+        }
         val i = Intent(ctx, BrowserActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ctx.startActivity(i)
         return "Nana's browser is now on the user's screen. Tell the user what they should do there (log in, solve a captcha, type a password), then use browser_wait and browser_read."
