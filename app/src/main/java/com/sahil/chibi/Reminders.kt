@@ -167,9 +167,7 @@ object Reminders {
             save(c, out)
         } catch (e: Exception) {}
         AuditLog.add(c, "Reminder fired: " + text)
-        if (CompanionService.running) {
-            try { c.startForegroundService(Intent(c, CompanionService::class.java).setAction(CompanionService.ACT_SAY).putExtra("text", text)) } catch (e: Exception) {}
-        }
+
     }
 }
 

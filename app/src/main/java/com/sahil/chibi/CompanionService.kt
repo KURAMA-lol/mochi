@@ -64,7 +64,8 @@ class CompanionService : Service() {
         const val ACT_RELOAD = "chibi.reload"
         const val ACT_WAKE = "chibi.wake"
         const val ACT_SAY = "chibi.say"
-        private const val CH = "chibi_channel"
+        const val ACT_TALK = "chibi.talk"
+        private const val CH = "chibi_channel_v2"
         private const val NID = 1
         @Volatile var running = false
 
@@ -173,6 +174,12 @@ class CompanionService : Service() {
             ACT_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACT_RELOAD -> { rebuildChibi() }
             ACT_WAKE -> { endWake() }
+            ACT_TALK -> {
+                ensureChibi()
+                if (hidden) showChibi()
+                if (!panelOpen) openPanel()
+                main.postDelayed({ if (recognizer == null) startListening() }, 500)
+            }
             ACT_SAY -> {
                 ensureChibi(); if (hidden) showChibi()
                 val t = intent?.getStringExtra("text") ?: ""
@@ -395,8 +402,9 @@ class CompanionService : Service() {
 
     private fun createChannel() {
         val nm = getSystemService(NotificationManager::class.java)
+        try { nm.deleteNotificationChannel("chibi_channel") } catch (ex: Exception) {}
         nm.createNotificationChannel(
-            NotificationChannel(CH, "Nana companion", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CH, "Nana companion", NotificationManager.IMPORTANCE_LOW).apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC }
         )
     }
 
@@ -410,15 +418,19 @@ class CompanionService : Service() {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        fun act(label: String, pi: PendingIntent) =
-            Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_tile), label, pi).build()
+        fun act(label: String, pi: PendingIntent): Notification.Action {
+            val b = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_tile), label, pi)
+            if (Build.VERSION.SDK_INT >= 31) b.setAuthenticationRequired(false)
+            return b.build()
+        }
         return Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("${cfg.persona.name} is on your phone")
             .setContentText(if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
             .setContentIntent(open)
             .setOngoing(true)
-            .addAction(act("Call", actionPi(1, ACT_SUMMON)))
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .addAction(act("Talk", actionPi(1, ACT_TALK)))
             .addAction(act(if (hidden) "Show" else "Hide", actionPi(2, ACT_TOGGLE)))
             .addAction(act("Stop", actionPi(3, ACT_STOP)))
             .build()
