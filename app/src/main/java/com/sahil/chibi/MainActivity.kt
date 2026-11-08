@@ -74,7 +74,7 @@ class MainActivity : Activity() {
         nana = ChibiView(this)
         nana.action = "idle"
         val nh = hh - dp(18)
-        val nw = (nh * 0.86f).toInt()
+        val nw = (nh * 1.3f).toInt().coerceAtMost(dm.widthPixels)
         header.addView(nana, FrameLayout.LayoutParams(nw, nh, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
         nana.setOnClickListener {
             nana.poke()
