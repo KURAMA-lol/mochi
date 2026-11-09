@@ -102,6 +102,9 @@ class CompanionService : Service() {
     private var dragging = false
     private var moved = false
     private var longFired = false
+    private var radial: RadialMenu? = null
+    private var radialOpen = false
+    private var torchOn = false
     private var downX = 0f
     private var downY = 0f
     private var startX = 0
@@ -209,6 +212,7 @@ class CompanionService : Service() {
         main.removeCallbacksAndMessages(null)
         stopListening()
         try { tts?.shutdown() } catch (ex: Exception) {}
+        closeRadial()
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         super.onDestroy()
     }
@@ -560,12 +564,14 @@ class CompanionService : Service() {
         val c = chibi ?: return false
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (radialOpen) { closeRadial(); longFired = true; moved = false; return true }
                 downX = e.rawX; downY = e.rawY; startX = lp.x; startY = lp.y
                 moved = false; longFired = false
                 main.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 wake()
             }
             MotionEvent.ACTION_MOVE -> {
+                if (radialOpen && longFired) { radial?.feed(e.rawX, e.rawY, false); return true }
                 val dx = e.rawX - downX
                 val dy = e.rawY - downY
                 if (!moved && hypot(dx, dy) > ViewConfiguration.get(this).scaledTouchSlop) {
@@ -580,6 +586,10 @@ class CompanionService : Service() {
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 main.removeCallbacks(longPress)
+                if (radialOpen && longFired) {
+                    if (e.actionMasked == MotionEvent.ACTION_UP) radial?.feed(e.rawX, e.rawY, true) else closeRadial()
+                    return true
+                }
                 if (moved) {
                     dragging = false
                     c.action = "idle"
@@ -600,10 +610,83 @@ class CompanionService : Service() {
     }
 
     private val longPress = Runnable {
-        if (!moved) {
+        if (!moved && !kbUp) {
             longFired = true
-            if (!panelOpen) openPanel()
+            openRadial()
         }
+    }
+
+    private fun toggleTorch() {
+        try {
+            val cm = getSystemService(android.hardware.camera2.CameraManager::class.java)
+            val id = cm.cameraIdList.firstOrNull {
+                cm.getCameraCharacteristics(it).get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } ?: return
+            torchOn = !torchOn
+            cm.setTorchMode(id, torchOn)
+            say(if (torchOn) "Torch on!" else "Torch off", "happy")
+        } catch (ex: Exception) { say("Couldn't use the torch", "neutral") }
+    }
+
+    private fun openRadial() {
+        if (radialOpen) return
+        val items = listOf(
+            RadialMenu.Item("chat", "Chat", R.drawable.ni_chat),
+            RadialMenu.Item("talk", "Talk", R.drawable.ni_mic),
+            RadialMenu.Item("screen", "My screen", R.drawable.ni_eye),
+            RadialMenu.Item("notifs", "Notifications", R.drawable.ni_bell),
+            RadialMenu.Item("remind", "Remind me", R.drawable.ni_alarm),
+            RadialMenu.Item("torch", "Torch", R.drawable.ni_torch),
+            RadialMenu.Item("browser", "Browser", R.drawable.ni_globe),
+            RadialMenu.Item("settings", "Settings", R.drawable.ni_settings),
+            RadialMenu.Item("hide", "Hide Nana", R.drawable.ni_hide),
+            RadialMenu.Item("stop", "Stop task", R.drawable.ni_stop)
+        )
+        val rm = RadialMenu(this)
+        rm.items = items
+        rm.onClose = { closeRadial() }
+        rm.onPick = { it2 ->
+            closeRadial()
+            when (it2.id) {
+                "chat" -> openPanel()
+                "talk" -> { openPanel(); main.postDelayed({ if (recognizer == null) startListening() }, 500) }
+                "screen" -> { openPanel(); sendUserText("What's on my screen right now?", false) }
+                "notifs" -> { openPanel(); sendUserText("Read my recent notifications", false) }
+                "remind" -> { openPanel(); fill("Remind me in 30 minutes to ") }
+                "torch" -> toggleTorch()
+                "browser" -> showBrowserFloat()
+                "settings" -> startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                "hide" -> hideChibi()
+                "stop" -> {
+                    Agent.stop(); cancelApproval()
+                    typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy()
+                    say("Stopped.", "neutral")
+                }
+            }
+        }
+        val (sw, sh) = screen()
+        val l = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        l.gravity = Gravity.TOP or Gravity.START
+        try { wm.addView(rm, l) } catch (ex: Exception) { longFired = false; return }
+        rm.open(lp.x + lp.width / 2f, lp.y + lp.height * 0.45f, sw, sh)
+        radial = rm
+        radialOpen = true
+        hideBubble()
+        chibi?.poke()
+        chibi?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+    }
+
+    private fun closeRadial() {
+        val r = radial
+        radial = null
+        radialOpen = false
+        if (r != null) { try { wm.removeView(r) } catch (ex: Exception) {} }
     }
 
     private fun wake() {
@@ -623,6 +706,7 @@ class CompanionService : Service() {
 
     private fun step() {
         val c = chibi ?: return
+        c.thinking = typing != null
         if (hidden || !attached) return
         val now = SystemClock.uptimeMillis()
         val dt = (now - lastStep).coerceIn(0, 100) / 1000f
@@ -630,7 +714,7 @@ class CompanionService : Service() {
 
         if (talkUntil in 1..now) { c.talking = false; talkUntil = 0 }
         if (moodResetAt in 1..now) { c.mood = "neutral"; moodResetAt = 0 }
-        if (dragging || panelOpen) return
+        if (dragging || panelOpen || radialOpen) return
 
         if (now >= kbCheckAt) {
             kbCheckAt = now + 300

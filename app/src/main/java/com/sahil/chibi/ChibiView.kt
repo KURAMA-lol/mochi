@@ -7,27 +7,24 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
-import android.util.Base64
-import android.webkit.JavascriptInterface
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.FrameLayout
+import android.view.View
+import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Character view. Shows Nana (LivLiv Player, a 2.5D character) in a transparent WebView.
- * Assets live in assets/nana/ and are served to the page from https://hina.local/.
- * If the player cannot start, a static sprite is drawn instead.
+ * Character view. Nana is a 2D "paper doll" built from layers cut out of one illustration
+ * (body, head, two forearms). Layers are rotated around their joints for idle / think / wave /
+ * talk / drag animations; eyes blink and the mouth opens by drawing on top of the head.
  * Public vars are set by CompanionService.
  */
-class ChibiView(ctx: Context) : FrameLayout(ctx) {
+class ChibiView(ctx: Context) : View(ctx) {
     @Volatile var mood = "neutral"
     @Volatile var action = "idle"
     @Volatile var facingRight = true
     @Volatile var talking = false
+    @Volatile var thinking = false
     @Volatile var pixel = false
     @Volatile var yaw = 0f
     @Volatile var vsx = 1f
@@ -39,104 +36,45 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         @Volatile var lastError: String = ""
         fun charId(c: Context): String = "nana"
         fun has3d(c: Context): Boolean = true
+        // layer size and joints (layer pixel coords)
+        private const val LW = 340f
+        private const val LH = 500f
+        private const val HEAD_X = 172f; private const val HEAD_Y = 176f
+        private const val EL_X = 63f; private const val ER_X = 284f; private const val EB_Y = 351f
     }
 
-    private fun load(name: String): Bitmap? = try {
-        val s = context.assets.open(name).bufferedReader().use { it.readText() }.trim()
-        val b = Base64.decode(s, Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(b, 0, b.size)
-    } catch (ex: Exception) { null }
+    private fun bmp(n: String): Bitmap? = try {
+        context.assets.open("sprite/$n.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Throwable) { lastError = (e.message ?: e.toString()).take(160); null }
 
-    private val open: Bitmap? by lazy { load("mascot.b64") }
-    private val closed: Bitmap? by lazy { load("mascot_closed.b64") }
-    private val bp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
-    private val dst = RectF()
+    private val body: Bitmap? by lazy { bmp("n_body") }
+    private val head: Bitmap? by lazy { bmp("n_head") }
+    private val armL: Bitmap? by lazy { bmp("n_arml") }
+    private val armR: Bitmap? by lazy { bmp("n_armr") }
+
+    private val bp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val skin = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFE4DC.toInt() }
+    private val lash = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF6A2F57.toInt(); style = Paint.Style.STROKE; strokeWidth = 2.6f; strokeCap = Paint.Cap.ROUND
+    }
+    private val mouthP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9B2F4A.toInt() }
+    private val tongueP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF2768F.toInt() }
+    private val oval = RectF()
+
+    // eased pose
+    private var aL = 0f; private var aR = 0f; private var hR = 0f
+    private var bobY = 0f; private var sway = 0f
+    private var lookX = 0f
     private var nextBlink = SystemClock.uptimeMillis() + 1500L
     private var blinkUntil = 0L
-    private var pendingDouble = false
+    private var pokeUntil = 0L
 
-    private var wv: WebView? = null
-    private var lastS = ""
-    private val stateTick: Runnable = object : Runnable {
-        override fun run() {
-            val w = wv ?: return
-            val m = mood.replace("'", "")
-            val s = action + "|" + facingRight + "|" + talking + "|" + m
-            if (s != lastS) {
-                lastS = s
-                w.evaluateJavascript("window.H && H.s('" + action.replace("'", "") + "'," + facingRight + "," + talking + ",'" + m + "')", null)
-            }
-            postDelayed(this, 120)
-        }
-    }
+    init { setWillNotDraw(false) }
 
-    inner class NanaBridge {
-        @JavascriptInterface fun err(m: String) {
-            lastError = m.take(200)
-            post { fallback() }
-        }
-        @JavascriptInterface fun ready() { lastError = "" }
-    }
-
-    init {
-        setWillNotDraw(false)
-        startNana()
-    }
-
-    private fun mime(p: String): String = when {
-        p.endsWith(".html") -> "text/html"
-        p.endsWith(".js") -> "text/javascript"
-        p.endsWith(".json") -> "application/json"
-        p.endsWith(".webp") -> "image/webp"
-        p.endsWith(".png") -> "image/png"
-        else -> "text/plain"
-    }
-
-    private fun reply(mt: String, data: ByteArray, code: Int): WebResourceResponse =
-        WebResourceResponse(mt, "UTF-8", code, if (code == 200) "OK" else "Not Found",
-            mapOf("Access-Control-Allow-Origin" to "*"), java.io.ByteArrayInputStream(data))
-
-    private fun serve(u: android.net.Uri): WebResourceResponse {
-        if (u.host != "hina.local") return reply("text/plain", ByteArray(0), 404)
-        var p = (u.path ?: "/").trimStart('/')
-        if (p.isEmpty()) p = "index.html"
-        if (p.contains("..")) return reply("text/plain", ByteArray(0), 404)
-        return try {
-            val data = context.assets.open("nana/" + p).use { it.readBytes() }
-            reply(mime(p), data, 200)
-        } catch (e: Exception) { reply("text/plain", ByteArray(0), 404) }
-    }
-
-    private fun startNana() {
-        try {
-            val w = WebView(context)
-            w.setBackgroundColor(0)
-            w.isVerticalScrollBarEnabled = false
-            w.isHorizontalScrollBarEnabled = false
-            w.overScrollMode = OVER_SCROLL_NEVER
-            w.settings.javaScriptEnabled = true
-            w.settings.allowFileAccess = false
-            w.addJavascriptInterface(NanaBridge(), "HinaNative")
-            w.webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = serve(request.url)
-            }
-            addView(w, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            w.loadUrl("https://hina.local/index.html")
-            wv = w
-            postDelayed(stateTick, 300)
-        } catch (e: Throwable) {
-            lastError = (e.message ?: e.toString()).take(200)
-            wv = null
-        }
-    }
-
-    /** Called when the player could not start: drop back to the sprite. */
-    fun fallback() {
-        removeCallbacks(stateTick)
-        wv?.let { try { removeView(it); it.destroy() } catch (e: Throwable) { } }
-        wv = null
-        invalidate()
-    }
+    fun fallback() { invalidate() }
+    fun lookAt(nx: Float, ny: Float) { lookX = nx.coerceIn(-1f, 1f) }
+    fun poke() { pokeUntil = SystemClock.uptimeMillis() + 1100L }
+    fun release() { }
 
     private val ventRim = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF7A8494.toInt() }
     private val ventHole = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF0B0D12.toInt() }
@@ -166,54 +104,99 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         c.restore()
     }
 
-    override fun onInterceptTouchEvent(ev: android.view.MotionEvent): Boolean = wv != null
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        if (wv != null) { removeCallbacks(stateTick); postDelayed(stateTick, 100) }
-    }
-
-    override fun onDetachedFromWindow() {
-        removeCallbacks(stateTick)
-        super.onDetachedFromWindow()
-    }
-
-    fun lookAt(nx: Float, ny: Float) { wv?.evaluateJavascript("window.H&&H.look($nx,$ny)", null) }
-    fun poke() { wv?.evaluateJavascript("window.H&&H.poke()", null) }
-
-    fun release() {
-        removeCallbacks(stateTick)
-        try { wv?.destroy() } catch (e: Exception) {}
-        wv = null
-    }
+    private fun ease(cur: Float, tgt: Float, k: Float = 0.2f) = cur + (tgt - cur) * k
 
     override fun onDraw(c: Canvas) {
-        if (wv != null) return
-        val base = open ?: return
+        val b = body ?: return
+        val hd = head ?: return
         val now = SystemClock.uptimeMillis()
-        if (now >= nextBlink && now >= blinkUntil) {
-            blinkUntil = now + 140L
-            if (pendingDouble) {
-                pendingDouble = false
-                nextBlink = now + 320L
-            } else {
-                pendingDouble = Random.nextInt(5) == 0
-                nextBlink = now + Random.nextLong(2500L, 5500L)
+        val t = now / 1000f
+        val act = action
+        val poking = now < pokeUntil
+        val think = thinking && act != "drag"
+
+        // ---- pose targets
+        var tL = 1.5f * sin(t * 1.8f)
+        var tR = -1.5f * sin(t * 1.7f + 1f)
+        var tH = 1.3f * sin(t * 1.3f) + lookX * 3f + yaw * 4f
+        var tBob = 0f
+        var tSway = 0f
+        var closed = false
+        when {
+            act == "drag" -> {
+                tL = 24f * sin(t * 14f); tR = -24f * sin(t * 14f + 1f); tH = 9f * sin(t * 10f)
+                tSway = 3f * sin(t * 9f)
             }
+            think -> {
+                tR = 142f + 3f * sin(t * 2.4f)       // hand up to the chin
+                tL = 3f + 1.5f * sin(t * 1.5f)
+                tH = 5f + 1.6f * sin(t * 1.6f)
+                tBob = 0.8f * sin(t * 2.2f)
+            }
+            poking || act == "wave" -> {
+                tR = -98f + 15f * sin(t * 9.5f)
+                tH = -3f
+                tBob = -2f * abs(sin(t * 9f))
+            }
+            act == "walk" || act == "run" -> {
+                val f = if (act == "run") 13f else 8f
+                val amp = if (act == "run") 20f else 12f
+                tL = amp * sin(t * f); tR = -amp * sin(t * f)
+                tBob = -abs(sin(t * f)) * (if (act == "run") 5f else 3f)
+                tSway = 2.2f * sin(t * f)
+            }
+            act == "sleep" -> {
+                tH = 13f + sin(t * 0.9f); tL = 2f; tR = -2f
+                tBob = 2f * sin(t * 0.9f)
+                closed = true
+            }
+            act == "sit" -> { tBob = 2.5f }
+            act == "sus" -> { tH = -6f; tR = -4f }
+            else -> { tBob = 1.2f * sin(t * 2.1f) }
         }
-        val cl = closed
-        val bm = if (now < blinkUntil && cl != null) cl else base
-        val s = min(width / bm.width.toFloat(), height / bm.height.toFloat())
-        val w = bm.width * s
-        val h = bm.height * s
-        val x = (width - w) / 2f
-        val y = (height - h) / 2f
-        dst.set(x, y, x + w, y + h)
+        aL = ease(aL, tL); aR = ease(aR, tR, if (think || poking || act == "wave") 0.25f else 0.2f)
+        hR = ease(hR, tH); bobY = ease(bobY, tBob); sway = ease(sway, tSway)
+
+        // ---- blink
+        if (now >= nextBlink && now >= blinkUntil) {
+            blinkUntil = now + 130L
+            nextBlink = now + Random.nextLong(2200L, 5200L)
+        }
+        val blink = closed || now < blinkUntil
+
+        // ---- place sprite: bottom-aligned, centred, flipped if she faces left
+        val s = min(width / LW, height / LH) * 0.98f
+        val ox = (width - LW * s) / 2f
+        val oy = height - LH * s
         c.save()
         c.scale(vsx, vsy, width / 2f, height.toFloat())
         if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
-        c.drawBitmap(bm, null, dst, bp)
+        c.translate(ox, oy + bobY * s)
+        c.scale(s, s)
+        c.rotate(sway * 0.5f, LW / 2f, LH)
+
+        c.drawBitmap(b, 0f, 0f, bp)
+        armL?.let { c.save(); c.rotate(aL, EL_X, EB_Y); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
+        armR?.let { c.save(); c.rotate(aR, ER_X, EB_Y); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
+
+        c.save()
+        c.translate(0f, 1.2f * sin(t * 2.2f))
+        c.rotate(hR, HEAD_X, HEAD_Y)
+        c.drawBitmap(hd, 0f, 0f, bp)
+        if (blink) {
+            oval.set(145f - 17f, 105f - 14f, 145f + 17f, 105f + 14f); c.drawOval(oval, skin)
+            oval.set(198f - 20f, 103f - 16f, 198f + 20f, 103f + 16f); c.drawOval(oval, skin)
+            c.drawArc(oval.apply { set(145f - 15f, 98f, 145f + 15f, 116f) }, 15f, 150f, false, lash)
+            c.drawArc(oval.apply { set(198f - 17f, 96f, 198f + 17f, 114f) }, 15f, 150f, false, lash)
+        }
+        if (talking) {
+            val m = 0.25f + 0.75f * abs(sin(t * 16f))
+            oval.set(174f - 7f, 131f - 2f, 174f + 7f, 131f + 2f + 7f * m)
+            c.drawOval(oval, mouthP)
+            if (m > 0.6f) { oval.set(174f - 4f, 131f + 4f * m, 174f + 4f, 131f + 2f + 7f * m); c.drawOval(oval, tongueP) }
+        }
         c.restore()
-        postInvalidateDelayed(60)
+        c.restore()
+        postInvalidateOnAnimation()
     }
 }
