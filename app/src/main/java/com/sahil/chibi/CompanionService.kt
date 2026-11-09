@@ -92,7 +92,7 @@ class CompanionService : Service() {
     private var scroll: ScrollView? = null
     private var listCol: LinearLayout? = null
     private var input: EditText? = null
-    private var micBtn: TextView? = null
+    private var micBtn: android.widget.ImageView? = null
     private var typing: TextView? = null
     private var panelOpen = false
     private var panelAttached = false
@@ -183,7 +183,7 @@ class CompanionService : Service() {
             ACT_SAY -> {
                 ensureChibi(); if (hidden) showChibi()
                 val t = intent?.getStringExtra("text") ?: ""
-                if (t.isNotBlank()) { addMsg("⏰ " + t, false, null); say(t, "happy", spoken = true) }
+                if (t.isNotBlank()) { addMsg(t, false, null); say(t, "happy", spoken = true) }
             }
             ACT_TOGGLE -> {
                 ensureChibi()
@@ -886,16 +886,18 @@ class CompanionService : Service() {
         setPadding(dp(10), dp(6), dp(10), dp(6)); setOnClickListener { onClick() }
     }
 
-    private var sendBtn: TextView? = null
+    private var sendBtn: android.widget.ImageView? = null
     private var subtitle: TextView? = null
 
     private fun glass(fill: Int, stroke: Int, r: Int) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(r).toFloat(); setStroke(dp(1), stroke)
     }
 
-    private fun roundBtn(label: String, fill: Int, txt: Int = 0xFFFFFFFF.toInt(), onClick: () -> Unit) = TextView(this).apply {
-        text = label; textSize = 17f; setTextColor(txt); gravity = Gravity.CENTER
-        background = glass(fill, 0x33FFFFFF, 20)
+    private fun iconBtn(res: Int, fill: Int, tint: Int = 0xFFFFFFFF.toInt(), onClick: () -> Unit) = android.widget.ImageView(this).apply {
+        setImageResource(res); setColorFilter(tint)
+        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        val pd = dp(10); setPadding(pd, pd, pd, pd)
+        background = glass(fill, 0x33FFFFFF, 21)
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply { leftMargin = dp(6) }
     }
@@ -905,7 +907,7 @@ class CompanionService : Service() {
         subtitle?.text = if (busy) "working on it..." else "online"
         subtitle?.setTextColor(if (busy) 0xFFF59E6C.toInt() else 0xFF8FF5E3.toInt())
         val empty = (input?.text?.toString()?.trim() ?: "").isEmpty()
-        sendBtn?.text = if (busy && empty) "■" else "➤"
+        sendBtn?.setImageResource(if (busy && empty) R.drawable.ni_stop else R.drawable.ni_send)
     }
 
     private fun md(s: String): CharSequence {
@@ -950,10 +952,14 @@ class CompanionService : Service() {
         addMsg("Fresh start! What's up, ${cfg.persona.userName}?", false, null)
     }
 
-    private fun chip(label: String, onClick: () -> Unit) = TextView(this).apply {
+    private fun chip(res: Int, label: String, onClick: () -> Unit) = TextView(this).apply {
         text = label; textSize = 12.5f; setTextColor(0xFFEAFAF6.toInt())
-        setPadding(dp(12), dp(7), dp(12), dp(7))
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(11), dp(7), dp(13), dp(7))
         background = glass(0x1FFFFFFF, 0x33FFFFFF, 16)
+        val d = this@CompanionService.getDrawable(res)?.mutate()
+        d?.setTint(0xFF8FF5E3.toInt()); d?.setBounds(0, 0, dp(15), dp(15))
+        setCompoundDrawables(d, null, null, null); compoundDrawablePadding = dp(6)
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(6) }
     }
@@ -980,12 +986,12 @@ class CompanionService : Service() {
         val sub = TextView(this).apply { text = "online"; textSize = 11f; setTextColor(0xFF8FF5E3.toInt()) }
         titleCol.addView(sub)
         header.addView(titleCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(roundBtn("🧹", 0x1FFFFFFF) { clearChat() })
-        header.addView(roundBtn("⚙", 0x1FFFFFFF) {
+        header.addView(iconBtn(R.drawable.ni_clear, 0x1FFFFFFF) { clearChat() })
+        header.addView(iconBtn(R.drawable.ni_settings, 0x1FFFFFFF) {
             closePanel()
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         })
-        header.addView(roundBtn("✕", 0x1FFFFFFF) { closePanel() })
+        header.addView(iconBtn(R.drawable.ni_close, 0x1FFFFFFF) { closePanel() })
         root.addView(header)
 
         val sc = ScrollView(this)
@@ -997,12 +1003,12 @@ class CompanionService : Service() {
         val chipScroll = android.widget.HorizontalScrollView(this)
         chipScroll.isHorizontalScrollBarEnabled = false
         val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        chips.addView(chip("👀 My screen") { sendUserText("What's on my screen right now?", false) })
-        chips.addView(chip("🔔 Notifications") { sendUserText("Read my recent notifications", false) })
-        chips.addView(chip("⏰ Remind me") { fill("Remind me in 30 minutes to ") })
-        chips.addView(chip("🔍 Search web") { fill("Search the web for ") })
-        chips.addView(chip("📱 Open app") { fill("Open ") })
-        chips.addView(chip("🔋 Phone status") { sendUserText("What's my battery and the time?", false) })
+        chips.addView(chip(R.drawable.ni_eye, "My screen") { sendUserText("What's on my screen right now?", false) })
+        chips.addView(chip(R.drawable.ni_bell, "Notifications") { sendUserText("Read my recent notifications", false) })
+        chips.addView(chip(R.drawable.ni_alarm, "Remind me") { fill("Remind me in 30 minutes to ") })
+        chips.addView(chip(R.drawable.ni_search, "Search web") { fill("Search the web for ") })
+        chips.addView(chip(R.drawable.ni_apps, "Open app") { fill("Open ") })
+        chips.addView(chip(R.drawable.ni_battery, "Phone status") { sendUserText("What's my battery and the time?", false) })
         chipScroll.addView(chips)
         root.addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
 
@@ -1024,8 +1030,8 @@ class CompanionService : Service() {
                 override fun afterTextChanged(s: android.text.Editable?) { refreshBusy() }
             })
         }
-        val mic = roundBtn("🎙", 0x1FFFFFFF) { if (recognizer == null) startListening() else stopListening() }
-        val send = roundBtn("➤", 0xFF5EEAD4.toInt(), 0xFF03211F.toInt()) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }
+        val mic = iconBtn(R.drawable.ni_mic, 0x1FFFFFFF) { if (recognizer == null) startListening() else stopListening() }
+        val send = iconBtn(R.drawable.ni_send, 0xFF5EEAD4.toInt(), 0xFF03211F.toInt()) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }
         row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(mic); row.addView(send)
         root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
@@ -1192,7 +1198,7 @@ class CompanionService : Service() {
 
     private fun onError(msg: String) {
         typing?.let { listCol?.removeView(it) }; typing = null; refreshBusy()
-        addMsg("⚠ $msg", false, null)
+        addMsg("Error: $msg", false, null)
         say("Something went wrong...", "sad")
     }
 
@@ -1296,7 +1302,7 @@ class CompanionService : Service() {
         stopListening()
         val sr = SpeechRecognizer.createSpeechRecognizer(this)
         sr.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) { micBtn?.text = "🔴"; chibi?.mood = "excited" }
+            override fun onReadyForSpeech(params: Bundle?) { micBtn?.setColorFilter(0xFFFF6B7A.toInt()); chibi?.mood = "excited" }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
@@ -1323,10 +1329,10 @@ class CompanionService : Service() {
     }
 
     private fun stopListening() {
-        val sr = recognizer ?: run { micBtn?.text = "🎙"; return }
+        val sr = recognizer ?: run { micBtn?.setColorFilter(0xFFFFFFFF.toInt()); return }
         recognizer = null
         try { sr.stopListening(); sr.destroy() } catch (ex: Exception) {}
-        micBtn?.text = "🎙"
+        micBtn?.setColorFilter(0xFFFFFFFF.toInt())
         scheduleWake(1500)
     }
 }

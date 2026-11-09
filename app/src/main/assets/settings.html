@@ -86,6 +86,12 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:20px 4px 
 .sw{border-bottom:1px solid rgba(255,255,255,.1)}
 .sw input[type=checkbox]{background:rgba(255,255,255,.16);box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
 .sw input[type=checkbox]:checked{background:linear-gradient(160deg,#8ff5e3,#3fd6bd)}
+
+.chip svg,.res svg{width:12px;height:12px;vertical-align:-1px;margin-right:2px}
+nav button svg{width:22px;height:22px}
+.pd{display:inline-block;width:9px;height:9px;border-radius:50%;background:#52666a;margin-right:6px;vertical-align:1px}
+.pd.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+button.b svg{width:14px;height:14px;vertical-align:-2px}
 </style>
 </head>
 <body>
@@ -370,7 +376,10 @@ function save(){ clearTimeout(timer); timer = setTimeout(() => Android.saveConfi
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
 // ---------- tabs ----------
-const tabs = [['home','🏠','Home'],['prov','🔌','APIs'],['route','🧭','Routing'],['pers','🎀','Her'],['stats','📊','Stats'],['mem','🧠','Memory']];
+const ICONS = {home:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',prov:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg>',route:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',pers:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg>',stats:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11M10 20V4M16 20v-6M2 21h20"/></svg>',mem:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>'};
+const IC_OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+const IC_NO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const tabs = [['home',ICONS.home,'Home'],['prov',ICONS.prov,'APIs'],['route',ICONS.route,'Routing'],['pers',ICONS.pers,'Her'],['stats',ICONS.stats,'Stats'],['mem',ICONS.mem,'Memory']];
 $('nav').innerHTML = '<div class="dh">Nana<small>your tiny phone companion</small></div>' + tabs.map(t => `<button data-t="${t[0]}" onclick="tab('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
 function toggleMenu(f){ const o = (f === undefined) ? !$('nav').classList.contains('open') : f; $('nav').classList.toggle('open', o); $('scrim').classList.toggle('on', o); }
 function tab(id){
@@ -387,7 +396,7 @@ function tab(id){
 // ---------- home ----------
 function refreshStatus(){
   const s = JSON.parse(Android.getStatus());
-  const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?'✓':'✗'} ${t}</span>`;
+  const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?IC_OK:IC_NO} ${t}</span>`;
   $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control') + c(s.notifAccess,'notification access');
   try { var d=document.getElementById('scDot'); if(d){d.className='dot'+(s.access?' ok':'');document.getElementById('scTxt').textContent=s.access?'Screen control is ON':'Screen control is OFF - tap Screen control settings and turn Nana on'} } catch (e) {}
   try { memLoad(); agLoad(); } catch (e) {}
@@ -434,12 +443,12 @@ function testP(i){
 window.onTest = (id, ok, text) => {
   const i = cfg.providers.findIndex(p => p.id === id); if (i < 0) return;
   const el = $('res'+i); if (!el) return;
-  el.className = 'res ' + (ok ? 'ok' : 'bad'); el.textContent = (ok ? '✓ ' : '✗ ') + text;
+  el.className = 'res ' + (ok ? 'ok' : 'bad'); el.innerHTML = (ok ? IC_OK : IC_NO) + ' ' + esc(text);
 };
 function renderProviders(){
   $('plist').innerHTML = cfg.providers.map((p,i) => `
   <details class="p">
-    <summary><span>${p.enabled?'🟢':'⚪'} ${esc(p.name)} <span class="tag">${esc(p.model)}</span></span><span class="tag">#${p.priority}</span></summary>
+    <summary><span><i class="pd ${p.enabled?'on':''}"></i> ${esc(p.name)} <span class="tag">${esc(p.model)}</span></span><span class="tag">#${p.priority}</span></summary>
     <label>Name</label><input value="${esc(p.name)}" oninput="P(${i},'name',this.value)">
     <label>API type</label>
     <select onchange="T(${i},this.value)">
@@ -547,7 +556,7 @@ function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAg
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
 function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid #0001">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
 function wakeSave(){try{Android.setWake(document.getElementById('wakeOn').checked)}catch(x){}}
-function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.1)"><span style="flex:1;color:var(--tx)">'+esc(r.text)+'<br><small>'+new Date(r.at).toLocaleString()+'</small></span><button class="b red" style="padding:6px 12px;min-height:0" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">✕</button></div>'}).join('')}catch(x){}}
+function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.1)"><span style="flex:1;color:var(--tx)">'+esc(r.text)+'<br><small>'+new Date(r.at).toLocaleString()+'</small></span><button class="b red" style="padding:6px 12px;min-height:0" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
 function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){el.textContent='Could not load memory: '+x}}
 function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved \u2713':r;i.value='';memLoad()}

@@ -213,7 +213,7 @@ How to work:
                     nudges++
                     msgs.add(Msg("assistant", res.text))
                     msgs.add(Msg("user", "SYSTEM: Do not ask. The user already gave this task. Find what you need with screen_read, browser_read or the remembered facts and continue with a tool call. (Nana itself asks the user to approve risky taps.) Only ask if it truly cannot be found."))
-                    onStep("🔧 continuing...")
+                    onStep("› continuing...")
                     continue
                 }
                 val promise = PROMISE.containsMatchIn(res.text) && !res.text.contains("?")
@@ -221,7 +221,7 @@ How to work:
                     nudges++
                     msgs.add(Msg("assistant", res.text))
                     msgs.add(Msg("user", "SYSTEM: Your last reply announced or described work but called no tool, so nothing happened. Reply now with ONLY a tool call for the next step (for example screen_tap_text, screen_type, screen_read, browser_open, launch_app). If the request is already fully done (opening an app means just opening it), or truly impossible, say so plainly instead. Never start new steps the user did not ask for."))
-                    onStep("🔧 trying again...")
+                    onStep("› trying again...")
                     continue
                 }
                 if (steps > 0 && actionish && checks < 1) {
@@ -230,7 +230,7 @@ How to work:
                     if (missing != null) {
                         msgs.add(Msg("assistant", res.text))
                         msgs.add(Msg("user", "SYSTEM CHECK: the task is not finished yet. Missing: " + missing + " Continue with a tool call, or say plainly what blocks you."))
-                        onStep("🔧 checking my work...")
+                        onStep("› checking my work...")
                         continue
                     }
                 }
@@ -251,7 +251,7 @@ How to work:
             val name = call.first
             val args = call.second
             lastName = name
-            onStep("🔧 " + describe(name, args))
+            onStep("› " + describe(name, args))
             val sig = name + args.toString()
             val times = (sigs[sig] ?: 0) + 1
             sigs[sig] = times
