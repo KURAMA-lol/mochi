@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.os.SystemClock
 import android.view.View
@@ -40,6 +41,7 @@ class ChibiView(ctx: Context) : View(ctx) {
         private const val LW = 340f
         private const val LH = 500f
         private const val HEAD_X = 172f; private const val HEAD_Y = 176f
+        private const val JR = 40f
         private const val EL_X = 63f; private const val ER_X = 284f; private const val EB_Y = 351f
     }
 
@@ -60,6 +62,7 @@ class ChibiView(ctx: Context) : View(ctx) {
     private val mouthP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9B2F4A.toInt() }
     private val tongueP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF2768F.toInt() }
     private val oval = RectF()
+    private val joint = Path()
 
     // eased pose
     private var aL = 0f; private var aR = 0f; private var hR = 0f
@@ -118,23 +121,23 @@ class ChibiView(ctx: Context) : View(ctx) {
         // ---- pose targets
         var tL = 1.5f * sin(t * 1.8f)
         var tR = -1.5f * sin(t * 1.7f + 1f)
-        var tH = 1.3f * sin(t * 1.3f) + lookX * 3f + yaw * 4f
+        var tH = 1.2f * sin(t * 1.3f) + lookX * 2f + (yaw / 60f).coerceIn(-1f, 1f) * 2f
         var tBob = 0f
         var tSway = 0f
         var closed = false
         when {
             act == "drag" -> {
-                tL = 24f * sin(t * 14f); tR = -24f * sin(t * 14f + 1f); tH = 9f * sin(t * 10f)
+                tL = 16f * sin(t * 12f); tR = -16f * sin(t * 12f + 1f); tH = 4f * sin(t * 9f)
                 tSway = 3f * sin(t * 9f)
             }
             think -> {
                 tR = 142f + 3f * sin(t * 2.4f)       // hand up to the chin
                 tL = 3f + 1.5f * sin(t * 1.5f)
-                tH = 5f + 1.6f * sin(t * 1.6f)
+                tH = 4f + 1f * sin(t * 1.6f)
                 tBob = 0.8f * sin(t * 2.2f)
             }
             poking || act == "wave" -> {
-                tR = -98f + 15f * sin(t * 9.5f)
+                tR = -62f + 12f * sin(t * 9.5f)
                 tH = -3f
                 tBob = -2f * abs(sin(t * 9f))
             }
@@ -146,16 +149,16 @@ class ChibiView(ctx: Context) : View(ctx) {
                 tSway = 2.2f * sin(t * f)
             }
             act == "sleep" -> {
-                tH = 13f + sin(t * 0.9f); tL = 2f; tR = -2f
+                tH = 6f + 0.6f * sin(t * 0.9f); tL = 2f; tR = -2f
                 tBob = 2f * sin(t * 0.9f)
                 closed = true
             }
             act == "sit" -> { tBob = 2.5f }
-            act == "sus" -> { tH = -6f; tR = -4f }
+            act == "sus" -> { tH = -4f; tR = -4f }
             else -> { tBob = 1.2f * sin(t * 2.1f) }
         }
-        aL = ease(aL, tL); aR = ease(aR, tR, if (think || poking || act == "wave") 0.25f else 0.2f)
-        hR = ease(hR, tH); bobY = ease(bobY, tBob); sway = ease(sway, tSway)
+        aL = ease(aL, tL, 0.15f); aR = ease(aR, tR, 0.15f)
+        hR = ease(hR, tH.coerceIn(-6f, 6f), 0.12f); bobY = ease(bobY, tBob); sway = ease(sway, tSway)
 
         // ---- blink
         if (now >= nextBlink && now >= blinkUntil) {
@@ -178,6 +181,9 @@ class ChibiView(ctx: Context) : View(ctx) {
         c.drawBitmap(b, 0f, 0f, bp)
         armL?.let { c.save(); c.rotate(aL, EL_X, EB_Y); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
         armR?.let { c.save(); c.rotate(aR, ER_X, EB_Y); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
+        // round elbow joint: the un-rotated sleeve stays inside a disc, so the bend has no flat seam
+        armL?.let { c.save(); joint.reset(); joint.addCircle(EL_X, EB_Y, JR, Path.Direction.CW); c.clipPath(joint); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
+        armR?.let { c.save(); joint.reset(); joint.addCircle(ER_X, EB_Y, JR, Path.Direction.CW); c.clipPath(joint); c.drawBitmap(it, 0f, 0f, bp); c.restore() }
 
         c.save()
         c.translate(0f, 1.2f * sin(t * 2.2f))
