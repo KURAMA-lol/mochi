@@ -63,6 +63,9 @@ object Agent {
 
     /** Cancels whatever task is running (a newer run also cancels the older one). */
     fun stop() { gen++ }
+    /** Live progress hook for the timeline UI: kinds think | tool | ok | fail | check. */
+    @Volatile var onEvent: ((String, String) -> Unit)? = null
+    private fun ev(k: String, t: String = "") { try { onEvent?.invoke(k, t) } catch (e: Throwable) {} }
 
     /** Only things that are really irreversible or that the user did not ask for need approval. */
     private fun labelRisk(lab: String): Boolean {
@@ -204,6 +207,7 @@ How to work:
         val done = ArrayList<String>()
         while (true) {
             if (gen != my) throw Interrupted()
+            if (gen == my) ev("think")
             val res = Router.chat(conf, system, msgs, voice)
             if (gen != my) throw Interrupted()
             val call = parse(res.text)
@@ -226,6 +230,7 @@ How to work:
                 }
                 if (steps > 0 && actionish && checks < 1) {
                     checks++
+                    if (gen == my) ev("check")
                     val missing = review(conf, request, evidence, res.text)
                     if (missing != null) {
                         msgs.add(Msg("assistant", res.text))
@@ -252,6 +257,7 @@ How to work:
             val args = call.second
             lastName = name
             onStep("› " + describe(name, args))
+            if (gen == my) ev("tool", name + "\u0001" + args.toString().take(240))
             val sig = name + args.toString()
             val times = (sigs[sig] ?: 0) + 1
             sigs[sig] = times
@@ -276,6 +282,7 @@ How to work:
             } else {
                 try { exec(ctx, name, args) } catch (e: Throwable) { "Error: " + (e.message ?: e.toString()) }
             }
+            if (gen == my) ev(if (blocked != null || denied || out.startsWith("Error")) "fail" else "ok", out.replace('\n', ' ').take(300))
             if (name != "screen_read" && name != "browser_read" && !denied) AuditLog.add(ctx, describe(name, args).removeSuffix("...") + " -> " + out.replace('\n', ' ').take(70))
             done.add(describe(name, args).removeSuffix("..."))
             evidence.add("- " + describe(name, args).removeSuffix("...") + " -> " + out.replace('\n', ' ').take(260))
