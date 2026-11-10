@@ -31,6 +31,8 @@ class RadialMenu(ctx: Context) : View(ctx) {
     var items: List<Item> = emptyList()
     var onPick: (Item) -> Unit = {}
     var onClose: () -> Unit = {}
+    var onLook: (Float, Float) -> Unit = { _, _ -> }
+    private var lastLook = 0L
 
     private val d = resources.displayMetrics.density
     private val D = 50f * d
@@ -144,8 +146,17 @@ class RadialMenu(ctx: Context) : View(ctx) {
         return best
     }
 
+    /** Nana looks towards the icon the finger is on (direction from her centre to the icon). */
+    private fun look(i: Int) {
+        lastLook = SystemClock.uptimeMillis()
+        if (i < 0 || i >= angles.size) { onLook(0f, 0f); return }
+        val a = angles[i].toDouble()
+        onLook((cos(a) * 0.9).toFloat(), (-sin(a) * 0.8).toFloat())
+    }
+
     private fun setHover(h: Int) {
         if (h != hover) {
+            look(h)
             hover = h; hoverSince = SystemClock.uptimeMillis()
             if (h >= 0) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             if (h != 0 && h != shown.size - 1) armed = true
@@ -216,6 +227,7 @@ class RadialMenu(ctx: Context) : View(ctx) {
         val now = SystemClock.uptimeMillis()
         val n = shown.size
         // edge paging
+        if (state == 0 && hover >= 0 && now - lastLook > 700L) look(hover)
         if (state == 0 && pages > 1 && armed && hover >= 0 && now - hoverSince > 380L) {
             if (hover == n - 1) { flip(1); invalidate(); return }
             if (hover == 0 && n > 1) { flip(-1); invalidate(); return }

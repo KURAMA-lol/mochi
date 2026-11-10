@@ -644,6 +644,7 @@ class CompanionService : Service() {
         val rm = RadialMenu(this)
         rm.items = items
         rm.onClose = { closeRadial() }
+        rm.onLook = { nx, ny -> chibi?.lookAt(nx, ny) }
         rm.onPick = { it2 ->
             when (it2.id) {
                 "chat" -> openPanel()
