@@ -587,7 +587,7 @@ class CompanionService : Service() {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 main.removeCallbacks(longPress)
                 if (radialOpen && longFired) {
-                    if (e.actionMasked == MotionEvent.ACTION_UP) radial?.feed(e.rawX, e.rawY, true) else closeRadial()
+                    if (e.actionMasked == MotionEvent.ACTION_UP) radial?.feed(e.rawX, e.rawY, true) else radial?.cancel()
                     return true
                 }
                 if (moved) {
@@ -645,7 +645,6 @@ class CompanionService : Service() {
         rm.items = items
         rm.onClose = { closeRadial() }
         rm.onPick = { it2 ->
-            closeRadial()
             when (it2.id) {
                 "chat" -> openPanel()
                 "talk" -> { openPanel(); main.postDelayed({ if (recognizer == null) startListening() }, 500) }
@@ -666,8 +665,8 @@ class CompanionService : Service() {
         val l = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
         l.gravity = Gravity.TOP or Gravity.START
@@ -678,6 +677,7 @@ class CompanionService : Service() {
         radial = rm
         radialOpen = true
         hideBubble()
+        chibi?.action = "wave"
         chibi?.poke()
         chibi?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
     }
@@ -687,6 +687,8 @@ class CompanionService : Service() {
         radial = null
         radialOpen = false
         if (r != null) { try { wm.removeView(r) } catch (ex: Exception) {} }
+        if (chibi?.action == "wave") chibi?.action = "idle"
+        nextDecision = SystemClock.uptimeMillis() + 2000
     }
 
     private fun wake() {
