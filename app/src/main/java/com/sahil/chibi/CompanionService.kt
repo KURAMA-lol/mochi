@@ -106,6 +106,21 @@ class CompanionService : Service() {
     private var longFired = false
     private var radial: RadialMenu? = null
     private var lastPowerSay = 0L
+    private var lastGreet = 0L
+    /** Short time-of-day hello when Nana is summoned (at most once per 30 min). Speaks nothing else, does nothing. */
+    private fun greetNow() {
+        val now = SystemClock.uptimeMillis()
+        if (lastGreet != 0L && now - lastGreet < 30 * 60 * 1000L) return
+        lastGreet = now
+        val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        when {
+            h in 0..4 -> say("It's so late... don't forget to sleep!", "shy")
+            h in 5..11 -> say("Good morning! Ready for today?", "happy")
+            h in 12..16 -> say("Good afternoon~ need anything?", "happy")
+            h in 17..20 -> say("Good evening! How was your day?", "happy")
+            else -> say("Getting late. Don't stay up too long!", "neutral")
+        }
+    }
     private val powerRx = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: android.content.Context, i: Intent) {
             if (hidden || chibi == null) return
@@ -205,7 +220,7 @@ class CompanionService : Service() {
                 if (!panelOpen) openPanel()
                 main.postDelayed({ if (recognizer == null) startListening() }, 500)
             }
-            ACT_SHOW -> { ensureChibi(); if (hidden) showChibi() }
+            ACT_SHOW -> { ensureChibi(); if (hidden) showChibi(); greetNow() }
             ACT_ASK -> {
                 ensureChibi(); if (hidden) showChibi()
                 val t = intent?.getStringExtra("text") ?: ""
