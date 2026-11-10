@@ -66,6 +66,7 @@ class CompanionService : Service() {
         const val ACT_SAY = "chibi.say"
         const val ACT_TALK = "chibi.talk"
         const val ACT_SHOW = "chibi.show"
+        const val ACT_ASK = "chibi.ask"
         private const val CH = "chibi_channel_v2"
         private const val NID = 1
         @Volatile var running = false
@@ -104,6 +105,20 @@ class CompanionService : Service() {
     private var moved = false
     private var longFired = false
     private var radial: RadialMenu? = null
+    private var lastPowerSay = 0L
+    private val powerRx = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) {
+            if (hidden || chibi == null) return
+            val now = SystemClock.uptimeMillis()
+            if (now - lastPowerSay < 8000) return
+            lastPowerSay = now
+            when (i.action) {
+                Intent.ACTION_BATTERY_LOW -> say("Battery's low, plug me in soon!", "sad")
+                Intent.ACTION_POWER_CONNECTED -> say("Charging~ ahh, that feels good.", "happy")
+                Intent.ACTION_POWER_DISCONNECTED -> say("Unplugged. Back to work!", "neutral")
+            }
+        }
+    }
     private var radialOpen = false
     private var torchOn = false
     private var downX = 0f
@@ -165,6 +180,12 @@ class CompanionService : Service() {
             if (st == TextToSpeech.SUCCESS) { ttsReady = true; applyTts() }
         }
         running = true
+        try {
+            val f = android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_BATTERY_LOW); addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
+            }
+            registerReceiver(powerRx, f)
+        } catch (ex: Exception) {}
         AgentBrowser.onUse = { main.post { showBrowserFloat() } }
         Agent.approver = { what -> requestApproval(what) }
     }
@@ -185,6 +206,16 @@ class CompanionService : Service() {
                 main.postDelayed({ if (recognizer == null) startListening() }, 500)
             }
             ACT_SHOW -> { ensureChibi(); if (hidden) showChibi() }
+            ACT_ASK -> {
+                ensureChibi(); if (hidden) showChibi()
+                val t = intent?.getStringExtra("text") ?: ""
+                if (t.isNotBlank()) {
+                    if (!panelOpen) openPanel()
+                    val q = if (t.length < 60) "Explain this simply (translate it to English if it is in another language): $t"
+                    else "Summarize this in a few short points: $t"
+                    sendUserText(q, false)
+                }
+            }
             ACT_SAY -> {
                 ensureChibi(); if (hidden) showChibi()
                 val t = intent?.getStringExtra("text") ?: ""
@@ -214,6 +245,7 @@ class CompanionService : Service() {
         main.removeCallbacksAndMessages(null)
         stopListening()
         try { tts?.shutdown() } catch (ex: Exception) {}
+        try { unregisterReceiver(powerRx) } catch (ex: Exception) {}
         closeRadial()
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         super.onDestroy()
