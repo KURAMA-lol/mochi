@@ -678,8 +678,8 @@ class CompanionService : Service() {
         radial = rm
         radialOpen = true
         hideBubble()
-        chibi?.action = "wave"
-        chibi?.poke()
+        chibi?.mood = "neutral"       // eyes open (smile/wave expressions close them)
+        chibi?.action = "look"
         chibi?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
     }
 
@@ -688,7 +688,7 @@ class CompanionService : Service() {
         radial = null
         radialOpen = false
         if (r != null) { try { wm.removeView(r) } catch (ex: Exception) {} }
-        if (chibi?.action == "wave") chibi?.action = "idle"
+        if (chibi?.action == "look") chibi?.action = "idle"
         nextDecision = SystemClock.uptimeMillis() + 2000
     }
 
