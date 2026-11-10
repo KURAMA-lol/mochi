@@ -20,7 +20,7 @@ class NanaSession(ctx: Context) : VoiceInteractionSession(ctx) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         try {
-            context.startForegroundService(Intent(context, CompanionService::class.java).setAction(CompanionService.ACT_TALK))
+            context.startForegroundService(Intent(context, CompanionService::class.java).setAction(CompanionService.ACT_SHOW))
         } catch (e: Exception) {}
         hide()
     }

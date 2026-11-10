@@ -65,6 +65,7 @@ class CompanionService : Service() {
         const val ACT_WAKE = "chibi.wake"
         const val ACT_SAY = "chibi.say"
         const val ACT_TALK = "chibi.talk"
+        const val ACT_SHOW = "chibi.show"
         private const val CH = "chibi_channel_v2"
         private const val NID = 1
         @Volatile var running = false
@@ -183,6 +184,7 @@ class CompanionService : Service() {
                 if (!panelOpen) openPanel()
                 main.postDelayed({ if (recognizer == null) startListening() }, 500)
             }
+            ACT_SHOW -> { ensureChibi(); if (hidden) showChibi() }
             ACT_SAY -> {
                 ensureChibi(); if (hidden) showChibi()
                 val t = intent?.getStringExtra("text") ?: ""

@@ -42,7 +42,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Second home-screen icon: tap it to call her out instantly -->
+        <!-- Invisible trampoline used by the Quick Settings tile (no launcher icon) -->
         <activity
             android:name=".SummonActivity"
             android:exported="true"
@@ -50,12 +50,7 @@
             android:label="Call Nana"
             android:excludeFromRecents="true"
             android:taskAffinity=""
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
             android:name=".BrowserActivity"

@@ -37,7 +37,7 @@ class SummonActivity : Activity() {
         if (!android.provider.Settings.canDrawOverlays(this)) {
             startActivity(Intent(this, MainActivity::class.java))
         } else {
-            CompanionService.send(this, CompanionService.ACT_SUMMON)
+            CompanionService.send(this, CompanionService.ACT_SHOW)
         }
         finish()
     }
