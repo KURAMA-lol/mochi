@@ -600,8 +600,7 @@ class CompanionService : Service() {
                 } else if (e.actionMasked == MotionEvent.ACTION_UP && !longFired) {
                     if (panelOpen) closePanel() else {
                         val nowT = SystemClock.uptimeMillis()
-                        if (nowT - lastTapAt < 380) { lastTapAt = 0; openPanel() }
-                        else { lastTapAt = nowT; val (pm, pt) = Persona.pokeLine(); say(pt, pm); chibi?.poke() }
+                        lastTapAt = nowT; val (pm, pt) = Persona.pokeLine(); say(pt, pm); chibi?.poke()
                     }
                 }
             }
@@ -664,7 +663,6 @@ class CompanionService : Service() {
                 }
             }
         }
-        val (sw, sh) = screen()
         val l = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -674,7 +672,9 @@ class CompanionService : Service() {
         )
         l.gravity = Gravity.TOP or Gravity.START
         try { wm.addView(rm, l) } catch (ex: Exception) { longFired = false; return }
-        rm.open(lp.x + lp.width / 2f, lp.y + lp.height * 0.45f, sw, sh)
+        val loc = IntArray(2)
+        chibi?.getLocationOnScreen(loc)
+        rm.open(loc[0] + lp.width / 2f, loc[1] + lp.height * 0.45f)
         radial = rm
         radialOpen = true
         hideBubble()
