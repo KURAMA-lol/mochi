@@ -249,6 +249,14 @@ class MainActivity : Activity() {
         @JavascriptInterface fun setTheme(a: String, m: String) { Theme.save(this@MainActivity, a, m); runOnUiThread { applyNativeTheme() } }
         @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
         @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
+        @JavascriptInterface fun getWakeState(): String = CompanionService.wakeState
+        @JavascriptInterface fun batteryOk(): Boolean = try { (this@MainActivity.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isIgnoringBatteryOptimizations(packageName) } catch (e: Exception) { false }
+        @JavascriptInterface fun batteryRequest() {
+            runOnUiThread {
+                try { startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:" + packageName))) }
+                catch (e: Exception) { try { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {} }
+            }
+        }
         @JavascriptInterface fun setWake(on: Boolean) {
             Agent.setWake(this@MainActivity, on)
             if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE)

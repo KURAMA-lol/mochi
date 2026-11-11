@@ -63,6 +63,7 @@ class CompanionService : Service() {
         const val ACT_STOP = "chibi.stop"
         const val ACT_RELOAD = "chibi.reload"
         const val ACT_WAKE = "chibi.wake"
+        @Volatile var wakeState = "off"
         const val ACT_SAY = "chibi.say"
         const val ACT_TALK = "chibi.talk"
         const val ACT_SHOW = "chibi.show"
@@ -217,7 +218,7 @@ class CompanionService : Service() {
         when (intent?.action) {
             ACT_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACT_RELOAD -> { rebuildChibi() }
-            ACT_WAKE -> { endWake() }
+            ACT_WAKE -> { endWake(); scheduleWake(300) }
             ACT_TALK -> {
                 ensureChibi()
                 if (hidden) showChibi()
@@ -1413,7 +1414,26 @@ class CompanionService : Service() {
 
     // ---- "Hey Nana" wake word: listens in short rounds while the screen is on ----
     private var wakeSr: SpeechRecognizer? = null
-    private val WAKE = Regex("\\bnana\\b[,.!?\\s]*(.*)$", RegexOption.IGNORE_CASE)
+    private var wakeFails = 0
+    private val WAKE_STRONG = Regex("\\b(?:n[aeu]+n+[aeu]+h?|na\\s+na|nan\\s+a)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
+    private val WAKE_WEAK = Regex("\\b(?:hey|hi|hello|ok|okay)\\s+(?:anna|hanna|hannah|nina|nona|lana)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
+
+    /** Returns the words spoken after the wake word, or null when none of the heard alternatives had it. */
+    private fun wakeMatch(list: List<String>): String? {
+        for (t in list) {
+            val m = WAKE_STRONG.find(t) ?: WAKE_WEAK.find(t)
+            if (m != null) return t.substring(m.range.last + 1).trim()
+        }
+        return null
+    }
+
+    private fun triggerWake(rest: String) {
+        ensureChibi()
+        if (hidden) showChibi()
+        if (!panelOpen) openPanel()
+        if (rest.length >= 3) sendUserText(rest, true) else startListening()
+        scheduleWake(3000)
+    }
 
     private fun scheduleWake(delay: Long) { main.postDelayed({ startWake() }, delay) }
 
@@ -1424,15 +1444,18 @@ class CompanionService : Service() {
     }
 
     private fun startWake() {
-        if (!running || !Agent.wake(this) || wakeSr != null || recognizer != null) return
-        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        if (!running) return
+        if (!Agent.wake(this)) { wakeState = "off"; return }
+        if (wakeSr != null || recognizer != null) return
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { wakeState = "no-mic"; scheduleWake(6000); return }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { wakeState = "no-recognizer"; return }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (!pm.isInteractive || typing != null) { scheduleWake(4000); return }
+        if (!pm.isInteractive) { wakeState = "screen-off"; scheduleWake(4000); return }
+        if (typing != null) { wakeState = "busy"; scheduleWake(4000); return }
         val sr = SpeechRecognizer.createSpeechRecognizer(this)
         wakeSr = sr
         sr.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onReadyForSpeech(params: Bundle?) { wakeState = "listening"; wakeFails = 0 }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
@@ -1441,26 +1464,31 @@ class CompanionService : Service() {
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onError(error: Int) {
                 endWake()
-                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) return
-                scheduleWake(if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 3000 else 500)
+                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { wakeState = "no-mic"; scheduleWake(6000); return }
+                val quiet = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                if (quiet) { wakeFails = 0; wakeState = "listening" } else { wakeFails++; wakeState = "error:$error" }
+                scheduleWake(when {
+                    error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 3000L
+                    wakeFails > 5 -> 8000L
+                    quiet -> 250L
+                    else -> 600L
+                })
             }
             override fun onResults(results: Bundle?) {
-                val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
-                val m = WAKE.find(t)
+                val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
+                val rest = wakeMatch(list)
                 endWake()
-                if (m == null) { scheduleWake(300); return }
-                val rest = m.groupValues[1].trim()
-                ensureChibi()
-                if (hidden) showChibi()
-                if (!panelOpen) openPanel()
-                if (rest.length >= 3) sendUserText(rest, true) else startListening()
+                if (rest == null) { scheduleWake(200); return }
+                triggerWake(rest)
             }
         })
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, cfg.persona.voiceLang)
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-        try { sr.startListening(i) } catch (ex: Exception) { endWake(); scheduleWake(5000) }
+        try { sr.startListening(i) } catch (ex: Exception) { endWake(); wakeState = "error:5"; scheduleWake(5000) }
     }
 
     private fun startListening() {

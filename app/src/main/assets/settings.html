@@ -116,8 +116,8 @@ nav button.on{color:var(--act)}
   <div class="dh"><span id="dDot" class="dot"></span><div>Nana<small id="dSub">your tiny phone companion</small></div></div>
   <div id="dnav"></div>
   <div class="dsec">Appearance</div>
-  <div class="dseg glass" id="modeSeg"></div>
-  <div class="swatches" id="accSw"></div>
+  <div class="dseg glass modeSeg"></div>
+  <div class="swatches accSw"></div>
   <div class="dsec">Quick actions</div>
   <button class="dl" onclick="toggleRun();toggleMenu(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg><span id="dRun">Start Nana</span></button>
   <button class="dl" onclick="Android.summon();toggleMenu(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>Call her</button>
@@ -135,8 +135,27 @@ nav button.on{color:var(--act)}
   </div>
   <div class="btns" style="margin-top:0"><button class="b ghost" style="flex:1" onclick="Android.summon()">Call her</button><button class="b ghost" style="flex:1" onclick="Android.openBrowser()">Her browser</button></div>
 
+  <div id="attn" class="card" style="display:none"></div>
+
+  <h2>Reminders</h2>
+  <div class="card"><div id="remList" class="mut">None. Say: "remind me in 30 min to drink water".</div></div>
+
+  <h2>Recent actions <a href="#" onclick="logClear();return false">Clear</a></h2>
+  <div class="card"><div id="logList" class="mut">Nothing yet.</div></div>
+
+</section>
+
+<!-- SETTINGS: setup -->
+<section id="cfg">
   <h2>Setup <span id="setupCount" class="tag"></span></h2>
   <div class="card" id="setup"></div>
+
+  <h2>Hey Nana</h2>
+  <div class="card">
+    <label class="sw"><span>Wake word<small>say "Hey Nana" or just "Nana, ..." (screen on only)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
+    <div class="setrow" style="border-bottom:0"><span class="mut">Status</span><span id="wakeStat" class="tag">...</span></div>
+    <p class="mut">Needs the microphone permission, internet (Google speech) and the screen on. Some phones play a tiny beep each time it re-listens. If it stays on "error", turn Hey Nana off and on again.</p>
+  </div>
 
   <h2>Abilities</h2>
   <div class="card">
@@ -144,29 +163,54 @@ nav button.on{color:var(--act)}
     <label class="sw"><span>Allow actions<small>open apps, tap, type, click</small></span><input type="checkbox" id="agAct" onchange="agSave()"></label>
     <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
     <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
-    <label class="sw"><span>Hey Nana<small>say "Nana, ..." to wake her (screen on only, uses mic + battery)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
-    <p class="mut">Try: "open YouTube and search lo-fi", "what's on my screen?". She never types passwords, cards or OTPs and never acts unless you ask.</p>
+    <p class="mut">She never types passwords, cards or OTPs and never acts unless you ask.</p>
   </div>
-
-  <h2>Reminders</h2>
-  <div class="card"><div id="remList" class="mut">None. Say: "remind me in 30 min to drink water".</div></div>
 
   <h2>Ways to call her</h2>
   <div class="card mut">
     Hold the <b>power button</b> or swipe from a corner (after choosing Nana as default assistant)<br>
+    Say <b>"Hey Nana"</b> (turn it on above)<br>
     Quick Settings tile: edit tiles and add <b>Call Nana</b><br>
     Notification buttons: <b>Call / Hide / Stop</b><br>
-    Hold on her for the radial menu
+    Select text in any app, then <b>Ask Nana</b>
   </div>
+</section>
 
-  <h2>Recent actions <a href="#" onclick="logClear();return false">Clear</a></h2>
-  <div class="card"><div id="logList" class="mut">Nothing yet.</div></div>
+<!-- SETTINGS: appearance -->
+<section id="look">
+  <h2>Theme</h2>
+  <div class="card">
+    <div class="dseg modeSeg" style="margin:0"></div>
+    <div class="swatches accSw" style="margin:16px 4px 4px"></div>
+    <p class="mut">Mono is white on dark and black on light. Black is pure AMOLED black. Her floating chat and radial menu use the accent but stay dark so they read on any app.</p>
+  </div>
+  <h2>Preview</h2>
+  <div class="card">
+    <div class="hero"><div class="hl"><span class="dot ok"></span><div><b>Nana</b><div class="mut">This is how it looks</div></div></div><button class="b">Button</button></div>
+    <label class="sw" style="margin-top:8px"><span>A switch</span><input type="checkbox" checked></label>
+    <div style="margin-top:6px"><span class="pill">Ready</span></div>
+  </div>
+</section>
 
+<!-- SETTINGS: data -->
+<section id="data">
   <h2>Backup</h2>
   <details class="p"><summary><span><b>Export / import settings</b></span><span class="tag">keys inside</span></summary>
     <textarea id="bk" placeholder="Settings JSON appears here"></textarea>
     <div class="btns" style="margin-bottom:14px"><button class="b ghost" onclick="exp()">Export</button><button class="b ghost" onclick="imp()">Import</button></div>
   </details>
+  <h2>Clean up</h2>
+  <div class="card">
+    <div class="setrow"><span>Recent actions log<div class="mut">what she did on your phone</div></span><button class="b ghost" onclick="logClear();this.textContent='Cleared'">Clear</button></div>
+    <div class="setrow"><span>Provider stats<div class="mut">calls, failures, latency</div></span><button class="b ghost" onclick="Android.resetStats();this.textContent='Reset'">Reset</button></div>
+    <div class="setrow"><span>Memory<div class="mut">things she remembers about you</div></span><button class="b ghost" onclick="tab('mem')">Open</button></div>
+  </div>
+  <h2>About</h2>
+  <div class="card mut">
+    Nana, your tiny phone companion.<br>
+    Characters: LivLiv (livliv.ai), shown with LivLiv Player (Apache-2.0). Personal, non-commercial use.<br>
+    Private build: do not share the APK.
+  </div>
 </section>
 
 <!-- MEMORY -->
@@ -398,17 +442,18 @@ function save(){ clearTimeout(timer); timer = setTimeout(() => Android.saveConfi
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
 // ---------- tabs ----------
-const ICONS = {home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',ai:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="3"/></svg>',pers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',mem:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>'};
+const ICONS = {gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',ai:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="3"/></svg>',pers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',mem:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>'};
 const IC_OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
 const IC_NO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const GROUPS = {
   home:{t:'Home',h:'Home',i:ICONS.home,s:[['home','Home']]},
   ai:{t:'AI',h:'AI models',i:ICONS.ai,s:[['prov','Providers'],['route','Routing'],['stats','Stats']]},
   nana:{t:'Nana',h:'Nana',i:ICONS.pers,s:[['pers','Personality'],['beh','Behaviour'],['voice','Voice']]},
-  mem:{t:'Memory',h:'Memory',i:ICONS.mem,s:[['mem','Memory']]}
+  mem:{t:'Memory',h:'Memory',i:ICONS.mem,s:[['mem','Memory']]},
+  set:{t:'Settings',h:'Settings',i:ICONS.gear,s:[['cfg','Setup'],['look','Appearance'],['data','Data']],hide:true,single:true}
 };
 const lastSub = {};
-$('nav').innerHTML = Object.keys(GROUPS).map(k => `<button data-t="${k}" onclick="tab('${k}')">${GROUPS[k].i}${GROUPS[k].t}</button>`).join('');
+$('nav').innerHTML = Object.keys(GROUPS).filter(k => !GROUPS[k].hide).map(k => `<button data-t="${k}" onclick="tab('${k}')">${GROUPS[k].i}${GROUPS[k].t}</button>`).join('');
 function toggleMenu(f){ const o = (f === undefined) ? !$('drawer').classList.contains('open') : f; $('drawer').classList.toggle('open', o); $('scrim').classList.toggle('on', o); }
 function tab(id){
   const g = GROUPS[id] ? id : Object.keys(GROUPS).find(k => GROUPS[k].s.some(x => x[0] === id));
@@ -441,11 +486,13 @@ function applyTheme(save){
   const s = document.documentElement.style;
   s.setProperty('--ac',ac); s.setProperty('--ac2',ac2); s.setProperty('--onac',on); s.setProperty('--act',act); s.setProperty('--acr',hx(ac).join(','));
   document.documentElement.dataset.mode = TH.mode;
-  $('modeSeg').innerHTML = [['dark','Dark'],['black','Black'],['light','Light']].map(m => `<button class="${TH.mode===m[0]?'on':''}" onclick="setMode('${m[0]}')">${m[1]}</button>`).join('');
-  $('accSw').innerHTML = Object.keys(ACC).map(k => {
+  const modeHtml = [['dark','Dark'],['black','Black'],['light','Light']].map(m => `<button class="${TH.mode===m[0]?'on':''}" onclick="setMode('${m[0]}')">${m[1]}</button>`).join('');
+  document.querySelectorAll('.modeSeg').forEach(e => e.innerHTML = modeHtml);
+  const accHtml = Object.keys(ACC).map(k => {
     const bgc = k === 'mono' ? 'linear-gradient(135deg,#fff 50%,#15171b 50%)' : ACC[k][1];
     return `<button class="${TH.accent===k?'on':''}" style="background:${bgc}" title="${ACC[k][0]}" onclick="setAcc('${k}')"></button>`;
   }).join('');
+  document.querySelectorAll('.accSw').forEach(e => e.innerHTML = accHtml);
   if (save) { try { Android.setTheme(TH.accent, TH.mode); } catch (e) {} }
 }
 function setAcc(k){ TH.accent = k; applyTheme(true); }
@@ -454,7 +501,7 @@ function buildDrawerNav(){
   const cur = (document.querySelector('section.on') || {}).id;
   $('dnav').innerHTML = Object.keys(GROUPS).map(k => {
     const g = GROUPS[k];
-    if (g.s.length === 1) return `<button class="dl ${cur===g.s[0][0]?'on':''}" onclick="tab('${g.s[0][0]}')">${g.i}${g.t}</button>`;
+    if (g.s.length === 1 || g.single) return `<button class="dl ${g.s.some(x => x[0]===cur)?'on':''}" onclick="tab('${k}')">${g.i}${g.t}</button>`;
     return `<div class="dsec">${g.h}</div>` + g.s.map(x => `<button class="dl sub ${cur===x[0]?'on':''}" onclick="tab('${x[0]}')">${x[1]}</button>`).join('');
   }).join('');
 }
@@ -472,16 +519,27 @@ function renderStatus(){
   if ($('dRun')) $('dRun').textContent = RUN ? 'Stop Nana' : 'Start Nana';
   if ($('dDot')) $('dDot').className = 'dot' + (RUN ? ' ok' : '');
   if ($('dSub')) $('dSub').textContent = RUN ? 'running on your screen' : 'your tiny phone companion';
+  let bat = true; try { if (Android.batteryOk) bat = !!Android.batteryOk(); } catch (e) {}
   const items = [
     ['Overlay permission', s.overlay, 'Android.openOverlaySettings()'],
     ['Microphone & notifications', s.mic && s.notif, 'Android.requestPerms()'],
     ['Screen control', s.access, 'Android.openAccessibility()'],
-    ['Notification access', s.notifAccess, 'Android.openNotifAccess()']
+    ['Notification access', s.notifAccess, 'Android.openNotifAccess()'],
+    ['Run in background (battery)', bat, 'Android.batteryRequest()']
   ];
   const n = items.filter(x => x[1]).length;
   $('setupCount').textContent = n + '/' + items.length + ' ready';
+  const miss = items.length - n;
+  if ($('attn')) { $('attn').style.display = miss ? 'block' : 'none'; $('attn').innerHTML = miss ? `<div class="hero"><div><b>${miss} setup ${miss===1?'item needs':'items need'} attention</b><div class="mut">Nana works best when these are on</div></div><button class="b" onclick="tab('cfg')">Fix</button></div>` : ''; }
+  try { if (Android.getWakeState && $('wakeStat')) { const w = Android.getWakeState(); $('wakeStat').textContent = WS(w); } } catch (e) {}
   $('setup').innerHTML = items.map(x => `<div class="setrow"><span>${x[0]}</span>${x[1] ? '<span class="pill">Ready</span>' : `<button class="b" onclick="${x[2]}">Enable</button>`}</div>`).join('')
     + '<div class="setrow"><span>Default assistant<div class="mut">power-button hold opens her</div></span><button class="b ghost" onclick="Android.openAssistSettings()">Set</button></div>';
+}
+function WS(w){
+  const m = {off:'Off', listening:'Listening for "Nana"', 'no-mic':'Microphone permission missing', 'no-recognizer':'No speech recognizer (enable the Google app)', 'screen-off':'Waiting, screen is off', busy:'Paused while she works'};
+  if (m[w]) return m[w];
+  if (/^error:/.test(w)) { const c = +w.slice(6); const n = {1:'network timeout',2:'no internet',3:'audio problem',4:'server error',5:'client error',8:'recognizer busy',11:'server disconnected',12:'language not supported',13:'language unavailable'}[c]; return 'Retrying (' + (n || 'error ' + c) + ')'; }
+  return w;
 }
 function toggleRun(){ if (RUN) Android.stop(); else Android.start(); setTimeout(renderStatus, 900); setTimeout(renderStatus, 2500); }
 function refreshStatus(){
