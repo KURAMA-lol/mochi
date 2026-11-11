@@ -30,9 +30,9 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
             p.strokeCap = Paint.Cap.ROUND
             when (state) {
                 2, 3 -> {
-                    p.style = Paint.Style.FILL; p.color = if (state == 2) 0xFF5EEAD4.toInt() else 0xFFE9778F.toInt()
+                    p.style = Paint.Style.FILL; p.color = if (state == 2) 0xFFE8E9EC.toInt() else 0xFFE9778F.toInt()
                     c.drawCircle(cx, cy, r, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = 0xFF03211F.toInt()
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = 0xFF0E0F12.toInt()
                     if (state == 2) {
                         c.drawLine(cx - 3f * dn, cy, cx - 1f * dn, cy + 2.4f * dn, p)
                         c.drawLine(cx - 1f * dn, cy + 2.4f * dn, cx + 3.2f * dn, cy - 2.4f * dn, p)
@@ -42,7 +42,7 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
                     }
                 }
                 1 -> {
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = 0xFFF59E6C.toInt()
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = 0xFFFF9F6E.toInt()
                     c.drawCircle(cx, cy, r, p)
                     val ph = (SystemClock.uptimeMillis() % 1100L) / 1100f
                     val rr = (2f + 2.8f * (0.5f + 0.5f * sin(ph * 2f * PI.toFloat()))) * dn
@@ -62,9 +62,9 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
         val dot = Dot(context, dn)
         val line = View(context).apply { setBackgroundColor(0x33FFFFFF) }
         val tv = TextView(context).apply { textSize = 13.5f; minHeight = dp(18); gravity = Gravity.CENTER_VERTICAL }
-        val tm = TextView(context).apply { textSize = 11f; setTextColor(0x88EAFAF6.toInt()) }
+        val tm = TextView(context).apply { textSize = 11f; setTextColor(0x88F2F3F5.toInt()) }
         val det = TextView(context).apply {
-            textSize = 11.5f; typeface = Typeface.MONOSPACE; setTextColor(0xB3EAFAF6.toInt()); setPadding(0, dp(4), 0, 0)
+            textSize = 11.5f; typeface = Typeface.MONOSPACE; setTextColor(0xB3F2F3F5.toInt()); setPadding(0, dp(4), 0, 0)
             visibility = View.GONE
         }
         val box = LinearLayout(context)
@@ -92,7 +92,7 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
         fun refresh() {
             dot.state = state; dot.invalidate()
             tv.text = title
-            tv.setTextColor(when (state) { 0 -> 0x88EAFAF6.toInt(); 1 -> 0xFFFFFFFF.toInt(); 3 -> 0xFFFFB4C0.toInt(); else -> 0xFFEAFAF6.toInt() })
+            tv.setTextColor(when (state) { 0 -> 0x88F2F3F5.toInt(); 1 -> 0xFFFFFFFF.toInt(); 3 -> 0xFFFFB4C0.toInt(); else -> 0xFFF2F3F5.toInt() })
             tv.typeface = if (state == 1) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             tm.text = if (ms >= 0 && state >= 2) fmt(ms) else ""
             if (open) { det.visibility = View.VISIBLE; det.text = if (detail.isEmpty()) "No details for this step." else detail }
@@ -102,7 +102,7 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
 
     private fun fmt(ms: Long) = if (ms < 1000) "${ms}ms" else String.format(java.util.Locale.US, "%.1fs", ms / 1000.0)
 
-    private val header = TextView(ctx).apply { textSize = 11.5f; setTextColor(0xAAEAFAF6.toInt()); setPadding(0, 0, 0, dp(8)) }
+    private val header = TextView(ctx).apply { textSize = 11.5f; setTextColor(0xAAF2F3F5.toInt()); setPadding(0, 0, 0, dp(8)) }
     private val rowsBox = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
     private val order = ArrayList<Row>()
     private val start = SystemClock.uptimeMillis()

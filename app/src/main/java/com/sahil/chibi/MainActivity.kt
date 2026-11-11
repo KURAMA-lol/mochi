@@ -55,10 +55,10 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             fitsSystemWindows = true
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF0B3033.toInt(), 0xFF071416.toInt()))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFF17181D.toInt(), 0xFF0E0F12.toInt()))
         }
-        window.statusBarColor = 0xFF0B3033.toInt()
-        window.navigationBarColor = 0xFF0C1B1D.toInt()
+        window.statusBarColor = 0xFF17181D.toInt()
+        window.navigationBarColor = 0xFF0E0F12.toInt()
         header = FrameLayout(this)
         val hh = (dm.heightPixels * 0.33f).toInt().coerceIn(dp(230), dp(330))
         root.addView(header, LinearLayout.LayoutParams(-1, hh))
@@ -67,7 +67,7 @@ class MainActivity : Activity() {
                 gradientType = GradientDrawable.RADIAL_GRADIENT
                 gradientRadius = dp(170).toFloat()
                 setGradientCenter(0.5f, 0.75f)
-                colors = intArrayOf(0x665EEAD4, 0x00000000)
+                colors = intArrayOf(0x40FF9F6E, 0x00000000)
             }
         }
         header.addView(glow, FrameLayout.LayoutParams(-1, -1))
@@ -82,11 +82,11 @@ class MainActivity : Activity() {
         }
         bubble = TextView(this).apply {
             textSize = 14f
-            setTextColor(0xFF0E2A2B.toInt())
+            setTextColor(0xFF1A1411.toInt())
             setPadding(dp(14), dp(9), dp(14), dp(9))
             maxWidth = (dm.widthPixels * 0.7f).toInt()
             background = GradientDrawable().apply {
-                setColor(0xFFEFFEFA.toInt()); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFF5EEAD4.toInt())
+                setColor(0xFFFFF4EC.toInt()); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFFFF9F6E.toInt())
             }
             alpha = 0f
         }

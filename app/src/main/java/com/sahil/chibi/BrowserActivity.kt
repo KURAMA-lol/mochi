@@ -20,7 +20,7 @@ class BrowserActivity : Activity() {
         val d = resources.displayMetrics.density
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF0C1B1D.toInt())
+            setBackgroundColor(0xFF0E0F12.toInt())
             fitsSystemWindows = true
         }
         val bar = LinearLayout(this).apply {
@@ -31,8 +31,8 @@ class BrowserActivity : Activity() {
         et = EditText(this).apply {
             setSingleLine()
             hint = "Search or type a link"
-            setTextColor(0xFFEAFAF6.toInt())
-            setHintTextColor(0x88EAFAF6.toInt())
+            setTextColor(0xFFF2F3F5.toInt())
+            setHintTextColor(0x88F2F3F5.toInt())
             imeOptions = EditorInfo.IME_ACTION_GO
         }
         val go = Button(this).apply { text = "Go" }

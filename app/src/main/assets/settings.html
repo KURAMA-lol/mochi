@@ -5,244 +5,232 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Nana</title>
 <style>
-:root{--bg:#0c1b1d;--card:#13282b;--card2:#1a3438;--tx:#eafaf6;--mut:#8fb3ae;--ac:#5eead4;--ac2:#f59e6c;--ok:#7ef0b0;--bad:#ff7a8a;--line:#244247}
+:root{--bg:#0e0f12;--card:#16181d;--card2:#1d2026;--tx:#f2f3f5;--mut:#8c919d;--ac:#ff9f6e;--ac2:#ff9f6e;--ok:#ff9f6e;--bad:#ff7a7a;--line:#262a31}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{background:transparent}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif;padding-bottom:80px;min-height:100vh;border-radius:28px 28px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.35)}
-header{padding:18px 18px 4px;display:flex;align-items:center;gap:10px}
-header h1{font-size:22px;margin:0;letter-spacing:.3px;color:var(--ac)}
-header small{color:var(--mut)}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0a1618;border-top:1px solid var(--line);z-index:5}
-nav button{flex:1;background:none;border:0;color:var(--mut);padding:12px 0 14px;font-size:12px}
-nav button.on{color:var(--ac);font-weight:600}
-nav button span{display:block;font-size:19px}
-section{display:none;padding:8px 14px}
+html{background:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;border-radius:26px 26px 0 0;padding-bottom:90px}
+#top{position:sticky;top:0;z-index:6;background:var(--bg);border-radius:26px 26px 0 0;padding:16px 18px 8px}
+#pgName{font-size:22px;font-weight:700;letter-spacing:-.01em}
+#seg{display:flex;gap:4px;margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px}
+#seg:empty{display:none}
+#seg button{flex:1;border:0;background:none;color:var(--mut);padding:8px 0;border-radius:10px;font:inherit;font-size:13.5px;font-weight:600}
+#seg button.on{background:var(--card2);color:var(--tx);box-shadow:0 0 0 1px var(--line)}
+section{display:none;padding:4px 16px 8px}
 section.on{display:block}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px 16px;margin:12px 0}
-h2{font-size:15px;margin:14px 2px 4px;color:var(--ac)}
-label{display:block;color:var(--mut);font-size:12px;margin:10px 0 3px}
-input,select,textarea{width:100%;background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin:10px 0}
+details.p{background:var(--card);border:1px solid var(--line);border-radius:16px;margin:10px 0;padding:0 14px}
+details.p[open]{border-color:#3a3f49}
+details.p summary{padding:13px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+details.p summary::-webkit-details-marker{display:none}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:10px 0}
+h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);font-weight:600;margin:22px 4px 6px;display:flex;justify-content:space-between;align-items:baseline}
+h2 a{color:var(--ac);text-transform:none;letter-spacing:0;font-size:12.5px;text-decoration:none;font-weight:500}
+label{display:block;color:var(--mut);font-size:12px;margin:12px 0 4px}
+input,select,textarea{width:100%;background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:inherit;outline:0}
+input:focus,select:focus,textarea:focus{border-color:var(--ac)}
 textarea{min-height:120px}
-input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
-input[type=range]{padding:0}
+input[type=checkbox]{width:auto;margin-right:8px;accent-color:var(--ac);transform:scale(1.25)}
+input[type=range]{padding:0;accent-color:var(--ac)}
 .sw{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;margin:0;border-bottom:1px solid var(--line);color:var(--tx);font-size:14.5px}
 .sw:last-of-type{border-bottom:0}
 .sw small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
-.sw input[type=checkbox]{-webkit-appearance:none;appearance:none;width:48px;height:28px;min-width:48px;border-radius:99px;background:#2a4549;border:0;position:relative;padding:0;margin:0;transform:none;transition:background .2s}
-.sw input[type=checkbox]::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#cfe6e2;transition:left .2s}
+.sw input[type=checkbox]{-webkit-appearance:none;appearance:none;width:46px;height:27px;min-width:46px;border-radius:99px;background:#2c3038;border:0;position:relative;padding:0;margin:0;transform:none;transition:background .2s}
+.sw input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#e8e9ec;transition:left .2s}
 .sw input[type=checkbox]:checked{background:var(--ac)}
-.sw input[type=checkbox]:checked::after{left:24px;background:#03211f}
-.btns.g>*{flex:1 1 40%}
-.btns.g .wide{flex:1 1 100%}
-button.b{min-height:46px}
-.stat{display:flex;align-items:center;gap:8px;font-size:13px;margin:2px 0 10px}
-.dot{width:10px;height:10px;border-radius:50%;background:var(--bad)}.dot.ok{background:var(--ok)}
-.row{display:flex;gap:8px}.row>*{flex:1}
-button.b{background:var(--ac2);color:#2a1206;border:0;border-radius:14px;padding:11px 14px;font:inherit;font-weight:600}
-button.b.pink{background:var(--ac);color:#03211f}
+.sw input[type=checkbox]:checked::after{left:22px;background:#1a0d05}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btns.g>*{flex:1 1 40%}.btns.g .wide{flex:1 1 100%}
+button.b{background:var(--ac);color:#1a0d05;border:0;border-radius:13px;padding:11px 14px;font:inherit;font-weight:600;min-height:44px}
+button.b:active{opacity:.85}
 button.b.ghost{background:var(--card2);color:var(--tx);border:1px solid var(--line)}
-button.b.red{background:#3b1d22;color:#ffb0bb}
-.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.chip{display:inline-block;padding:4px 10px;border-radius:99px;font-size:12px;margin:3px 4px 3px 0;background:#3b1d22;color:var(--bad)}
-.chip.ok{background:#12372f;color:var(--ok)}
-.mut{color:var(--mut);font-size:12.5px}
-details.p{background:var(--card);border:1px solid var(--line);border-radius:16px;margin:10px 0;padding:0 14px}
-details.p summary{padding:13px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:8px}
-details.p summary::-webkit-details-marker{display:none}
-.tag{font-size:11px;font-weight:400;color:var(--mut)}
-.res{margin-top:8px;font-size:12.5px;word-break:break-word}
-.res.ok{color:var(--ok)}.res.bad{color:var(--bad)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
-th{color:var(--mut);font-weight:500;font-size:12px}
-.rule{background:var(--card2);border-radius:12px;padding:10px;margin:8px 0}
-.order span{display:inline-block;background:var(--ac2);border-radius:8px;padding:3px 9px;margin:3px 4px 3px 0;font-size:13px}
-
-/* ---- liquid glass ---- */
-body{background:radial-gradient(420px 320px at 90% 0%,rgba(94,234,212,.26),transparent 70%),radial-gradient(380px 340px at -5% 38%,rgba(245,158,108,.18),transparent 70%),radial-gradient(420px 420px at 100% 85%,rgba(130,150,255,.18),transparent 70%),#0a1719;background-attachment:fixed;padding-bottom:30px}
-header{position:sticky;top:0;z-index:6;padding:12px 14px;margin:0;background:rgba(10,23,25,.45);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);border-bottom:1px solid rgba(255,255,255,.12);border-radius:28px 28px 0 0}
-header h1{font-size:19px;line-height:1.1}
-header small{display:block;font-size:12px}
-#menuBtn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:0;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-#menuBtn i{display:block;width:20px;height:2.5px;border-radius:2px;background:var(--tx)}
-#scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:9}
-#scrim.on{opacity:1;pointer-events:auto}
-nav{top:0;bottom:0;right:auto;left:0;width:76%;max-width:290px;flex-direction:column;padding:22px 12px;gap:6px;z-index:10;transform:translateX(-108%);transition:transform .28s cubic-bezier(.2,.8,.2,1);background:rgba(12,30,33,.55);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);border:0;border-right:1px solid rgba(255,255,255,.18);box-shadow:inset -1px 0 0 rgba(255,255,255,.08),12px 0 40px rgba(0,0,0,.45);border-radius:0 26px 26px 0}
-nav.open{transform:none}
-nav .dh{font-size:22px;font-weight:700;color:var(--ac);padding:8px 12px 16px}
-nav .dh small{display:block;font-size:12px;font-weight:400;color:var(--mut);margin-top:2px}
-nav button{flex:none;display:flex;align-items:center;gap:12px;text-align:left;padding:14px 14px;border-radius:16px;font-size:15px;color:var(--tx);border:1px solid transparent}
-nav button span{display:inline-block;width:30px;font-size:21px}
-nav button.on{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.28);color:var(--ac)}
-.card,details.p,.rule{background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.16);-webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 10px 28px rgba(0,0,0,.28)}
-.card{border-radius:24px;padding:16px 16px}
-input,select,textarea{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
-button.b{border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 14px rgba(0,0,0,.25)}
-button.b.pink{background:linear-gradient(160deg,#8ff5e3,#3fd6bd);color:#03211f}
-button.b.ghost{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
-button.b.red{background:rgba(255,100,120,.18);border:1px solid rgba(255,120,140,.35);color:#ffc2cb}
-h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:20px 4px 2px;opacity:.9}
-.chip{background:rgba(255,90,110,.16);border:1px solid rgba(255,120,140,.25)}
-.chip.ok{background:rgba(94,234,160,.14);border:1px solid rgba(126,240,176,.28)}
-.sw{border-bottom:1px solid rgba(255,255,255,.1)}
-.sw input[type=checkbox]{background:rgba(255,255,255,.16);box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
-.sw input[type=checkbox]:checked{background:linear-gradient(160deg,#8ff5e3,#3fd6bd)}
-
-.chip svg,.res svg{width:12px;height:12px;vertical-align:-1px;margin-right:2px}
-nav button svg{width:22px;height:22px}
-.pd{display:inline-block;width:9px;height:9px;border-radius:50%;background:#52666a;margin-right:6px;vertical-align:1px}
-.pd.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+button.b.red{background:rgba(255,122,122,.12);color:#ffaaaa;border:1px solid rgba(255,122,122,.25)}
 button.b svg{width:14px;height:14px;vertical-align:-2px}
+.mut{color:var(--mut);font-size:12.5px}
+p.mut{margin:10px 2px 0}
+.tag{font-size:11.5px;font-weight:400;color:var(--mut)}
+.pn{display:flex;align-items:center;gap:10px;min-width:0}.pn .tag{display:block}.pn b{font-weight:600}
+.pd{display:inline-block;flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:#444a55}.pd.on{background:var(--ac)}
+.dot{width:10px;height:10px;border-radius:50%;background:#444a55;flex:0 0 10px}.dot.ok{background:var(--ac);box-shadow:0 0 0 4px rgba(255,159,110,.16)}
+.res{margin-top:8px;font-size:12.5px;word-break:break-word}
+.res.ok{color:var(--ac)}.res.bad{color:var(--bad)}
+.res svg{width:12px;height:12px;vertical-align:-1px;margin-right:2px}
+.order span{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:3px 10px;margin:3px 4px 3px 0;font-size:13px}
+.hero{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hero .hl{display:flex;align-items:center;gap:12px}
+.hero b{font-size:16px}
+.hero button{min-width:96px}
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.setrow:last-child{border-bottom:0}
+.pill{font-size:12px;padding:4px 11px;border-radius:99px;background:rgba(255,159,110,.14);color:var(--ac);font-weight:600}
+.setrow button.b{min-height:34px;padding:6px 14px;font-size:13px}
+.kpis{display:flex;gap:8px;margin:10px 0}
+.kpi{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center}
+.kpi b{display:block;font-size:20px;letter-spacing:-.01em}.kpi span{font-size:11.5px;color:var(--mut)}
+.pc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:10px 0}
+.pc .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.bar{height:6px;border-radius:9px;background:var(--card2);margin:9px 0 7px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac);border-radius:9px}
+.pc .m{display:flex;gap:14px;font-size:12px;color:var(--mut)}
+.li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.li:last-child{border-bottom:0}
+.li span{flex:1;font-size:14px}.li small{display:block;color:var(--mut);font-size:11.5px}
+button.x{background:none;border:0;color:var(--mut);padding:6px}button.x svg{width:16px;height:16px}
+.lg{font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--mut)}.lg:last-child{border-bottom:0}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(14,15,18,.97);border-top:1px solid var(--line);z-index:8}
+nav button{flex:1;background:none;border:0;color:var(--mut);padding:9px 0 11px;font:inherit;font-size:11.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:22px;height:22px}
+nav button.on{color:var(--ac)}
 </style>
 </head>
 <body>
-<header><button id="menuBtn" onclick="toggleMenu()" aria-label="Menu"><i></i><i></i><i></i></button><div><h1>Nana</h1><small id="pgName">Home</small></div></header>
-<div id="scrim" onclick="toggleMenu(false)"></div>
+<div id="top"><div id="pgName">Home</div><div id="seg"></div></div>
 
 <!-- HOME -->
 <section id="home" class="on">
-  <div class="card">
-    <div id="chips"></div>
-    <div class="btns g">
-      <button class="b ghost" onclick="Android.openOverlaySettings()">1 · Allow overlay</button>
-      <button class="b ghost" onclick="Android.requestPerms()">2 · Mic + notifications</button>
-    </div>
-    <div class="btns g">
-      <button class="b pink wide" onclick="Android.start()">Start Nana</button>
-      <button class="b" onclick="Android.summon()">Call her</button>
-      <button class="b red" onclick="Android.stop()">Stop</button>
-    </div>
-    <p class="mut">Add an API key in the <b>APIs</b> tab first. Tap her to chat, hold to poke, drag up and she drops down.</p>
+  <div class="card hero">
+    <div class="hl"><span id="hDot" class="dot"></span><div><b id="hTxt">Nana is off</b><div class="mut" id="hSub">Tap Start to bring her out</div></div></div>
+    <button id="hBtn" class="b" onclick="toggleRun()">Start</button>
   </div>
-  <h2>Tools &amp; screen control</h2>
+  <div class="btns" style="margin-top:0"><button class="b ghost" style="flex:1" onclick="Android.summon()">Call her</button><button class="b ghost" style="flex:1" onclick="Android.openBrowser()">Her browser</button></div>
+
+  <h2>Setup <span id="setupCount" class="tag"></span></h2>
+  <div class="card" id="setup"></div>
+
+  <h2>Abilities</h2>
   <div class="card">
-    <div class="stat"><span id="scDot" class="dot"></span><span id="scTxt">Checking screen control...</span></div>
     <label class="sw"><span>Use tools<small>web, her browser, phone screen</small></span><input type="checkbox" id="agOn" onchange="agSave()"></label>
     <label class="sw"><span>Allow actions<small>open apps, tap, type, click</small></span><input type="checkbox" id="agAct" onchange="agSave()"></label>
-    <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
     <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
-    <label class="sw"><span>Hey Nana<small>say "Nana, ..." and she wakes up (screen on only, uses mic + battery)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
-    <div class="btns g">
-      <button class="b ghost" onclick="Android.openAccessibility()">Screen control settings</button>
-      <button class="b ghost" onclick="Android.openNotifAccess()">Notification access</button>
-      <button class="b ghost wide" onclick="Android.openAssistSettings()">Set Nana as default assistant</button>
-      <button class="b ghost" onclick="Android.openBrowser()">Open her browser</button>
-    </div>
-    <p class="mut">Try: "open YouTube and search lo-fi", "what's on my screen?". She never types passwords. If screen control shows red, turn Nana ON in Accessibility settings. Default assistant: pick <b>Nana</b> under "Default digital assistant app", then your power-button hold or corner swipe opens her.</p>
+    <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
+    <label class="sw"><span>Hey Nana<small>say "Nana, ..." to wake her (screen on only, uses mic + battery)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
+    <p class="mut">Try: "open YouTube and search lo-fi", "what's on my screen?". She never types passwords, cards or OTPs and never acts unless you ask.</p>
   </div>
+
   <h2>Reminders</h2>
   <div class="card"><div id="remList" class="mut">None. Say: "remind me in 30 min to drink water".</div></div>
-  <h2>Other ways to call her</h2>
+
+  <h2>Ways to call her</h2>
   <div class="card mut">
-    • Notification buttons: <b>Call / Hide / Stop</b><br>
-    • Quick Settings tile: edit your tiles and add <b>Call Nana</b><br>
-    • Home-screen icon <b>Call Nana</b> (long-press it and drag it to your home screen)
+    Hold the <b>power button</b> or swipe from a corner (after choosing Nana as default assistant)<br>
+    Quick Settings tile: edit tiles and add <b>Call Nana</b><br>
+    Notification buttons: <b>Call / Hide / Stop</b><br>
+    Hold on her for the radial menu
   </div>
-  <h2>Recent actions <a href="#" onclick="logClear();return false" style="font-size:12px;font-weight:normal">clear</a></h2>
+
+  <h2>Recent actions <a href="#" onclick="logClear();return false">Clear</a></h2>
   <div class="card"><div id="logList" class="mut">Nothing yet.</div></div>
-  <h2>Backup / restore settings</h2>
-  <div class="card">
+
+  <h2>Backup</h2>
+  <details class="p"><summary><span><b>Export / import settings</b></span><span class="tag">keys inside</span></summary>
     <textarea id="bk" placeholder="Settings JSON appears here"></textarea>
-    <div class="btns">
-      <button class="b ghost" onclick="exp()">Export</button>
-      <button class="b ghost" onclick="imp()">Import</button>
-    </div>
-    <p class="mut">Contains your API keys. Keep it private.</p>
-  </div>
+    <div class="btns" style="margin-bottom:14px"><button class="b ghost" onclick="exp()">Export</button><button class="b ghost" onclick="imp()">Import</button></div>
+  </details>
 </section>
 
 <!-- MEMORY -->
 <section id="mem">
-  <h2>What Nana remembers <span id="memCount" class="mut"></span></h2>
+  <h2>Saved <span id="memCount" class="tag"></span></h2>
   <div class="card">
+    <input id="memQ" placeholder="Search memory" oninput="memLoad()" style="margin-bottom:6px">
     <div id="memList" class="mut">Loading...</div>
   </div>
   <div class="card">
-    <label>Add something for her to remember</label>
-    <div class="row"><input id="memNew" placeholder="e.g. My number is 93877..., exam on 12th"><button class="b pink" style="flex:0 0 auto" onclick="memAdd()">Add</button></div>
+    <label style="margin-top:0">Add something for her to remember</label>
+    <div class="row"><input id="memNew" placeholder="e.g. exam on the 12th"><button class="b" style="flex:0 0 auto" onclick="memAdd()">Add</button></div>
     <div id="memMsg" class="mut" style="margin-top:6px"></div>
     <div class="btns"><button class="b red" onclick="if(confirm('Forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
-    <p class="mut">Nana also saves important things you tell her while chatting. She never stores passwords, codes or card numbers. Tap the cross to remove one.</p>
+    <p class="mut">Nana also saves important things you tell her while chatting. She never stores passwords, codes or card numbers.</p>
   </div>
 </section>
 
 <!-- PROVIDERS -->
 <section id="prov">
+  <div class="btns" style="margin-top:6px"><button class="b ghost" style="flex:1" onclick="testAll()">Test all</button></div>
   <div id="plist"></div>
+  <h2>Add provider</h2>
   <div class="card">
-    <label>Add API provider</label>
     <select id="preset"></select>
-    <div class="btns"><button class="b pink" onclick="addProvider()">+ Add</button></div>
-    <p class="mut">Any OpenAI-compatible API works (Groq, OpenRouter, DeepSeek, Together, Ollama, your own Grok wrapper...). Pick "Custom" and paste its base URL.</p>
+    <div class="btns"><button class="b" onclick="addProvider()">+ Add</button></div>
+    <p class="mut">Any OpenAI-compatible API works (Groq, OpenRouter, DeepSeek, Together, Ollama, your own wrapper...). Pick "Custom" and paste its base URL.</p>
   </div>
 </section>
 
 <!-- ROUTING -->
 <section id="route">
+  <h2>Strategy</h2>
   <div class="card">
-    <label>Strategy</label>
     <select id="strategy" onchange="R('strategy',this.value);hint()"></select>
     <div class="mut" id="shint" style="margin-top:6px"></div>
     <div class="row">
-      <div><label>Retries / provider</label><input type="number" min="0" max="3" id="retries" onchange="R('retries',+this.value)"></div>
-      <div><label>Cooldown (sec)</label><input type="number" min="5" id="cooldownSec" onchange="R('cooldownSec',+this.value)"></div>
-      <div><label>Trip after N fails</label><input type="number" min="1" id="failThreshold" onchange="R('failThreshold',+this.value)"></div>
+      <div><label>Retries</label><input type="number" min="0" max="3" id="retries" onchange="R('retries',+this.value)"></div>
+      <div><label>Cooldown (s)</label><input type="number" min="5" id="cooldownSec" onchange="R('cooldownSec',+this.value)"></div>
+      <div><label>Trip after</label><input type="number" min="1" id="failThreshold" onchange="R('failThreshold',+this.value)"></div>
     </div>
-    <label style="display:flex;align-items:center"><input type="checkbox" id="fallback" onchange="R('fallback',this.checked)">Fall back to other providers when the chosen ones fail</label>
+    <label class="sw" style="margin-top:8px"><span>Fall back to other providers<small>when the chosen ones fail</small></span><input type="checkbox" id="fallback" onchange="R('fallback',this.checked)"></label>
   </div>
-
-  <h2>Rules <span class="mut">(first match wins)</span></h2>
+  <h2>Rules <span class="tag">first match wins</span></h2>
   <div id="rules"></div>
-  <div class="btns"><button class="b ghost" onclick="addRule()">+ Add rule</button></div>
-  <p class="mut">Example: <i>regex</i> "code|python|bug" → <i>tag:code</i>. Or <i>voice</i> → <i>tag:fast</i>. Give providers tags in the APIs tab.</p>
-
+  <div class="btns" style="margin-top:0"><button class="b ghost" onclick="addRule()">+ Add rule</button></div>
+  <p class="mut">Example: regex "code|python|bug" → tag:code. Give providers tags in the Providers tab.</p>
   <h2>Route tester</h2>
   <div class="card">
     <input id="dtext" placeholder="Type a message to see who would answer...">
-    <label style="display:flex;align-items:center"><input type="checkbox" id="dvoice">as voice input</label>
+    <label class="sw" style="margin-top:6px"><span>As voice input</span><input type="checkbox" id="dvoice"></label>
     <div class="btns"><button class="b" onclick="dry()">Test route</button></div>
     <div id="dres" class="res"></div>
   </div>
 </section>
 
-<!-- PERSONA -->
+<!-- STATS -->
+<section id="stats">
+  <div id="stSum" class="kpis"></div>
+  <div id="st"></div>
+  <div class="btns"><button class="b ghost" onclick="loadStats()">Refresh</button><button class="b ghost" onclick="Android.resetStats();loadStats()">Reset</button></div>
+  <p class="mut">Paused means the circuit breaker stopped using that provider for a while after repeated failures.</p>
+</section>
+
+<!-- PERSONALITY -->
 <section id="pers">
   <div class="card">
     <div class="row">
-      <div><label>Her name</label><input id="name" oninput="Pz('name',this.value)"></div>
-      <div><label>Your name</label><input id="userName" oninput="Pz('userName',this.value)"></div>
+      <div><label style="margin-top:0">Her name</label><input id="name" oninput="Pz('name',this.value)"></div>
+      <div><label style="margin-top:0">Your name</label><input id="userName" oninput="Pz('userName',this.value)"></div>
     </div>
-    <label>Personality prompt <span class="mut">({name} and {user} get filled in)</span></label>
+    <label>Personality prompt <span class="tag">({name} and {user} get filled in)</span></label>
     <textarea id="prompt" style="min-height:220px" oninput="Pz('prompt',this.value)"></textarea>
     <div class="btns"><button class="b ghost" onclick="resetPrompt()">Reset prompt</button></div>
   </div>
   <div class="card">
-    <label>Size: <span id="sizev"></span></label>
-    <input type="range" min="80" max="240" id="size" oninput="document.getElementById('sizev').textContent=this.value;Pz('size',+this.value)">
-    <label style="display:flex;align-items:center"><input type="checkbox" id="walking" onchange="Pz('walking',this.checked)">She roams around the screen</label>
-    <label style="display:flex;align-items:center"><input type="checkbox" id="idleChatter" onchange="Pz('idleChatter',this.checked)">Random little remarks (free, no API)</label>
-    <label>AI remarks every N minutes (0 = off, uses your API)</label>
-    <input type="number" min="0" id="aiChatterMin" onchange="Pz('aiChatterMin',+this.value)">
-    <label>Messages of memory sent to the AI</label>
-    <input type="number" min="2" max="40" id="history" onchange="Pz('history',+this.value)">
-  </div>
-  <div class="card">
-    <label>Character</label>
-    <div style="font-size:15px;margin:6px 0">Nana</div>
-    <div class="mut" style="font-size:12px">Characters: LivLiv (livliv.ai). Shown with LivLiv Player (Apache-2.0). Free for personal, non-commercial use; not for sale or redistribution.</div>
-    <div id="nanaErr" style="color:#ff8a8a;font-size:12px;margin-top:6px"></div>
+    <label style="margin-top:0">Character</label>
+    <div style="font-size:15px;margin:4px 0">Nana</div>
+    <div class="mut">Characters: LivLiv (livliv.ai). Shown with LivLiv Player (Apache-2.0). Free for personal, non-commercial use; not for sale or redistribution.</div>
+    <div id="nanaErr" style="color:var(--bad);font-size:12px;margin-top:6px"></div>
   </div>
   <script>
   function nanaErr(){try{var i=JSON.parse(Android.modelInfo());document.getElementById('nanaErr').textContent=i.error?('Nana could not start, showing the plain sprite: '+i.error):'';}catch(x){}}
   setTimeout(nanaErr,500);setInterval(nanaErr,4000);
   </script>
-  <div class="card" style="display:none">
-    <label>Character style</label>
-    <select id="style" onchange="Pz('style',this.value)">
-      <option value="pixel">Pixel art</option><option value="smooth">Original (smooth)</option>
-    </select>
+</section>
+
+<!-- BEHAVIOUR -->
+<section id="beh">
+  <div class="card">
+    <label style="margin-top:0">Size: <span id="sizev"></span></label>
+    <input type="range" min="80" max="240" id="size" oninput="document.getElementById('sizev').textContent=this.value;Pz('size',+this.value)">
+    <label class="sw" style="margin-top:8px"><span>She roams the screen</span><input type="checkbox" id="walking" onchange="Pz('walking',this.checked)"></label>
+    <label class="sw"><span>Little remarks<small>free, no API used</small></span><input type="checkbox" id="idleChatter" onchange="Pz('idleChatter',this.checked)"></label>
   </div>
   <div class="card">
-    <label>Speak replies out loud</label>
+    <label style="margin-top:0">AI remarks every N minutes <span class="tag">(0 = off, uses your API)</span></label>
+    <input type="number" min="0" id="aiChatterMin" onchange="Pz('aiChatterMin',+this.value)">
+    <label>Messages of memory sent to the AI</label>
+    <input type="number" min="2" max="40" id="history" onchange="Pz('history',+this.value)">
+  </div>
+</section>
+
+<!-- VOICE -->
+<section id="voice">
+  <div class="card">
+    <label style="margin-top:0">Speak replies out loud</label>
     <select id="ttsMode" onchange="Pz('ttsMode',this.value)">
       <option value="never">Never</option><option value="voice">Only when I used voice</option><option value="always">Always</option>
     </select>
@@ -300,7 +288,7 @@ button.b svg{width:14px;height:14px;vertical-align:-2px}
     <div class="btns"><button class="b" onclick="vTest()">Test voice</button></div>
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:6px"></div>
   </div>
-  <script>
+    <script>
   var VC={engine:'system',local:{sid:3,speed:1},openai:{},eleven:{}};
   var LV=[["Female - warm (af_heart)",3],["Female - bella",2],["Female - nicole (soft)",6],["Female - sarah",9],["Female - sky",10],["Female - nova",7],["Female - jessica",4],["Female - alloy",0],["Female - aoede",1],["Female - kore",5],["Female - river",8],["Male - adam",11],["Male - michael",16],["Male - puck",18],["Male - echo",12],["Male - liam",15],["Male - onyx",17],["Male - fenrir",14],["British F - emma",21],["British F - isabella",22],["British F - alice",20],["British F - lily",23],["British M - george",26],["British M - lewis",27],["British M - daniel",24],["British M - fable",25],["Hindi F - alpha",31],["Hindi F - beta",32],["Hindi M - omega",33],["Hindi M - psi",34]];
   function vg(i){return document.getElementById(i)}
@@ -340,16 +328,7 @@ button.b svg{width:14px;height:14px;vertical-align:-2px}
   </script>
 </section>
 
-<!-- STATS -->
-<section id="stats">
-  <div class="card"><table id="st"></table>
-    <div class="btns"><button class="b ghost" onclick="loadStats()">Refresh</button><button class="b ghost" onclick="Android.resetStats();loadStats()">Reset</button></div>
-  </div>
-  <p class="mut">Cooldown &gt; 0 means the circuit breaker paused that provider after repeated failures.</p>
-</section>
-
 <nav id="nav"></nav>
-
 <script>
 // ---------- tiny mock so the page also opens in a normal browser ----------
 if (!window.Android) {
@@ -376,31 +355,60 @@ function save(){ clearTimeout(timer); timer = setTimeout(() => Android.saveConfi
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
 // ---------- tabs ----------
-const ICONS = {home:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',prov:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg>',route:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',pers:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg>',stats:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11M10 20V4M16 20v-6M2 21h20"/></svg>',mem:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>'};
+const ICONS = {home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',ai:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="3"/></svg>',pers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>',mem:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>'};
 const IC_OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
 const IC_NO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-const tabs = [['home',ICONS.home,'Home'],['prov',ICONS.prov,'APIs'],['route',ICONS.route,'Routing'],['pers',ICONS.pers,'Her'],['stats',ICONS.stats,'Stats'],['mem',ICONS.mem,'Memory']];
-$('nav').innerHTML = '<div class="dh">Nana<small>your tiny phone companion</small></div>' + tabs.map(t => `<button data-t="${t[0]}" onclick="tab('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
-function toggleMenu(f){ const o = (f === undefined) ? !$('nav').classList.contains('open') : f; $('nav').classList.toggle('open', o); $('scrim').classList.toggle('on', o); }
+const GROUPS = {
+  home:{t:'Home',h:'Home',i:ICONS.home,s:[['home','Home']]},
+  ai:{t:'AI',h:'AI models',i:ICONS.ai,s:[['prov','Providers'],['route','Routing'],['stats','Stats']]},
+  nana:{t:'Nana',h:'Nana',i:ICONS.pers,s:[['pers','Personality'],['beh','Behaviour'],['voice','Voice']]},
+  mem:{t:'Memory',h:'Memory',i:ICONS.mem,s:[['mem','Memory']]}
+};
+const lastSub = {};
+$('nav').innerHTML = Object.keys(GROUPS).map(k => `<button data-t="${k}" onclick="tab('${k}')">${GROUPS[k].i}${GROUPS[k].t}</button>`).join('');
+function toggleMenu(){}
 function tab(id){
-  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === id));
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === id));
-  if (id === 'stats') loadStats();
-  if (id === 'mem') memLoad();
-  if (id === 'route') renderRoute();
-  const tt = tabs.find(t => t[0] === id); if (tt && $('pgName')) $('pgName').textContent = tt[2];
-  toggleMenu(false);
+  const g = GROUPS[id] ? id : Object.keys(GROUPS).find(k => GROUPS[k].s.some(x => x[0] === id));
+  if (!g) return;
+  const sec = GROUPS[id] ? (lastSub[id] || GROUPS[id].s[0][0]) : id;
+  lastSub[g] = sec;
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === sec));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === g));
+  $('pgName').textContent = GROUPS[g].h;
+  $('seg').innerHTML = GROUPS[g].s.length > 1 ? GROUPS[g].s.map(x => `<button class="${x[0]===sec?'on':''}" onclick="tab('${x[0]}')">${x[1]}</button>`).join('') : '';
+  if (sec === 'stats') loadStats();
+  if (sec === 'mem') memLoad();
+  if (sec === 'route') renderRoute();
   window.scrollTo(0,0);
 }
 
 // ---------- home ----------
-function refreshStatus(){
+let RUN = false;
+function renderStatus(){
   const s = JSON.parse(Android.getStatus());
-  const c = (ok, t) => `<span class="chip ${ok?'ok':''}">${ok?IC_OK:IC_NO} ${t}</span>`;
-  $('chips').innerHTML = c(s.overlay,'overlay permission') + c(s.mic,'microphone') + c(s.notif,'notifications') + c(s.running,'Nana running') + c(s.access,'screen control') + c(s.notifAccess,'notification access');
-  try { var d=document.getElementById('scDot'); if(d){d.className='dot'+(s.access?' ok':'');document.getElementById('scTxt').textContent=s.access?'Screen control is ON':'Screen control is OFF - tap Screen control settings and turn Nana on'} } catch (e) {}
+  RUN = !!s.running;
+  $('hDot').className = 'dot' + (RUN ? ' ok' : '');
+  $('hTxt').textContent = RUN ? 'Nana is running' : 'Nana is off';
+  $('hSub').textContent = RUN ? 'She is on your screen' : 'Tap Start to bring her out';
+  $('hBtn').textContent = RUN ? 'Stop' : 'Start';
+  $('hBtn').className = 'b' + (RUN ? ' red' : '');
+  const items = [
+    ['Overlay permission', s.overlay, 'Android.openOverlaySettings()'],
+    ['Microphone & notifications', s.mic && s.notif, 'Android.requestPerms()'],
+    ['Screen control', s.access, 'Android.openAccessibility()'],
+    ['Notification access', s.notifAccess, 'Android.openNotifAccess()']
+  ];
+  const n = items.filter(x => x[1]).length;
+  $('setupCount').textContent = n + '/' + items.length + ' ready';
+  $('setup').innerHTML = items.map(x => `<div class="setrow"><span>${x[0]}</span>${x[1] ? '<span class="pill">Ready</span>' : `<button class="b" onclick="${x[2]}">Enable</button>`}</div>`).join('')
+    + '<div class="setrow"><span>Default assistant<div class="mut">power-button hold opens her</div></span><button class="b ghost" onclick="Android.openAssistSettings()">Set</button></div>';
+}
+function toggleRun(){ if (RUN) Android.stop(); else Android.start(); setTimeout(renderStatus, 900); setTimeout(renderStatus, 2500); }
+function refreshStatus(){
+  renderStatus();
   try { memLoad(); agLoad(); } catch (e) {}
 }
+setInterval(function(){ try { renderStatus(); } catch (e) {} }, 4000);
 function exp(){ $('bk').value = JSON.stringify(cfg, null, 1); }
 function imp(){
   try { const j = JSON.parse($('bk').value); cfg = j; Android.saveConfig(JSON.stringify(cfg)); renderAll(); alert('Imported'); }
@@ -436,6 +444,7 @@ function addProvider(){
 function P(i,k,v){ cfg.providers[i][k] = v; save(); }
 function T(i,v){ P(i,'type',v); renderProviders(); const d = document.querySelectorAll('#plist details')[i]; if (d) d.open = true; }
 function delProvider(i){ if (confirm('Delete ' + cfg.providers[i].name + '?')) { cfg.providers.splice(i,1); save(); renderProviders(); } }
+function testAll(){ cfg.providers.forEach((p,i) => { if (p.enabled) { const t = $('tst'+i); if (t) { t.textContent = 'Testing...'; t.style.color = ''; } testP(i); } }); }
 function testP(i){
   const el = $('res'+i); el.className = 'res'; el.textContent = 'Testing...';
   Android.testProvider(JSON.stringify(cfg.providers[i]));
@@ -444,11 +453,12 @@ window.onTest = (id, ok, text) => {
   const i = cfg.providers.findIndex(p => p.id === id); if (i < 0) return;
   const el = $('res'+i); if (!el) return;
   el.className = 'res ' + (ok ? 'ok' : 'bad'); el.innerHTML = (ok ? IC_OK : IC_NO) + ' ' + esc(text);
+  const tt = $('tst'+i); if (tt) { tt.textContent = ok ? 'Working' : 'Failed'; tt.style.color = ok ? 'var(--ac)' : 'var(--bad)'; }
 };
 function renderProviders(){
   $('plist').innerHTML = cfg.providers.map((p,i) => `
   <details class="p">
-    <summary><span><i class="pd ${p.enabled?'on':''}"></i> ${esc(p.name)} <span class="tag">${esc(p.model)}</span></span><span class="tag">#${p.priority}</span></summary>
+    <summary><span class="pn"><i class="pd ${p.enabled?'on':''}"></i><span><b>${esc(p.name)}</b><span class="tag" id="tst${i}">${esc(p.model||p.type)}${(!p.apiKey&&p.type!=='generic')?' · no key':''}</span></span></span><span class="tag">#${p.priority}</span></summary>
     <label>Name</label><input value="${esc(p.name)}" oninput="P(${i},'name',this.value)">
     <label>API type</label>
     <select onchange="T(${i},this.value)">
@@ -528,7 +538,7 @@ function renderRoute(){
 function dry(){
   const r = JSON.parse(Android.dryRun($('dtext').value, $('dvoice').checked));
   $('dres').innerHTML = (r.rule ? `<div class="mut">Matched rule: ${esc(r.rule)}</div>` : '<div class="mut">No rule matched - strategy order</div>')
-    + '<div class="order">' + (r.order.map((n,i) => `<span>${i+1}. ${esc(n)}</span>`).join('') || '<span style="background:#4a2030">no usable providers</span>') + '</div>';
+    + '<div class="order">' + (r.order.map((n,i) => `<span>${i+1}. ${esc(n)}</span>`).join('') || '<span style="color:var(--bad)">no usable providers</span>') + '</div>';
 }
 
 // ---------- persona ----------
@@ -544,8 +554,15 @@ function renderPersona(){
 // ---------- stats ----------
 function loadStats(){
   const rows = JSON.parse(Android.getStats());
-  $('st').innerHTML = '<tr><th>Provider</th><th>Calls</th><th>Fails</th><th>Avg</th><th>Pause</th></tr>' +
-    rows.map(r => `<tr><td>${esc(r.name)}${r.lastError?`<div class="mut">${esc(r.lastError)}</div>`:''}</td><td>${r.calls}</td><td>${r.fails}</td><td>${r.avgMs}ms</td><td>${r.cooldownSec}s</td></tr>`).join('');
+  const tc = rows.reduce((a,r) => a + r.calls, 0), tf = rows.reduce((a,r) => a + r.fails, 0);
+  $('stSum').innerHTML = `<div class="kpi"><b>${tc}</b><span>requests</span></div><div class="kpi"><b>${tc ? Math.max(0, Math.round((tc-tf)/tc*100)) : 100}%</b><span>success</span></div><div class="kpi"><b>${rows.filter(r => r.cooldownSec > 0).length}</b><span>paused</span></div>`;
+  $('st').innerHTML = rows.map(r => {
+    const ok = r.calls ? Math.max(0, Math.round((r.calls - r.fails) / r.calls * 100)) : 0;
+    return `<div class="pc"><div class="t"><b>${esc(r.name)}</b><span class="tag">${r.calls ? ok + '% ok' : 'unused'}</span></div>
+      <div class="bar"><i style="width:${ok}%"></i></div>
+      <div class="m"><span>${r.calls} calls</span><span>${r.fails} fails</span><span>${r.avgMs} ms avg</span>${r.cooldownSec > 0 ? `<span style="color:var(--bad)">paused ${r.cooldownSec}s</span>` : ''}</div>
+      ${r.lastError ? `<div class="mut" style="margin-top:6px">${esc(r.lastError)}</div>` : ''}</div>`;
+  }).join('') || '<div class="card mut">No data yet. Chat with Nana first.</div>';
 }
 
 function renderAll(){ refreshStatus(); renderProviders(); renderRoute(); renderPersona(); }
@@ -554,12 +571,12 @@ renderAll(); tab('home');
 <script>
 function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
-function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid #0001">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
+function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div class="lg">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
 function wakeSave(){try{Android.setWake(document.getElementById('wakeOn').checked)}catch(x){}}
-function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.1)"><span style="flex:1;color:var(--tx)">'+esc(r.text)+'<br><small>'+new Date(r.at).toLocaleString()+'</small></span><button class="b red" style="padding:6px 12px;min-height:0" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
+function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div class="li"><span>'+esc(r.text)+'<small>'+new Date(r.at).toLocaleString()+'</small></span><button class="x" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
-function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}el.innerHTML=a.map(function(t,i){return '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;color:var(--tx)">'+esc(t)+'</span><button class="b ghost" style="padding:4px 10px" onclick="Android.deleteMemory('+i+');memLoad()">&#10005;</button></div>'}).join('')}catch(x){el.textContent='Could not load memory: '+x}}
-function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved \u2713':r;i.value='';memLoad()}
+function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}var q=((document.getElementById('memQ')||{value:''}).value||'').trim().toLowerCase();var h=a.map(function(t,i){return [t,i]}).filter(function(p){return !q||p[0].toLowerCase().indexOf(q)>=0}).map(function(p){return '<div class="li"><span>'+esc(p[0])+'</span><button class="x" onclick="Android.deleteMemory('+p[1]+');memLoad()">'+IC_NO+'</button></div>'}).join('');el.innerHTML=h||'No match.'}catch(x){el.textContent='Could not load memory: '+x}}
+function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved':r;i.value='';memLoad()}
 window.addEventListener('load',function(){agLoad();memLoad();logLoad()});
 </script>
 </body>
