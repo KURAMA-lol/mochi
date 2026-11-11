@@ -217,18 +217,17 @@ nav button.on{color:var(--act)}
 
 <!-- MEMORY -->
 <section id="mem">
-  <h2>Saved <span id="memCount" class="tag"></span></h2>
+  <div class="card" id="bond"></div>
   <div class="card">
-    <input id="memQ" placeholder="Search memory" oninput="memLoad()" style="margin-bottom:6px">
+    <label class="sw"><span>Learn about me automatically<small>she picks up lasting facts from our chats and grows with you (one small extra API call every few messages)</small></span><input type="checkbox" id="learnOn" onchange="learnSave()"></label>
+  </div>
+  <h2>What she knows <span id="memCount" class="tag"></span></h2>
+  <div class="card">
+    <input id="memQ" placeholder="Search what she knows" oninput="memLoad()" style="margin-bottom:6px">
     <div id="memList" class="mut">Loading...</div>
   </div>
-  <div class="card">
-    <label style="margin-top:0">Add something for her to remember</label>
-    <div class="row"><input id="memNew" placeholder="e.g. exam on the 12th"><button class="b" style="flex:0 0 auto" onclick="memAdd()">Add</button></div>
-    <div id="memMsg" class="mut" style="margin-top:6px"></div>
-    <div class="btns"><button class="b red" onclick="if(confirm('Forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
-    <p class="mut">Nana also saves important things you tell her while chatting. She never stores passwords, codes or card numbers.</p>
-  </div>
+  <div class="btns"><button class="b red" onclick="if(confirm('Make her forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
+  <p class="mut">She never stores passwords, codes, card or ID numbers. Tap the cross to make her forget one thing. You can also just tell her "forget that".</p>
 </section>
 
 <!-- PROVIDERS -->
@@ -715,8 +714,9 @@ function logLoad(){try{var el=document.getElementById('logList');if(!el||!Androi
 function wakeSave(){try{var on=document.getElementById('wakeOn').checked;var r=String(Android.setWake(on));var el=document.getElementById('wakeStat');if(on&&r==='mic')el.textContent='Allow the microphone in the popup';else if(on&&r==='overlay')el.textContent='Allow display over other apps first';setTimeout(renderStatus,1500)}catch(x){}}
 function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div class="li"><span>'+esc(r.text)+'<small>'+new Date(r.at).toLocaleString()+'</small></span><button class="x" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
-function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}var q=((document.getElementById('memQ')||{value:''}).value||'').trim().toLowerCase();var h=a.map(function(t,i){return [t,i]}).filter(function(p){return !q||p[0].toLowerCase().indexOf(q)>=0}).map(function(p){return '<div class="li"><span>'+esc(p[0])+'</span><button class="x" onclick="Android.deleteMemory('+p[1]+');memLoad()">'+IC_NO+'</button></div>'}).join('');el.innerHTML=h||'No match.'}catch(x){el.textContent='Could not load memory: '+x}}
-function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;var r='';try{r=String(Android.addMemory(t))}catch(x){r='Error: '+x}document.getElementById('memMsg').textContent=r==='Remembered.'?'Saved':r;i.value='';memLoad()}
+function bondLoad(){try{var el=document.getElementById('bond');if(!el||!Android.getBond)return;var b=JSON.parse(Android.getBond());el.innerHTML='<div class="kpis" style="margin:0"><div class="kpi"><b>'+(b.days||0)+'</b><span>days together</span></div><div class="kpi"><b>'+b.msgs+'</b><span>messages</span></div><div class="kpi"><b>'+b.facts+'</b><span>things I know</span></div></div>';if(Android.getLearn)document.getElementById('learnOn').checked=!!Android.getLearn()}catch(x){}}
+function learnSave(){try{Android.setLearn(document.getElementById('learnOn').checked)}catch(x){}}
+function memLoad(){var el=document.getElementById('memList');if(!el)return;bondLoad();try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing yet. Just chat with her, she learns by herself.';return}var q=((document.getElementById('memQ')||{value:''}).value||'').trim().toLowerCase();var h=a.map(function(t,i){return [t,i]}).reverse().filter(function(p){return !q||p[0].toLowerCase().indexOf(q)>=0}).map(function(p){return '<div class="li"><span>'+esc(p[0])+'</span><button class="x" onclick="Android.deleteMemory('+p[1]+');memLoad()">'+IC_NO+'</button></div>'}).join('');el.innerHTML=h||'No match.'}catch(x){el.textContent='Could not load memory: '+x}}
 window.addEventListener('load',function(){agLoad();memLoad();logLoad()});
 </script>
 </body>

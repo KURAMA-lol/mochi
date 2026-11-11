@@ -1330,6 +1330,7 @@ class CompanionService : Service() {
         if (typing != null) { Agent.stop(); cancelApproval(); endTyping(false) }
         addMsg(text, true, null)
         history.add(Msg("user", text))
+        Memory.bump(this)
         saveChat()
         while (history.size > 60) history.removeAt(0)
         val t = Timeline(this, text)
@@ -1368,6 +1369,7 @@ class CompanionService : Service() {
         addMsg(clean, false, "via ${res.provider.name} · ${res.ms}ms")
         val mode = cfg.persona.ttsMode
         say(clean, mood, spoken = mode == "always" || (mode == "voice" && voice))
+        Learner.after(this, cfg, history.takeLast(8).toList()) { _ -> main.post { if (typing == null) say("Noted, I'll remember that.", "happy") } }
     }
 
     private fun onError(msg: String) {

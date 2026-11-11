@@ -298,6 +298,9 @@ class MainActivity : Activity() {
         @JavascriptInterface fun getLog(): String = AuditLog.json(this@MainActivity)
         @JavascriptInterface fun clearLog() { AuditLog.clear(this@MainActivity) }
         @JavascriptInterface fun getMemory(): String = Memory.json(this@MainActivity)
+        @JavascriptInterface fun getLearn(): Boolean = Memory.learnOn(this@MainActivity)
+        @JavascriptInterface fun setLearn(on: Boolean) { Memory.setLearn(this@MainActivity, on) }
+        @JavascriptInterface fun getBond(): String = Memory.bond(this@MainActivity)
         @JavascriptInterface fun addMemory(t: String): String = Memory.add(this@MainActivity, t)
         @JavascriptInterface fun deleteMemory(i: Int) { Memory.removeAt(this@MainActivity, i) }
         @JavascriptInterface fun clearMemory() { Memory.clear(this@MainActivity) }
