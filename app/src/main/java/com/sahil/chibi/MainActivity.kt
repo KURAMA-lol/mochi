@@ -169,6 +169,15 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 7) {
+            val ok = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (ok) {
+                if (CompanionService.running) CompanionService.send(this, CompanionService.ACT_WAKE)
+                else if (Settings.canDrawOverlays(this)) CompanionService.send(this, CompanionService.ACT_START)
+            } else if (!shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + packageName))) } catch (e: Exception) {}
+            }
+        }
         web.evaluateJavascript("window.refreshStatus && refreshStatus()", null)
     }
 
@@ -257,9 +266,21 @@ class MainActivity : Activity() {
                 catch (e: Exception) { try { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {} }
             }
         }
-        @JavascriptInterface fun setWake(on: Boolean) {
+        @JavascriptInterface fun setWake(on: Boolean): String {
             Agent.setWake(this@MainActivity, on)
-            if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE)
+            if (!on) { if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE); return "off" }
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                runOnUiThread { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 7) }
+                return "mic"
+            }
+            if (!Settings.canDrawOverlays(this@MainActivity)) { openOverlaySettings(); return "overlay" }
+            if (!CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_START)
+            else CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE)
+            return "ok"
+        }
+        @JavascriptInterface fun getWakeHeard(): String = CompanionService.wakeHeard
+        @JavascriptInterface fun openAppSettings() {
+            runOnUiThread { try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + packageName))) } catch (e: Exception) {} }
         }
         @JavascriptInterface fun openAssistSettings() {
             runOnUiThread {

@@ -153,8 +153,10 @@ nav button.on{color:var(--act)}
   <h2>Hey Nana</h2>
   <div class="card">
     <label class="sw"><span>Wake word<small>say "Hey Nana" or just "Nana, ..." (screen on only)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
-    <div class="setrow" style="border-bottom:0"><span class="mut">Status</span><span id="wakeStat" class="tag">...</span></div>
-    <p class="mut">Needs the microphone permission, internet (Google speech) and the screen on. Some phones play a tiny beep each time it re-listens. If it stays on "error", turn Hey Nana off and on again.</p>
+    <div class="setrow"><span class="mut">Status</span><span id="wakeStat" class="tag">...</span></div>
+    <div class="setrow" style="border-bottom:0"><span class="mut">Last heard</span><span id="wakeHeard" class="tag">-</span></div>
+    <div class="btns"><button id="wakeFix" class="b" style="display:none" onclick="wakeSave()">Fix / retry</button><button class="b ghost" onclick="Android.openAppSettings()">App permissions</button></div>
+    <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Needs internet (Google speech) and the screen on. When she hears her name she pops up like the power button does, says Yes? and listens. "Last heard" shows what the phone understood, handy if it keeps missing.</p>
   </div>
 
   <h2>Abilities</h2>
@@ -531,12 +533,12 @@ function renderStatus(){
   $('setupCount').textContent = n + '/' + items.length + ' ready';
   const miss = items.length - n;
   if ($('attn')) { $('attn').style.display = miss ? 'block' : 'none'; $('attn').innerHTML = miss ? `<div class="hero"><div><b>${miss} setup ${miss===1?'item needs':'items need'} attention</b><div class="mut">Nana works best when these are on</div></div><button class="b" onclick="tab('cfg')">Fix</button></div>` : ''; }
-  try { if (Android.getWakeState && $('wakeStat')) { const w = Android.getWakeState(); $('wakeStat').textContent = WS(w); } } catch (e) {}
+  try { if (Android.getWakeState && $('wakeStat')) { const w = Android.getWakeState(); $('wakeStat').textContent = WS(w); const fx = $('wakeFix'); if (fx) fx.style.display = /^(no-mic|error:|no-recognizer)/.test(w) ? '' : 'none'; if (Android.getWakeHeard && $('wakeHeard')) $('wakeHeard').textContent = Android.getWakeHeard() || '-'; } } catch (e) {}
   $('setup').innerHTML = items.map(x => `<div class="setrow"><span>${x[0]}</span>${x[1] ? '<span class="pill">Ready</span>' : `<button class="b" onclick="${x[2]}">Enable</button>`}</div>`).join('')
     + '<div class="setrow"><span>Default assistant<div class="mut">power-button hold opens her</div></span><button class="b ghost" onclick="Android.openAssistSettings()">Set</button></div>';
 }
 function WS(w){
-  const m = {off:'Off', listening:'Listening for "Nana"', 'no-mic':'Microphone permission missing', 'no-recognizer':'No speech recognizer (enable the Google app)', 'screen-off':'Waiting, screen is off', busy:'Paused while she works'};
+  const m = {off:'Off', listening:'Listening for "Nana"', 'no-mic':'Microphone permission missing, tap Fix', 'no-recognizer':'No speech recognizer (enable the Google app)', 'screen-off':'Waiting, screen is off', busy:'Paused while she works'};
   if (m[w]) return m[w];
   if (/^error:/.test(w)) { const c = +w.slice(6); const n = {1:'network timeout',2:'no internet',3:'audio problem',4:'server error',5:'client error',8:'recognizer busy',11:'server disconnected',12:'language not supported',13:'language unavailable'}[c]; return 'Retrying (' + (n || 'error ' + c) + ')'; }
   return w;
@@ -710,7 +712,7 @@ renderAll(); tab('home'); applyTheme(false);
 function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
 function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div class="lg">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
-function wakeSave(){try{Android.setWake(document.getElementById('wakeOn').checked)}catch(x){}}
+function wakeSave(){try{var on=document.getElementById('wakeOn').checked;var r=String(Android.setWake(on));var el=document.getElementById('wakeStat');if(on&&r==='mic')el.textContent='Allow the microphone in the popup';else if(on&&r==='overlay')el.textContent='Allow display over other apps first';setTimeout(renderStatus,1500)}catch(x){}}
 function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div class="li"><span>'+esc(r.text)+'<small>'+new Date(r.at).toLocaleString()+'</small></span><button class="x" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
 function memLoad(){var el=document.getElementById('memList');if(!el)return;try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing saved yet. Tell Nana something important, or add it below.';return}var q=((document.getElementById('memQ')||{value:''}).value||'').trim().toLowerCase();var h=a.map(function(t,i){return [t,i]}).filter(function(p){return !q||p[0].toLowerCase().indexOf(q)>=0}).map(function(p){return '<div class="li"><span>'+esc(p[0])+'</span><button class="x" onclick="Android.deleteMemory('+p[1]+');memLoad()">'+IC_NO+'</button></div>'}).join('');el.innerHTML=h||'No match.'}catch(x){el.textContent='Could not load memory: '+x}}

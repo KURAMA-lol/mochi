@@ -64,6 +64,7 @@ class CompanionService : Service() {
         const val ACT_RELOAD = "chibi.reload"
         const val ACT_WAKE = "chibi.wake"
         @Volatile var wakeState = "off"
+        @Volatile var wakeHeard = ""
         const val ACT_SAY = "chibi.say"
         const val ACT_TALK = "chibi.talk"
         const val ACT_SHOW = "chibi.show"
@@ -1415,6 +1416,22 @@ class CompanionService : Service() {
     // ---- "Hey Nana" wake word: listens in short rounds while the screen is on ----
     private var wakeSr: SpeechRecognizer? = null
     private var wakeFails = 0
+
+    /** Nana is also the "assistant", and its own recognition service is only a stub, so always pick a real recognizer (Google) explicitly. */
+    private fun newRecognizer(): SpeechRecognizer {
+        try {
+            val list = packageManager.queryIntentServices(Intent(android.speech.RecognitionService.SERVICE_INTERFACE), 0)
+                .map { it.serviceInfo }.filter { it.packageName != packageName }
+            val pick = list.firstOrNull { it.packageName == "com.google.android.googlequicksearchbox" }
+                ?: list.firstOrNull { it.packageName.contains("google") } ?: list.firstOrNull()
+            if (pick != null) return SpeechRecognizer.createSpeechRecognizer(this, android.content.ComponentName(pick.packageName, pick.name))
+        } catch (ex: Exception) {}
+        return SpeechRecognizer.createSpeechRecognizer(this)
+    }
+
+    private fun recognizerAvailable(): Boolean = try {
+        packageManager.queryIntentServices(Intent(android.speech.RecognitionService.SERVICE_INTERFACE), 0).any { it.serviceInfo.packageName != packageName }
+    } catch (ex: Exception) { SpeechRecognizer.isRecognitionAvailable(this) }
     private val WAKE_STRONG = Regex("\\b(?:n[aeu]+n+[aeu]+h?|na\\s+na|nan\\s+a)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
     private val WAKE_WEAK = Regex("\\b(?:hey|hi|hello|ok|okay)\\s+(?:anna|hanna|hannah|nina|nona|lana)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
 
@@ -1427,11 +1444,12 @@ class CompanionService : Service() {
         return null
     }
 
+    /** Same wake-up as the power button: she pops up on screen, says "Yes?" and listens (or takes the command you said right after her name). */
     private fun triggerWake(rest: String) {
         ensureChibi()
         if (hidden) showChibi()
-        if (!panelOpen) openPanel()
-        if (rest.length >= 3) sendUserText(rest, true) else startListening()
+        if (rest.length >= 3) { if (!panelOpen) openPanel(); sendUserText(rest, true) }
+        else { say("Yes?", "happy"); main.postDelayed({ startListening() }, 350) }
         scheduleWake(3000)
     }
 
@@ -1448,11 +1466,11 @@ class CompanionService : Service() {
         if (!Agent.wake(this)) { wakeState = "off"; return }
         if (wakeSr != null || recognizer != null) return
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { wakeState = "no-mic"; scheduleWake(6000); return }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) { wakeState = "no-recognizer"; return }
+        if (!recognizerAvailable()) { wakeState = "no-recognizer"; return }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (!pm.isInteractive) { wakeState = "screen-off"; scheduleWake(4000); return }
         if (typing != null) { wakeState = "busy"; scheduleWake(4000); return }
-        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        val sr = newRecognizer()
         wakeSr = sr
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { wakeState = "listening"; wakeFails = 0 }
@@ -1476,6 +1494,7 @@ class CompanionService : Service() {
             }
             override fun onResults(results: Bundle?) {
                 val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: arrayListOf()
+                wakeHeard = list.firstOrNull() ?: ""
                 val rest = wakeMatch(list)
                 endWake()
                 if (rest == null) { scheduleWake(200); return }
@@ -1496,23 +1515,23 @@ class CompanionService : Service() {
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             addMsg("I need mic permission. Open the Nana app and tap 'Grant mic'.", false, null); return
         }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+        if (!recognizerAvailable()) {
             addMsg("No speech recognizer found on this phone (needs the Google app).", false, null); return
         }
         stopListening()
-        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        val sr = newRecognizer()
         sr.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) { micBtn?.setColorFilter(0xFFFF6B7A.toInt()); chibi?.mood = "excited" }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onError(error: Int) { stopListening() }
+            override fun onError(error: Int) { stopListening(); if (!panelOpen) say("I didn't catch that.", "neutral") }
             override fun onResults(results: Bundle?) {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 stopListening()
                 input?.setText("")
-                if (!text.isNullOrBlank()) sendUserText(text, true)
+                if (!text.isNullOrBlank()) { if (!panelOpen) openPanel(); sendUserText(text, true) }
             }
             override fun onPartialResults(partialResults: Bundle?) {
                 val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
