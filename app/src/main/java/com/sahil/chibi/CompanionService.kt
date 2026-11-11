@@ -107,6 +107,7 @@ class CompanionService : Service() {
     private var longFired = false
     private var radial: RadialMenu? = null
     private var lastPowerSay = 0L
+    private var panelV = -1
     private var lastGreet = 0L
     /** Short time-of-day hello when Nana is summoned (at most once per 30 min). Speaks nothing else, does nothing. */
     private fun greetNow() {
@@ -188,6 +189,7 @@ class CompanionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Theme.load(this)
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         cfg = ConfigStore.load(this)
         createChannel()
@@ -291,7 +293,7 @@ class CompanionService : Service() {
                 val c = LinearLayout(this)
                 c.orientation = LinearLayout.VERTICAL
                 c.setPadding(dp(16), dp(14), dp(16), dp(14))
-                c.background = GradientDrawable().apply { setColor(0xFF0E0F12.toInt()); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFFFF8A7A.toInt()) }
+                c.background = GradientDrawable().apply { setColor(Theme.panelBg); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFFFF8A7A.toInt()) }
                 val t = TextView(this)
                 t.text = "Nana wants to:\n" + what
                 t.setTextColor(0xFFF2F3F5.toInt())
@@ -319,7 +321,7 @@ class CompanionService : Service() {
                     row.addView(b, lpb)
                 }
                 btn("Deny", 0xFFFF8A7A.toInt(), false)
-                btn("Allow", 0xFFFF9F6E.toInt(), true)
+                btn("Allow", Theme.ac, true)
                 c.addView(row)
                 val (sw, sh) = screen()
                 val l = WindowManager.LayoutParams(
@@ -379,7 +381,7 @@ class CompanionService : Service() {
         val card = LinearLayout(this)
         card.orientation = LinearLayout.VERTICAL
         card.background = GradientDrawable().apply {
-            setColor(0xFF0E0F12.toInt()); cornerRadius = dp(16).toFloat(); setStroke(dp(2), 0xFFFF9F6E.toInt())
+            setColor(Theme.panelBg); cornerRadius = dp(16).toFloat(); setStroke(dp(2), Theme.ac)
         }
         card.clipToOutline = true
         val bar = LinearLayout(this)
@@ -388,7 +390,7 @@ class CompanionService : Service() {
         bar.setPadding(dp(12), dp(6), dp(6), dp(6))
         val title = TextView(this)
         title.text = "Nana's browser"
-        title.setTextColor(0xFFFF9F6E.toInt())
+        title.setTextColor(Theme.ac)
         title.textSize = 13f
         title.typeface = Typeface.DEFAULT_BOLD
         bar.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -680,6 +682,7 @@ class CompanionService : Service() {
     }
 
     private fun openRadial() {
+        Theme.load(this)
         if (radialOpen) return
         val items = listOf(
             RadialMenu.Item("chat", "Chat", R.drawable.ni_chat),
@@ -974,7 +977,7 @@ class CompanionService : Service() {
                 maxWidth = dp(230)
                 background = GradientDrawable().apply {
                     setColor(0xFFFFFFFF.toInt()); cornerRadius = dp(16).toFloat()
-                    setStroke(dp(2), 0xFFFF9F6E.toInt())
+                    setStroke(dp(2), Theme.ac)
                 }
             }
             bubble = b
@@ -1052,7 +1055,7 @@ class CompanionService : Service() {
     private fun refreshBusy() {
         val busy = typing != null
         subtitle?.text = if (busy) "working on it..." else "online"
-        subtitle?.setTextColor(if (busy) 0xFFFF9F6E.toInt() else 0xFFFFB892.toInt())
+        subtitle?.setTextColor(if (busy) Theme.ac else Theme.ac2)
         val empty = (input?.text?.toString()?.trim() ?: "").isEmpty()
         sendBtn?.setImageResource(if (busy && empty) R.drawable.ni_stop else R.drawable.ni_send)
     }
@@ -1106,7 +1109,7 @@ class CompanionService : Service() {
         setPadding(dp(11), dp(7), dp(13), dp(7))
         background = glass(0x1FFFFFFF, 0x33FFFFFF, 16)
         val d = this@CompanionService.getDrawable(res)?.mutate()
-        d?.setTint(0xFFFFB892.toInt()); d?.setBounds(0, 0, dp(15), dp(15))
+        d?.setTint(Theme.ac2); d?.setBounds(0, 0, dp(15), dp(15))
         setCompoundDrawables(d, null, null, null); compoundDrawablePadding = dp(6)
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(6) }
@@ -1130,7 +1133,7 @@ class CompanionService : Service() {
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(16), dp(10), dp(12), dp(12))
         root.background = GradientDrawable().apply {
-            setColor(0xEC0E0F12.toInt()); cornerRadius = dp(28).toFloat(); setStroke(dp(1), 0x2EFFFFFF)
+            setColor(Theme.alpha(Theme.panelBg, 0xEC)); cornerRadius = dp(28).toFloat(); setStroke(dp(1), 0x2EFFFFFF)
         }
         root.onBack = { closePanel() }
 
@@ -1139,7 +1142,7 @@ class CompanionService : Service() {
         titleRow.addView(TextView(this).apply {
             text = cfg.persona.name; textSize = 16f; setTextColor(0xFFFFFFFF.toInt()); typeface = Typeface.DEFAULT_BOLD
         })
-        val sub = TextView(this).apply { text = "online"; textSize = 11f; setTextColor(0xFFFFB892.toInt()); setPadding(dp(8), dp(2), 0, 0) }
+        val sub = TextView(this).apply { text = "online"; textSize = 11f; setTextColor(Theme.ac2); setPadding(dp(8), dp(2), 0, 0) }
         titleRow.addView(sub)
         header.addView(titleRow, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(ghostBtn(R.drawable.ni_clear) { clearChat() })
@@ -1189,15 +1192,16 @@ class CompanionService : Service() {
             })
         }
         val mic = ghostBtn(R.drawable.ni_mic) { if (recognizer == null) startListening() else stopListening() }
-        val send = iconBtn(R.drawable.ni_send, 0xFFFF9F6E.toInt(), 0xFF1A0D05.toInt()) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }.apply {
+        val send = iconBtn(R.drawable.ni_send, Theme.ac, Theme.onAc) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }.apply {
             layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(2) }
-            background = glass(0xFFFF9F6E.toInt(), 0x00000000, 18)
+            background = glass(Theme.ac, 0x00000000, 18)
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
         row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(mic); row.addView(send)
         root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8); rightMargin = dp(4) })
 
+        panelV = Theme.version
         panel = root; scroll = sc; listCol = col; input = et; micBtn = mic; sendBtn = send; subtitle = sub
         val (sw, sh) = screen()
         panelLp = WindowManager.LayoutParams(
@@ -1220,7 +1224,9 @@ class CompanionService : Service() {
 
     private fun openPanel() {
         if (panelOpen) return
+        Theme.load(this)
         cfg = ConfigStore.load(this)
+        if (panel != null && panelV != Theme.version) panel = null
         if (panel == null) buildPanel()
         hideBubble()
         val (_, sh) = screen()
@@ -1262,13 +1268,13 @@ class CompanionService : Service() {
             setText(md(msg), TextView.BufferType.SPANNABLE)
             textSize = 15f
             setLineSpacing(0f, 1.12f)
-            setLinkTextColor(0xFFFFB892.toInt())
+            setLinkTextColor(Theme.ac2)
             if (user) {
-                setTextColor(0xFF2A1208.toInt())
+                setTextColor(Theme.onAc)
                 setPadding(dp(13), dp(8), dp(13), dp(8))
                 maxWidth = (screen().first * 0.72f).toInt()
                 val r = dp(18).toFloat(); val k = dp(5).toFloat()
-                background = GradientDrawable().apply { setColor(0xFFFF9F6E.toInt()); cornerRadii = floatArrayOf(r, r, r, r, k, k, r, r) }
+                background = GradientDrawable().apply { setColor(Theme.ac); cornerRadii = floatArrayOf(r, r, r, r, k, k, r, r) }
             } else {
                 setTextColor(0xFFF2F3F5.toInt())
                 setPadding(dp(2), dp(2), dp(10), dp(2))

@@ -50,6 +50,27 @@ class MainActivity : Activity() {
         ui.postDelayed(hideBubbleRun, 3200)
     }
 
+    private lateinit var rootV: LinearLayout
+    private lateinit var glowV: View
+
+    private fun applyNativeTheme() {
+        if (!::rootV.isInitialized) return
+        rootV.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Theme.top, Theme.bg))
+        window.statusBarColor = Theme.top
+        window.navigationBarColor = Theme.bg
+        glowV.background = GradientDrawable().apply {
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            gradientRadius = dp(170).toFloat()
+            setGradientCenter(0.5f, 0.75f)
+            colors = intArrayOf(Theme.alpha(Theme.ac, 0x40), 0)
+        }
+        bubble.setTextColor(Theme.bubbleText)
+        bubble.background = GradientDrawable().apply { setColor(Theme.bubbleBg); cornerRadius = dp(18).toFloat(); setStroke(dp(2), Theme.ac) }
+        var f = 0
+        if (Theme.light) { f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR; if (android.os.Build.VERSION.SDK_INT >= 26) f = f or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR }
+        window.decorView.systemUiVisibility = f
+    }
+
     private fun buildUi() {
         val dm = resources.displayMetrics
         val root = LinearLayout(this).apply {
@@ -97,6 +118,7 @@ class MainActivity : Activity() {
             val kb = dm.heightPixels - r.bottom > dm.heightPixels * 0.18f
             header.visibility = if (kb) View.GONE else View.VISIBLE
         }
+        rootV = root; glowV = glow; applyNativeTheme()
         setContentView(root)
         val who = try { ConfigStore.load(this).persona.userName } catch (e: Exception) { "" }
         ui.postDelayed({ sayHome(if (who.isBlank()) "Hi! I'm Nana~" else "Hi $who! I'm Nana~") }, 1200)
@@ -128,6 +150,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Theme.load(this)
         web = WebView(this)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
@@ -222,6 +245,8 @@ class MainActivity : Activity() {
             }
         }
 
+        @JavascriptInterface fun getTheme(): String = Theme.json(this@MainActivity)
+        @JavascriptInterface fun setTheme(a: String, m: String) { Theme.save(this@MainActivity, a, m); runOnUiThread { applyNativeTheme() } }
         @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
         @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
         @JavascriptInterface fun setWake(on: Boolean) {

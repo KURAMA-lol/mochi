@@ -201,7 +201,7 @@ class RadialMenu(ctx: Context) : View(ctx) {
         p.shader = RadialGradient(px, py + 4f * d, r * 1.45f, intArrayOf(0x66000000, 0x00000000), floatArrayOf(0.55f, 1f), Shader.TileMode.CLAMP)
         p.alpha = 255; al(p, a); c.drawCircle(px, py + 4f * d, r * 1.45f, p)
         if (glowK > 0f) {
-            p.shader = RadialGradient(px, py, r * 2.1f, intArrayOf(0xAAFFB892.toInt(), 0x00FFB892), null, Shader.TileMode.CLAMP)
+            p.shader = RadialGradient(px, py, r * 2.1f, intArrayOf(Theme.alpha(Theme.ac2, 0xAA), Theme.alpha(Theme.ac2, 0)), null, Shader.TileMode.CLAMP)
             p.alpha = (255 * glowK).toInt(); al(p, a); c.drawCircle(px, py, r * 2.1f, p)
         }
         // frosted body
@@ -209,11 +209,11 @@ class RadialMenu(ctx: Context) : View(ctx) {
         p.shader = LinearGradient(px, py - r, px, py + r, intArrayOf(0x66FFFFFF, 0x10FFFFFF, 0x2EFFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         p.alpha = 255; al(p, a); c.drawCircle(px, py, r, p)
         if (glowK > 0f) {
-            p.shader = RadialGradient(px, py, r, intArrayOf(0x00FFB892, (0x88 * glowK).toInt() shl 24 or 0xFFB892), floatArrayOf(0.4f, 1f), Shader.TileMode.CLAMP)
+            p.shader = RadialGradient(px, py, r, intArrayOf(Theme.alpha(Theme.ac2, 0), ((0x88 * glowK).toInt() shl 24) or (Theme.ac2 and 0xFFFFFF)), floatArrayOf(0.4f, 1f), Shader.TileMode.CLAMP)
             p.alpha = 255; al(p, a); c.drawCircle(px, py, r, p)
         }
         // rim light
-        stroke.shader = LinearGradient(px - r, py - r, px + r, py + r, intArrayOf(0xEEFFFFFF.toInt(), 0x33FFFFFF, 0x99FFD9C2.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        stroke.shader = LinearGradient(px - r, py - r, px + r, py + r, intArrayOf(0xEEFFFFFF.toInt(), 0x33FFFFFF, Theme.alpha(Theme.ac2, 0x99)), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         stroke.alpha = 255; al(stroke, a); c.drawCircle(px, py, r - 0.7f * d, stroke)
         // specular crescent
         oval.set(px - r * 0.62f, py - r * 0.94f, px + r * 0.62f, py - r * 0.34f)

@@ -42,7 +42,7 @@ class Timeline(ctx: Context, private val request: String) : LinearLayout(ctx) {
                     }
                 }
                 1 -> {
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = 0xFFFF9F6E.toInt()
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 1.8f * dn; p.color = Theme.ac
                     c.drawCircle(cx, cy, r, p)
                     val ph = (SystemClock.uptimeMillis() % 1100L) / 1100f
                     val rr = (2f + 2.8f * (0.5f + 0.5f * sin(ph * 2f * PI.toFloat()))) * dn
