@@ -164,7 +164,7 @@ nav button.on{color:var(--act)}
     <label class="sw"><span>Use tools<small>web, her browser, phone screen</small></span><input type="checkbox" id="agOn" onchange="agSave()"></label>
     <label class="sw"><span>Allow actions<small>open apps, tap, type, click</small></span><input type="checkbox" id="agAct" onchange="agSave()"></label>
     <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
-    <div class="setrow" style="border-bottom:0"><span>Ask me for<div class="mut">payments only skips every other approval</div></span><select id="askMode" onchange="askModeSave()" style="width:auto;padding:8px 10px"><option value="all">Risky things</option><option value="money">Payments only</option></select></div>
+    <div class="setrow" style="border-bottom:0"><span>Ask me for<div class="mut">payments only skips every other approval</div></span><select id="askMode" onchange="askModeSave()" style="width:auto;padding:8px 10px"><option value="money">Payments only</option><option value="all">Risky things</option><option value="everything">Everything (ask every screen action)</option></select></div>
     <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
     <p class="mut">She never types passwords, cards or OTPs and never acts unless you ask.</p>
   </div>

@@ -24,7 +24,7 @@ object Agent {
     fun kbAside(c: Context): Boolean = prefs(c).getBoolean("kb", true)
     fun ask(c: Context): Boolean = prefs(c).getBoolean("ask", true)
     fun askMode(c: Context): String = prefs(c).getString("askmode", "all") ?: "all"
-    fun setAskMode(c: Context, v: String) { prefs(c).edit().putString("askmode", if (v == "money") "money" else "all").apply() }
+    fun setAskMode(c: Context, v: String) { prefs(c).edit().putString("askmode", if (v == "money" || v == "everything") v else "all").apply() }
     fun wake(c: Context): Boolean = prefs(c).getBoolean("wake", false)
     fun setWake(c: Context, v: Boolean) { prefs(c).edit().putBoolean("wake", v).apply() }
     private fun lastTask(c: Context): String = prefs(c).getString("last_task", "") ?: ""
@@ -101,6 +101,8 @@ object Agent {
         }
         if (r != null && r in approved) return null
         // "payments only" mode: skip everything except money-related taps
+        // "everything" mode: ask before any screen action (tap, type, swipe), not only risky ones
+        if (r == null && askMode(ctx) == "everything" && name.startsWith("screen_") && name != "screen_read") return "Do " + name.removePrefix("screen_") + " in " + app
         if (r != null && askMode(ctx) == "money" && !(ALWAYS_ASK.containsMatchIn(r) || PAY_PKG.containsMatchIn(pkg))) return null
         return r
     }
