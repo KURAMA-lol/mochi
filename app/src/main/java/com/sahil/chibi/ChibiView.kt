@@ -35,6 +35,13 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     @Volatile var vsy = 1f
     @Volatile var vopen = 0f    // vent opening 0..1
     @Volatile var vdy = 0f      // character vertical offset in px (down = into the vent)
+    /** Chat open: show the resting sprite (head on arms) instead of the 3D player. */
+    var pose: Boolean = false
+        set(v) {
+            field = v
+            wv?.visibility = if (v) INVISIBLE else VISIBLE
+            postInvalidate()
+        }
 
     companion object {
         @Volatile var lastError: String = ""
@@ -189,7 +196,7 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
     }
 
     override fun onDraw(c: Canvas) {
-        if (wv != null) return
+        if (wv != null && !pose) return
         val base = open ?: return
         val now = SystemClock.uptimeMillis()
         if (now >= nextBlink && now >= blinkUntil) {
