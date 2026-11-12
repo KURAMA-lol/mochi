@@ -1246,7 +1246,8 @@ class CompanionService : Service() {
         // put her on the panel's top edge, drawn above it
         lp.y = (sh - ph - dp(8) - lp.height + dp(26)).coerceAtLeast(0)
         detachChibi(); attachChibi()
-        chibi?.action = "idle"
+        // chat open: she sits down (existing sit pose) and her mood/expression still works on top
+        chibi?.action = "sit"
         wake()
         say("Yes?", "happy")
     }
@@ -1258,6 +1259,7 @@ class CompanionService : Service() {
         val pv = panel
         if (pv != null && panelAttached) { try { wm.removeView(pv) } catch (ex: Exception) {}; panelAttached = false }
         lp.y = preY
+        if (chibi?.action == "sit") chibi?.action = "idle"
         updateChibiPos()
         startFall()
         nextDecision = SystemClock.uptimeMillis() + 2000
