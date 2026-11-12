@@ -294,47 +294,54 @@ class CompanionService : Service() {
             try {
                 val c = LinearLayout(this)
                 c.orientation = LinearLayout.VERTICAL
-                c.setPadding(dp(16), dp(14), dp(16), dp(14))
-                c.background = GradientDrawable().apply { setColor(Theme.panelBg); cornerRadius = dp(18).toFloat(); setStroke(dp(2), 0xFFFF8A7A.toInt()) }
+                c.setPadding(dp(12), dp(9), dp(12), dp(10))
+                c.background = GradientDrawable().apply { setColor(Theme.panelBg); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Theme.alpha(Theme.ac, 0x99)) }
                 val t = TextView(this)
-                t.text = "Nana wants to:\n" + what
+                val h = TextView(this)
+                h.text = "Nana asks"
+                h.setTextColor(Theme.ac)
+                h.textSize = 11f
+                h.typeface = Typeface.DEFAULT_BOLD
+                c.addView(h)
+                t.text = what
                 t.setTextColor(0xFFF2F3F5.toInt())
-                t.textSize = 15f
+                t.textSize = 13.5f
+                t.setPadding(0, dp(3), 0, 0)
                 c.addView(t)
                 val row = LinearLayout(this)
                 row.orientation = LinearLayout.HORIZONTAL
                 row.setPadding(0, dp(12), 0, 0)
-                fun btn(label: String, bg: Int, ok: Boolean) {
+                fun btn(label: String, bg: Int, fg: Int, ok: Boolean) {
                     val b = TextView(this)
                     b.text = label
                     b.gravity = Gravity.CENTER
-                    b.setTextColor(0xFF08161A.toInt())
+                    b.setTextColor(fg)
                     b.typeface = Typeface.DEFAULT_BOLD
-                    b.textSize = 15f
-                    b.background = GradientDrawable().apply { setColor(bg); cornerRadius = dp(12).toFloat() }
+                    b.textSize = 13f
+                    b.background = GradientDrawable().apply { setColor(bg); cornerRadius = dp(10).toFloat() }
                     b.setOnClickListener {
                         allowed = ok
                         try { wm.removeView(c) } catch (ex: Exception) {}
                         card = null
                         latch.countDown()
                     }
-                    val lpb = LinearLayout.LayoutParams(0, dp(44), 1f)
-                    lpb.setMargins(dp(4), 0, dp(4), 0)
+                    val lpb = LinearLayout.LayoutParams(0, dp(34), 1f)
+                    lpb.setMargins(dp(3), 0, dp(3), 0)
                     row.addView(b, lpb)
                 }
-                btn("Deny", 0xFFFF8A7A.toInt(), false)
-                btn("Allow", Theme.ac, true)
+                btn("Deny", 0x33FFFFFF, 0xFFF2F3F5.toInt(), false)
+                btn("Allow", Theme.ac, Theme.onAc, true)
                 c.addView(row)
                 val (sw, sh) = screen()
                 val l = WindowManager.LayoutParams(
-                    (sw * 0.92f).toInt(), WindowManager.LayoutParams.WRAP_CONTENT,
+                    dp(230), WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                     PixelFormat.TRANSLUCENT
                 )
-                l.gravity = Gravity.TOP or Gravity.START
-                l.x = (sw - l.width) / 2
-                l.y = (sh * 0.42f).toInt()
+                l.gravity = Gravity.TOP or Gravity.END
+                l.x = dp(10)
+                l.y = (sh * 0.36f).toInt()
                 wm.addView(c, l)
                 card = c
                 apCard = c

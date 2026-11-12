@@ -23,6 +23,8 @@ object Agent {
     fun actions(c: Context): Boolean = prefs(c).getBoolean("act", true)
     fun kbAside(c: Context): Boolean = prefs(c).getBoolean("kb", true)
     fun ask(c: Context): Boolean = prefs(c).getBoolean("ask", true)
+    fun askMode(c: Context): String = prefs(c).getString("askmode", "all") ?: "all"
+    fun setAskMode(c: Context, v: String) { prefs(c).edit().putString("askmode", if (v == "money") "money" else "all").apply() }
     fun wake(c: Context): Boolean = prefs(c).getBoolean("wake", false)
     fun setWake(c: Context, v: Boolean) { prefs(c).edit().putBoolean("wake", v).apply() }
     private fun lastTask(c: Context): String = prefs(c).getString("last_task", "") ?: ""
@@ -40,9 +42,9 @@ object Agent {
     private val ALWAYS_ASK = Regex("\\b(pay|buy|purchase|order|checkout|transfer|donate|place order)\\b", RegexOption.IGNORE_CASE)
     private val SEND_WORDS = Regex("\\b(send|post|publish|tweet|reply|forward)\\b", RegexOption.IGNORE_CASE)
     private val DEL_WORDS = Regex("\\b(delete|erase|remove|uninstall|unsend|sign ?out|log ?out)\\b", RegexOption.IGNORE_CASE)
-    private val REQ_SEND = Regex("send|bhej|post|message|msg|text|reply|likh|tweet|publish|share|forward", RegexOption.IGNORE_CASE)
+    private val REQ_SEND = Regex("send|bhej|post|message|msg|text|reply|likh|tweet|publish|share|forward|comment|like|follow|subscribe|react|tap|click|press", RegexOption.IGNORE_CASE)
     private val REQ_DEL = Regex("delete|remove|hata|uninstall|clear|erase|log ?out|sign ?out", RegexOption.IGNORE_CASE)
-    private val REQ_SEARCH = Regex("search|find|dhund|look|play|khol|open", RegexOption.IGNORE_CASE)
+    private val REQ_SEARCH = Regex("search|find|dhund|look|play|khol|open|check|dekh|see|show|watch", RegexOption.IGNORE_CASE)
     private val MSG_PKG = Regex("whatsapp|telegram|messag|mms|signal|instagram|snapchat|facebook|twitter|gmail|\\.mail", RegexOption.IGNORE_CASE)
     private val PAY_PKG = Regex("paytm|phonepe|gpay|upi|bank|wallet|\\.pay|amazon|flipkart|swiggy|zomato", RegexOption.IGNORE_CASE)
 
@@ -71,13 +73,15 @@ object Agent {
     private fun labelRisk(lab: String): Boolean {
         if (lab.isBlank()) return false
         if (ALWAYS_ASK.containsMatchIn(lab)) return true
-        if (SEND_WORDS.containsMatchIn(lab)) return !REQ_SEND.containsMatchIn(curRequest)
-        if (DEL_WORDS.containsMatchIn(lab)) return !REQ_DEL.containsMatchIn(curRequest)
+        // the user named this exact target in the request, so it is already their choice
+        val named = lab.trim().length >= 3 && curRequest.contains(lab.trim(), ignoreCase = true)
+        if (SEND_WORDS.containsMatchIn(lab)) return !(named || REQ_SEND.containsMatchIn(curRequest))
+        if (DEL_WORDS.containsMatchIn(lab)) return !(named || REQ_DEL.containsMatchIn(curRequest))
         return false
     }
 
     /** Returns a short description if this call must be approved by the user first, else null. */
-    private fun risk(name: String, args: JSONObject): String? {
+    private fun risk(ctx: Context, name: String, args: JSONObject): String? {
         val pkg = NanaAccess.inst?.foregroundPkg() ?: ""
         val app = pkg.substringAfterLast('.')
         val r = when (name) {
@@ -86,7 +90,7 @@ object Agent {
                 val lab = args.optString("text").ifEmpty { if (id >= 0) NanaAccess.inst?.labelOf(id) ?: "" else "" }
                 if (labelRisk(lab)) "Tap '" + lab.take(40) + "' in " + app else null
             }
-            "screen_tap_xy" -> if (PAY_PKG.containsMatchIn(pkg) || (MSG_PKG.containsMatchIn(pkg) && !REQ_SEND.containsMatchIn(curRequest))) "Tap the screen at (" + args.optInt("x") + "," + args.optInt("y") + ") in " + app else null
+            "screen_tap_xy" -> if (PAY_PKG.containsMatchIn(pkg)) "Tap on the screen in " + app else null
             "screen_type" -> if (args.optBoolean("submit", false) && MSG_PKG.containsMatchIn(pkg) && !REQ_SEND.containsMatchIn(curRequest) && !REQ_SEARCH.containsMatchIn(curRequest)) "Type '" + args.optString("text").take(50) + "' and press enter in " + app else null
             "browser_click_text", "browser_click" -> {
                 val id = args.optInt("id", -1)
@@ -96,12 +100,25 @@ object Agent {
             else -> null
         }
         if (r != null && r in approved) return null
+        // "payments only" mode: skip everything except money-related taps
+        if (r != null && askMode(ctx) == "money" && !(ALWAYS_ASK.containsMatchIn(r) || PAY_PKG.containsMatchIn(pkg))) return null
         return r
     }
 
     private val ACTIONS = setOf(
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press", "set_reminder", "cancel_reminder", "set_alarm", "set_timer", "flashlight", "set_volume", "dial", "copy_text",
         "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type"
+    )
+    /** Other names a model may use for a parameter. They are copied to the real name before checking. */
+    private val ARG_ALIASES = mapOf(
+        "key" to listOf("name", "button", "action", "value", "keycode"),
+        "text" to listOf("value", "query", "label", "message", "content"),
+        "name" to listOf("app", "app_name", "package"),
+        "url" to listOf("link", "href", "address"),
+        "query" to listOf("q", "search", "term"),
+        "number" to listOf("phone", "phone_number", "to"),
+        "match" to listOf("text", "name", "query"),
+        "fact" to listOf("text", "memory")
     )
     private val UI_TOOLS = setOf("launch_app", "open_url", "browser_open", "browser_click_text", "browser_select", "browser_type", "browser_click", "browser_scroll", "browser_back", "browser_scroll_to", "browser_click_xy")
     private const val MAX_BATCH = 6
@@ -292,7 +309,7 @@ How to work:
                     val times = (sigs[sig] ?: 0) + 1
                     if (gen != my) throw Interrupted()
                     val blocked = scopeBlock(name)
-                    val risky = if (blocked == null && ask(ctx)) risk(name, args) else null
+                    val risky = if (blocked == null && ask(ctx)) risk(ctx, name, args) else null
                     var denied = false
                     if (risky != null) {
                         val ap = approver
@@ -521,6 +538,12 @@ How to work:
         while (keys.hasNext()) {
             val k = keys.next() as String
             if (!args.isNull(k)) values[k] = args.opt(k)
+        }
+        for (p in def.params) {
+            if (values.containsKey(p.name)) continue
+            val alt = ARG_ALIASES[p.name]?.firstOrNull { values.containsKey(it) } ?: continue
+            args.put(p.name, args.opt(alt))
+            values[p.name] = args.opt(alt)
         }
         ToolCore.checkArgs(def.params, values)?.let { return ToolOutcome("INVALID", it) }
         if (def.action && !actions(ctx)) return ToolOutcome("OFF", "Actions are turned off in Nana's settings. Tell the user to turn on 'Allow actions'.")
