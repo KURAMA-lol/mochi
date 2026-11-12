@@ -103,6 +103,8 @@ object Agent {
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press", "set_reminder", "cancel_reminder", "set_alarm", "set_timer", "flashlight", "set_volume", "dial", "copy_text",
         "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type"
     )
+    private val UI_TOOLS = setOf("launch_app", "open_url", "browser_open", "browser_click_text", "browser_select", "browser_type", "browser_click", "browser_scroll", "browser_back", "browser_scroll_to", "browser_click_xy")
+    private const val MAX_BATCH = 6
     private val SCREEN_ACTIONS = setOf("launch_app", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press")
     private val NO_REPEAT_GUARD = setOf("screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "device_status", "read_notifications", "list_reminders", "remember", "forget")
 
@@ -112,11 +114,11 @@ object Agent {
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
     private val TAG_OPEN = Regex("""<tool>\s*(\{[\s\S]*\})""")
 
-    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. One call at a time. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query}; web_read{url}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact}."
+    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. Several independent calls may go in one reply; they run in order. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query}; web_read{url}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact}."
 
     private const val DOC = """You can use tools. To use one, reply with ONLY a tool call and nothing else, exactly like:
 <tool>{"name":"TOOL_NAME","args":{...}}</tool>
-The result comes back in the next message as TOOL_RESULT. Then call another tool, or give your final answer. One tool call at a time. When you are done, or no tool is needed, answer normally WITHOUT any <tool> tag.
+The results come back in the next message as TOOL_RESULT blocks. You may put several <tool> blocks in one reply when the calls do not depend on each other (for example device_status and web_search); they run in order and you get all their results together. A screen or browser action must go alone in its reply, because the screen changes after it. Then call more tools, or give your final answer. When you are done, or no tool is needed, answer normally WITHOUT any <tool> tag.
 
 Tools:
 - device_status {} : time and battery.
@@ -159,9 +161,21 @@ How to work:
 
     private const val REVIEW_SYSTEM = """You review the work of an AI agent that operates a phone and a browser for a user. You get the user's request, the actions taken with their results, and the agent's final answer. Judge ONLY the literal request. Never demand extra steps the user did not ask for (for example \"open WhatsApp\" is done once WhatsApp is open; do not ask for reading or messaging chats). Decide from the EVIDENCE whether the request is really done (not whether the answer sounds finished). Common misses: opened something but did not finish the action; typed but never submitted; did only part of a multi-part request; the answer claims something no result shows. An honest "I could not do it" or a question to the user counts as done. Reply with ONLY JSON: {"done":true} or {"done":false,"missing":"one short sentence: what is still missing"}."""
 
+    private fun chatRetry(conf: AppConfig, system: String, msgs: List<Msg>, voice: Boolean): Router.Result {
+        return try {
+            Router.chat(conf, system, msgs, voice)
+        } catch (e: Interrupted) {
+            throw e
+        } catch (e: Exception) {
+            Thread.sleep(1500)
+            Router.chat(conf, system, msgs, voice)
+        }
+    }
+
     fun run(ctx: Context, conf: AppConfig, history: List<Msg>, voice: Boolean, onStep: (String) -> Unit): Router.Result {
+        ensureRegistered()
         val base = Persona.system(conf) + Memory.block(ctx, conf.persona.userName)
-        if (!enabled(ctx)) return Router.chat(conf, base, history, voice)
+        if (!enabled(ctx)) return chatRetry(conf, base, history, voice)
         val acc = NanaAccess.inst != null
         val live = "\n\nLIVE STATUS (trust this): tools ON; phone/browser actions " + (if (actions(ctx)) "ON" else "OFF (user switched it off in settings)") + "; screen control (accessibility) " + (if (acc) "ON" else "OFF (screen_* tools and tapping will not work)") + ". If a needed switch is OFF, say so plainly and tell the user which one to turn on. Never claim you did something unless a tool result in this conversation shows it."
         val system = base + live + "\n\n" + DOC
@@ -199,102 +213,123 @@ How to work:
             msgs[lastIdx] = Msg("user", msgs[lastIdx].content + "\n\n(System note: the user interrupted your previous task (\"" + prevReq.take(80) + "\") with this new message. Stop the old task. If this message corrects or changes it, apply the change; if it is a new task, do only the new one. Check the screen first.)")
         }
         try {
-        var steps = 0
-        var nudges = 0
-        var checks = 0
-        var lastName = ""
-        val sigs = HashMap<String, Int>()
-        val done = ArrayList<String>()
-        while (true) {
-            if (gen != my) throw Interrupted()
-            if (gen == my) ev("think")
-            val res = Router.chat(conf, system, msgs, voice)
-            if (gen != my) throw Interrupted()
-            val call = parse(res.text)
-            if (call == null) {
-                val asking = res.text.contains("?") && Regex("(should i|shall i|do you want me|kya main|karun\\?|want me to|can you (tell|give|share|send)|please (tell|give|share|provide)|bata do|batao)", RegexOption.IGNORE_CASE).containsMatchIn(res.text)
-                if (actionish && asking && nudges < 2 && steps < MAX_STEPS) {
-                    nudges++
-                    msgs.add(Msg("assistant", res.text))
-                    msgs.add(Msg("user", "SYSTEM: Do not ask. The user already gave this task. Find what you need with screen_read, browser_read or the remembered facts and continue with a tool call. (Nana itself asks the user to approve risky taps.) Only ask if it truly cannot be found."))
-                    onStep("› continuing...")
-                    continue
-                }
-                val promise = PROMISE.containsMatchIn(res.text) && !res.text.contains("?")
-                if (actionish && nudges < 2 && (steps == 0 || lastName == "screen_read" || promise)) {
-                    nudges++
-                    msgs.add(Msg("assistant", res.text))
-                    msgs.add(Msg("user", "SYSTEM: Your last reply announced or described work but called no tool, so nothing happened. Reply now with ONLY a tool call for the next step (for example screen_tap_text, screen_type, screen_read, browser_open, launch_app). If the request is already fully done (opening an app means just opening it), or truly impossible, say so plainly instead. Never start new steps the user did not ask for."))
-                    onStep("› trying again...")
-                    continue
-                }
-                if (steps > 0 && actionish && checks < 1) {
-                    checks++
-                    if (gen == my) ev("check")
-                    val missing = review(conf, request, evidence, res.text)
-                    if (missing != null) {
-                        msgs.add(Msg("assistant", res.text))
-                        msgs.add(Msg("user", "SYSTEM CHECK: the task is not finished yet. Missing: " + missing + " Continue with a tool call, or say plainly what blocks you."))
-                        onStep("› checking my work...")
+            var steps = 0
+            var nudges = 0
+            var checks = 0
+            var empties = 0
+            var lastName = ""
+            val sigs = HashMap<String, Int>()
+            val done = ArrayList<String>()
+            while (true) {
+                if (gen != my) throw Interrupted()
+                if (gen == my) ev("think")
+                val res = chatRetry(conf, system, msgs, voice)
+                if (gen != my) throw Interrupted()
+                val calls = parseAll(res.text)
+                if (calls.isEmpty()) {
+                    if (res.text.isBlank() && steps > 0 && empties < 2) {
+                        empties++
+                        msgs.add(Msg("user", "SYSTEM: Your last reply was empty. Continue with a tool call, or give the final answer in one short sentence."))
+                        onStep("› continuing...")
                         continue
                     }
+                    val asking = res.text.contains("?") && Regex("(should i|shall i|do you want me|kya main|karun\\?|want me to|can you (tell|give|share|send)|please (tell|give|share|provide)|bata do|batao)", RegexOption.IGNORE_CASE).containsMatchIn(res.text)
+                    if (actionish && asking && nudges < 2 && steps < MAX_STEPS) {
+                        nudges++
+                        msgs.add(Msg("assistant", res.text))
+                        msgs.add(Msg("user", "SYSTEM: Do not ask. The user already gave this task. Find what you need with screen_read, browser_read or the remembered facts and continue with a tool call. (Nana itself asks the user to approve risky taps.) Only ask if it truly cannot be found."))
+                        onStep("› continuing...")
+                        continue
+                    }
+                    val promise = PROMISE.containsMatchIn(res.text) && !res.text.contains("?")
+                    if (actionish && nudges < 2 && (steps == 0 || lastName == "screen_read" || promise)) {
+                        nudges++
+                        msgs.add(Msg("assistant", res.text))
+                        msgs.add(Msg("user", "SYSTEM: Your last reply announced or described work but called no tool, so nothing happened. Reply now with ONLY a tool call for the next step (for example screen_tap_text, screen_type, screen_read, browser_open, launch_app). If the request is already fully done (opening an app means just opening it), or truly impossible, say so plainly instead. Never start new steps the user did not ask for."))
+                        onStep("› trying again...")
+                        continue
+                    }
+                    if (steps > 0 && actionish && checks < 1) {
+                        checks++
+                        if (gen == my) ev("check")
+                        val missing = review(conf, request, evidence, res.text)
+                        if (missing != null) {
+                            msgs.add(Msg("assistant", res.text))
+                            msgs.add(Msg("user", "SYSTEM CHECK: the task is not finished yet. Missing: " + missing + " Continue with a tool call, or say plainly what blocks you."))
+                            onStep("› checking my work...")
+                            continue
+                        }
+                    }
+                    if (actionish && steps == 0 && !res.text.contains("?")) {
+                        val why = if (!actions(ctx)) "Actions are switched OFF in my settings, so I did nothing. Turn on 'Allow actions' on the Home tab."
+                            else if (NanaAccess.inst == null && Regex("tap|click|type|scroll|screen|chat|message", RegexOption.IGNORE_CASE).containsMatchIn(request)) "Screen control is OFF, so I could not do that. Turn Nana on in Accessibility settings."
+                            else "I did not actually do that: no action ran. Please say it again, a bit more specifically."
+                        return Router.Result("[sad] " + why, res.provider, res.ms, res.trace)
+                    }
+                    return res
                 }
-                if (actionish && steps == 0 && !res.text.contains("?")) {
-                    val why = if (!actions(ctx)) "Actions are switched OFF in my settings, so I did nothing. Turn on 'Allow actions' on the Home tab."
-                        else if (NanaAccess.inst == null && Regex("tap|click|type|scroll|screen|chat|message", RegexOption.IGNORE_CASE).containsMatchIn(request)) "Screen control is OFF, so I could not do that. Turn Nana on in Accessibility settings."
-                        else "I did not actually do that: no action ran. Please say it again, a bit more specifically."
-                    return Router.Result("[sad] " + why, res.provider, res.ms, res.trace)
+                if (steps >= MAX_STEPS) {
+                    msgs.add(Msg("assistant", res.text))
+                    msgs.add(Msg("user", "TOOL_RESULT: step limit reached. Do not call tools now. Tell the user what you did and what is left."))
+                    return chatRetry(conf, system, msgs, voice)
                 }
-                return res
-            }
-            if (steps >= MAX_STEPS) {
+                val results = StringBuilder()
+                var skipWhy = ""
+                for (call in calls.take(MAX_BATCH)) {
+                    val name = call.first
+                    val args = call.second
+                    if (skipWhy.isEmpty() && steps >= MAX_STEPS) skipWhy = "step limit reached."
+                    if (skipWhy.isNotEmpty()) {
+                        results.append("TOOL_RESULT [").append(name).append("] (SKIPPED):\nNot run: ").append(skipWhy).append("\n\n")
+                        continue
+                    }
+                    steps++
+                    lastName = name
+                    val label = describe(name, args)
+                    onStep("› " + label)
+                    if (gen == my) ev("tool", name + "\u0001" + args.toString().take(240))
+                    val sig = name + args.toString()
+                    val times = (sigs[sig] ?: 0) + 1
+                    sigs[sig] = times
+                    if (gen != my) throw Interrupted()
+                    val blocked = scopeBlock(name)
+                    val risky = if (blocked == null && ask(ctx)) risk(name, args) else null
+                    var denied = false
+                    if (risky != null) {
+                        val ap = approver
+                        denied = ap == null || !ap(risky)
+                        if (gen != my) throw Interrupted()
+                        if (!denied) approved.add(risky)
+                        AuditLog.add(ctx, (if (denied) "DENIED: " else "APPROVED: ") + risky)
+                    }
+                    val def = ToolRegistry.get(name)
+                    val outcome: ToolOutcome = if (blocked != null) {
+                        AuditLog.add(ctx, "BLOCKED: " + label.removeSuffix("..."))
+                        ToolOutcome("BLOCKED", blocked)
+                    } else if (denied) {
+                        ToolOutcome("DENIED", "The user DENIED this action (or did not answer in time). Do not try it again or find another way around it. Tell the user in one short sentence that you stopped.")
+                    } else if (times >= 2 && name !in NO_REPEAT_GUARD) {
+                        ToolOutcome("REPEATED", "You already did this exact action. Do NOT repeat it. Its result is earlier in this conversation. Look at the newest screen/page state you already have and do the NEXT step, or give your final answer.")
+                    } else {
+                        runTool(ctx, name, args)
+                    }
+                    if (gen == my) ev(if (blocked != null || denied || outcome.status != "OK") "fail" else "ok", outcome.text.replace('\n', ' ').take(300))
+                    if (name != "screen_read" && name != "browser_read" && !denied) AuditLog.add(ctx, label.removeSuffix("...") + " -> " + outcome.text.replace('\n', ' ').take(70))
+                    done.add(label.removeSuffix("..."))
+                    evidence.add("- " + label.removeSuffix("...") + " -> " + outcome.text.replace('\n', ' ').take(260))
+                    results.append("TOOL_RESULT [").append(name).append("] (").append(outcome.status).append("):\n").append(outcome.text.take(3000)).append("\n\n")
+                    if (calls.size == 1 && name == "launch_app" && !denied && SIMPLE_OPEN.containsMatchIn(request) && (outcome.text.startsWith("Opened") || outcome.text.contains("already open"))) {
+                        return Router.Result("[happy] " + outcome.text.substringBefore("\n").substringBefore(" No need"), res.provider, res.ms, res.trace)
+                    }
+                    if (denied) skipWhy = "the user denied an earlier step."
+                    else if (def?.ui == true) skipWhy = "the screen or page changes after that step. Do the next steps in your next reply, after you see the new state."
+                }
                 msgs.add(Msg("assistant", res.text))
-                msgs.add(Msg("user", "TOOL_RESULT: step limit reached. Do not call tools now. Tell the user what you did and what is left."))
-                return Router.chat(conf, system, msgs, voice)
+                msgs.add(Msg("user", results.toString() + "Actions so far: " + done.takeLast(8).joinToString(" | ")))
             }
-            steps++
-            val name = call.first
-            val args = call.second
-            lastName = name
-            onStep("› " + describe(name, args))
-            if (gen == my) ev("tool", name + "\u0001" + args.toString().take(240))
-            val sig = name + args.toString()
-            val times = (sigs[sig] ?: 0) + 1
-            sigs[sig] = times
-            if (gen != my) throw Interrupted()
-            val blocked = scopeBlock(name)
-            val risky = if (blocked == null && ask(ctx)) risk(name, args) else null
-            var denied = false
-            if (risky != null) {
-                val ap = approver
-                denied = ap == null || !ap(risky)
-                if (gen != my) throw Interrupted()
-                if (!denied) approved.add(risky)
-                AuditLog.add(ctx, (if (denied) "DENIED: " else "APPROVED: ") + risky)
-            }
-            val out = if (blocked != null) {
-                AuditLog.add(ctx, "BLOCKED: " + describe(name, args).removeSuffix("..."))
-                blocked
-            } else if (denied) {
-                "The user DENIED this action (or did not answer in time). Do not try it again or find another way around it. Tell the user in one short sentence that you stopped."
-            } else if (times >= 2 && name !in NO_REPEAT_GUARD) {
-                "You already did this exact action. Do NOT repeat it. Its result is earlier in this conversation. Look at the newest screen/page state you already have and do the NEXT step, or give your final answer."
-            } else {
-                try { exec(ctx, name, args) } catch (e: Throwable) { "Error: " + (e.message ?: e.toString()) }
-            }
-            if (gen == my) ev(if (blocked != null || denied || out.startsWith("Error")) "fail" else "ok", out.replace('\n', ' ').take(300))
-            if (name != "screen_read" && name != "browser_read" && !denied) AuditLog.add(ctx, describe(name, args).removeSuffix("...") + " -> " + out.replace('\n', ' ').take(70))
-            done.add(describe(name, args).removeSuffix("..."))
-            evidence.add("- " + describe(name, args).removeSuffix("...") + " -> " + out.replace('\n', ' ').take(260))
-            val log = "\n\nActions so far: " + done.takeLast(8).joinToString(" | ")
-            if (name == "launch_app" && !denied && SIMPLE_OPEN.containsMatchIn(request) && (out.startsWith("Opened") || out.contains("already open"))) {
-                return Router.Result("[happy] " + out.substringBefore("\n").substringBefore(" No need"), res.provider, res.ms, res.trace)
-            }
-            msgs.add(Msg("assistant", res.text))
-            msgs.add(Msg("user", "TOOL_RESULT [" + name + "]:\n" + out.take(4000) + log))
-        }
         } finally { if (gen == my) active = false; if (evidence.isNotEmpty()) saveLast(ctx, if (resume) lastTask(ctx).substringAfter("REQUEST: ").substringBefore("\nDONE SO FAR") else request, evidence) }
     }
+
 
     private fun review(conf: AppConfig, request: String, evidence: List<String>, answer: String): String? {
         return try {
@@ -309,7 +344,7 @@ How to work:
         } catch (e: Exception) { null }
     }
 
-    private val KNOWN = setOf("copy_text", "flashlight", "set_volume", "dial", "read_notifications", "list_reminders", "set_reminder", "cancel_reminder", "set_alarm", "set_timer", "device_status", "remember", "forget", "web_search", "web_read", "browser_open", "browser_read", "browser_click_text", "browser_click", "browser_click_xy", "browser_select", "browser_wait", "browser_type", "browser_scroll", "browser_scroll_to", "browser_back", "browser_show", "launch_app", "open_url", "screen_read", "screen_tap_text", "screen_tap", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_scroll", "screen_scroll_to", "screen_wait", "screen_press", "screen_type", "screen_back", "screen_home")
+    private fun knownNames(): Set<String> { ensureRegistered(); return ToolRegistry.names() }
 
     /** Finds the first balanced {...} starting at or after `from`. */
     private fun balanced(t: String, from: Int): String? {
@@ -347,7 +382,7 @@ How to work:
         }
         // 2) weaker models: a known tool name written anywhere, e.g. [browser_wait {"seconds":3}] or tool_name({...})
         var best: Pair<Int, String>? = null
-        for (n in KNOWN) {
+        for (n in knownNames()) {
             val k = Regex("(?<![a-z_])" + n + "(?![a-z_])").find(t)?.range?.first ?: continue
             if (best == null || k < best.first) best = Pair(k, n)
         }
@@ -361,9 +396,32 @@ How to work:
         if (b != null) try {
             val o = JSONObject(b)
             val nm = o.optString("name", o.optString("tool", ""))
-            if (nm in KNOWN) return Pair(nm, o.optJSONObject("args") ?: JSONObject())
+            if (nm in knownNames()) return Pair(nm, o.optJSONObject("args") ?: JSONObject())
         } catch (e: Exception) {}
         return null
+    }
+
+    /** Every <tool> block in the reply (run in order). Falls back to the single-call parser for sloppy output. */
+    private fun parseAll(t: String): List<Pair<String, JSONObject>> {
+        val out = ArrayList<Pair<String, JSONObject>>()
+        for (body in ToolCore.tagBodies(t)) {
+            val p = parseBody(body) ?: continue
+            out.add(p)
+        }
+        if (out.isEmpty()) parse(t)?.let { out.add(it) }
+        return out
+    }
+
+    private fun parseBody(body: String): Pair<String, JSONObject>? {
+        try {
+            val o = JSONObject(body)
+            return Pair(o.getString("name"), o.optJSONObject("args") ?: JSONObject())
+        } catch (e: Exception) {}
+        val b = balanced(body, 0) ?: return null
+        return try {
+            val o = JSONObject(b)
+            if (o.has("name")) Pair(o.getString("name"), o.optJSONObject("args") ?: JSONObject()) else null
+        } catch (e: Exception) { null }
     }
 
     private fun describe(name: String, a: JSONObject): String {
@@ -381,60 +439,112 @@ How to work:
         return out + "\n\nScreen now:\n" + a.read().take(2800)
     }
 
-    private fun exec(ctx: Context, name: String, args: JSONObject): String {
-        if (name in ACTIONS && !actions(ctx)) return "Actions are turned off in Nana's settings. Tell the user to turn on 'Allow actions'."
-        if (name.startsWith("browser_")) AgentBrowser.onUse?.invoke()
-        val down = args.optString("direction", "down") != "up"
-        val out = when (name) {
-            "device_status" -> status(ctx)
-            "set_reminder" -> Reminders.fromArgs(ctx, args)
-            "list_reminders" -> Reminders.list(ctx)
-            "cancel_reminder" -> Reminders.cancel(ctx, args.optString("match"))
-            "set_alarm" -> setAlarm(ctx, args)
-            "copy_text" -> try {
-                (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("Nana", args.optString("text")))
+    private fun p(name: String, type: String, required: Boolean = false, enums: List<String> = emptyList()) = ParamSpec(name, type, required, enums)
+
+    @Volatile private var registered = false
+
+    private fun ensureRegistered() {
+        if (registered) return
+        synchronized(this) {
+            if (!registered) { registerBuiltins(); registered = true }
+        }
+    }
+
+    private fun reg(name: String, desc: String, params: List<ParamSpec> = emptyList(), readOnly: Boolean = false, run: (Context, JSONObject) -> String) {
+        val ui = (name.startsWith("screen_") && name != "screen_read") || name in UI_TOOLS
+        ToolRegistry.register(ToolDef(name, desc, params, name in ACTIONS, readOnly, ui, name in SCREEN_ACTIONS, run))
+    }
+
+    private fun registerBuiltins() {
+        reg("device_status", "Time, battery, network, storage, screen and current app.", readOnly = true) { c, _ -> status(c) }
+        reg("set_reminder", "Notify the user later. text is written TO the user.", listOf(p("text", "string", true), p("minutes", "int"), p("at", "string"), p("date", "string"), p("repeat", "string", enums = listOf("daily", "weekly")))) { c, a -> Reminders.fromArgs(c, a) }
+        reg("list_reminders", "List upcoming reminders.", readOnly = true) { c, _ -> Reminders.list(c) }
+        reg("cancel_reminder", "Cancel reminders matching the text.", listOf(p("match", "string"))) { c, a -> Reminders.cancel(c, a.optString("match")) }
+        reg("set_alarm", "Set an alarm in the clock app.", listOf(p("hour", "int", true), p("minute", "int"), p("label", "string"))) { c, a -> setAlarm(c, a) }
+        reg("set_timer", "Start a timer in the clock app.", listOf(p("seconds", "int", true), p("label", "string"))) { c, a -> setTimer(c, a) }
+        reg("copy_text", "Copy text to the clipboard.", listOf(p("text", "string", true))) { c, a ->
+            try {
+                (c.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("Nana", a.optString("text")))
                 "Copied to the clipboard."
             } catch (e: Exception) { "Could not copy." }
-            "flashlight" -> flashlight(ctx, args.optBoolean("on", true))
-            "set_volume" -> setVolume(ctx, args.optInt("level", -1), args.optString("stream", "music"))
-            "dial" -> dial(ctx, args.optString("number"))
-            "set_timer" -> setTimer(ctx, args)
-            "read_notifications" -> NanaNotifs.read(ctx, args.optString("app"), args.optInt("count", 10))
-            "remember" -> Memory.add(ctx, args.optString("fact"))
-            "forget" -> Memory.forget(ctx, args.optString("match"))
-            "web_search" -> webSearch(args.optString("query"))
-            "web_read" -> webRead(args.optString("url"))
-            "launch_app" -> launch(ctx, args.optString("name"))
-            "open_url" -> openUrl(ctx, args.optString("url"))
-            "browser_open" -> AgentBrowser.open(ctx, args.optString("url"))
-            "browser_read" -> AgentBrowser.snapshot(ctx, args.optInt("offset", 0))
-            "browser_click_text" -> AgentBrowser.clickText(ctx, args.optString("text"))
-            "browser_select" -> AgentBrowser.select(ctx, args.optInt("id", -1), args.optString("value"))
-            "browser_wait" -> AgentBrowser.waitAndRead(ctx, args.optInt("seconds", 3))
-            "browser_show" -> AgentBrowser.show(ctx)
-            "browser_type" -> AgentBrowser.type(ctx, args.optInt("id", -1), args.optString("text"), args.optBoolean("submit", false))
-            "browser_click" -> AgentBrowser.click(ctx, args.optInt("id", -1))
-            "browser_scroll" -> AgentBrowser.scroll(ctx, down)
-            "browser_back" -> AgentBrowser.back(ctx)
-            "screen_read" -> acc { it.read() }
-            "screen_tap" -> acc { it.tap(args.optInt("id", -1)) }
-            "screen_tap_text" -> acc { it.tapText(args.optString("text")) }
-            "screen_type" -> acc { it.type(args.optInt("id", -1), args.optString("text"), args.optBoolean("submit", false)) }
-            "screen_scroll" -> acc { it.scroll(down) }
-            "screen_tap_xy" -> acc { it.tapXY(args.optInt("x", -1), args.optInt("y", -1)) }
-            "screen_long_press" -> acc { it.longPress(args.optInt("id", -1), args.optString("text")) }
-            "screen_swipe" -> acc { it.swipe(args.optString("direction"), args.optBoolean("edge", false), args.optInt("x1", -1), args.optInt("y1", -1), args.optInt("x2", -1), args.optInt("y2", -1)) }
-            "screen_scroll_to" -> acc { it.scrollTo(args.optString("text")) }
-            "screen_wait" -> acc { it.screenWait(args.optString("text"), args.optInt("seconds", 5)) }
-            "screen_press" -> acc { it.press(args.optString("key")) }
-            "browser_scroll_to" -> AgentBrowser.scrollTo(ctx, args.optString("text"))
-            "browser_click_xy" -> AgentBrowser.clickXY(ctx, args.optInt("x", -1), args.optInt("y", -1))
-            "screen_back" -> acc { it.back() }
-            "screen_home" -> acc { it.home() }
-            else -> "Unknown tool '" + name + "'."
         }
-        if (name.startsWith("screen_") && name != "screen_read") Thread.sleep(800)
-        return if (name in SCREEN_ACTIONS) withScreen(out) else out
+        reg("flashlight", "Turn the torch on or off.", listOf(p("on", "bool"))) { c, a -> flashlight(c, a.optBoolean("on", true)) }
+        reg("set_volume", "Set volume 0-100 for music, ring or alarm.", listOf(p("level", "int", true), p("stream", "string", enums = listOf("music", "ring", "alarm")))) { c, a -> setVolume(c, a.optInt("level", -1), a.optString("stream", "music")) }
+        reg("dial", "Open the dialer with a number (the user presses call).", listOf(p("number", "string", true))) { c, a -> dial(c, a.optString("number")) }
+        reg("read_notifications", "Recent phone notifications, optionally from one app.", listOf(p("app", "string"), p("count", "int")), readOnly = true) { c, a -> NanaNotifs.read(c, a.optString("app"), a.optInt("count", 10)) }
+        reg("remember", "Save a lasting fact about the user.", listOf(p("fact", "string", true))) { c, a -> Memory.add(c, a.optString("fact")) }
+        reg("forget", "Delete remembered facts containing the text.", listOf(p("match", "string", true))) { c, a -> Memory.forget(c, a.optString("match")) }
+        reg("web_search", "Search the web.", listOf(p("query", "string", true)), readOnly = true) { _, a -> webSearch(a.optString("query")) }
+        reg("web_read", "Read a web page as plain text.", listOf(p("url", "string", true)), readOnly = true) { _, a -> webRead(a.optString("url")) }
+        reg("launch_app", "Open an app by name.", listOf(p("name", "string", true))) { c, a -> launch(c, a.optString("name")) }
+        reg("open_url", "Open a link in the user's apps.", listOf(p("url", "string", true))) { c, a -> openUrl(c, a.optString("url")) }
+        reg("browser_open", "Open a page in Nana's browser.", listOf(p("url", "string", true))) { c, a -> AgentBrowser.open(c, a.optString("url")) }
+        reg("browser_read", "Read the current browser page.", listOf(p("offset", "int")), readOnly = true) { c, a -> AgentBrowser.snapshot(c, a.optInt("offset", 0)) }
+        reg("browser_click_text", "Click the first element whose label contains the text.", listOf(p("text", "string", true))) { c, a -> AgentBrowser.clickText(c, a.optString("text")) }
+        reg("browser_select", "Choose an option in a dropdown.", listOf(p("id", "int", true), p("value", "string"))) { c, a -> AgentBrowser.select(c, a.optInt("id", -1), a.optString("value")) }
+        reg("browser_wait", "Wait, then read the browser page again.", listOf(p("seconds", "int")), readOnly = true) { c, a -> AgentBrowser.waitAndRead(c, a.optInt("seconds", 3)) }
+        reg("browser_show", "Show the browser to the user (for their own login or captcha).") { c, _ -> AgentBrowser.show(c) }
+        reg("browser_type", "Type into a browser field.", listOf(p("id", "int"), p("text", "string"), p("submit", "bool"))) { c, a -> AgentBrowser.type(c, a.optInt("id", -1), a.optString("text"), a.optBoolean("submit", false)) }
+        reg("browser_click", "Click a browser element by number.", listOf(p("id", "int", true))) { c, a -> AgentBrowser.click(c, a.optInt("id", -1)) }
+        reg("browser_scroll", "Scroll the browser page.", listOf(p("direction", "string", enums = listOf("up", "down")))) { c, a -> AgentBrowser.scroll(c, a.optString("direction", "down") != "up") }
+        reg("browser_back", "Go back in the browser.") { c, _ -> AgentBrowser.back(c) }
+        reg("browser_scroll_to", "Scroll the browser until the text shows.", listOf(p("text", "string", true))) { c, a -> AgentBrowser.scrollTo(c, a.optString("text")) }
+        reg("browser_click_xy", "Tap page pixel coordinates in the browser.", listOf(p("x", "int", true), p("y", "int", true))) { c, a -> AgentBrowser.clickXY(c, a.optInt("x", -1), a.optInt("y", -1)) }
+        reg("screen_read", "Numbered elements of the phone screen now.", readOnly = true) { _, _ -> acc { it.read() } }
+        reg("screen_tap_text", "Tap the first element whose label contains the text.", listOf(p("text", "string", true))) { _, a -> acc { it.tapText(a.optString("text")) } }
+        reg("screen_tap", "Tap an element by number.", listOf(p("id", "int", true))) { _, a -> acc { it.tap(a.optInt("id", -1)) } }
+        reg("screen_tap_xy", "Tap screen pixel coordinates.", listOf(p("x", "int", true), p("y", "int", true))) { _, a -> acc { it.tapXY(a.optInt("x", -1), a.optInt("y", -1)) } }
+        reg("screen_long_press", "Long-press an element by number or text.", listOf(p("id", "int"), p("text", "string"))) { _, a -> acc { it.longPress(a.optInt("id", -1), a.optString("text")) } }
+        reg("screen_swipe", "Swipe up, down, left or right, or between two points.", listOf(p("direction", "string", enums = listOf("up", "down", "left", "right")), p("edge", "bool"), p("x1", "int"), p("y1", "int"), p("x2", "int"), p("y2", "int"))) { _, a ->
+            acc { it.swipe(a.optString("direction"), a.optBoolean("edge", false), a.optInt("x1", -1), a.optInt("y1", -1), a.optInt("x2", -1), a.optInt("y2", -1)) }
+        }
+        reg("screen_scroll", "Scroll the screen.", listOf(p("direction", "string", enums = listOf("up", "down")))) { _, a -> acc { it.scroll(a.optString("direction", "down") != "up") } }
+        reg("screen_scroll_to", "Scroll until the text shows.", listOf(p("text", "string", true))) { _, a -> acc { it.scrollTo(a.optString("text")) } }
+        reg("screen_wait", "Wait for the text to appear on screen.", listOf(p("text", "string", true), p("seconds", "int")), readOnly = true) { _, a -> acc { it.screenWait(a.optString("text"), a.optInt("seconds", 5)) } }
+        reg("screen_press", "Press a system key.", listOf(p("key", "string", true, listOf("back", "home", "recents", "notifications", "quick_settings")))) { _, a -> acc { it.press(a.optString("key")) } }
+        reg("screen_type", "Type into a field (replaces its text).", listOf(p("text", "string"), p("submit", "bool"), p("id", "int"))) { _, a -> acc { it.type(a.optInt("id", -1), a.optString("text"), a.optBoolean("submit", false)) } }
+        reg("screen_back", "Press back.") { _, _ -> acc { it.back() } }
+        reg("screen_home", "Go to the home screen.") { _, _ -> acc { it.home() } }
+    }
+
+    private fun isFailure(t: String): Boolean = t.startsWith("Error") || t.startsWith("Could not") || t.startsWith("Screen control is off")
+
+    /** Runs one registered tool: checks name, arguments and switches, retries read-only tools, and returns a structured outcome. */
+    private fun runTool(ctx: Context, name: String, args: JSONObject): ToolOutcome {
+        ensureRegistered()
+        val def = ToolRegistry.get(name) ?: run {
+            val near = ToolCore.suggest(name, knownNames())
+            return ToolOutcome("INVALID", "Unknown tool '" + name + "'." + (if (near.isNotEmpty()) " Did you mean: " + near.joinToString(", ") + "?" else "") + " Use only tools from your instructions.")
+        }
+        val values = HashMap<String, Any?>()
+        val keys = args.keys()
+        while (keys.hasNext()) {
+            val k = keys.next() as String
+            if (!args.isNull(k)) values[k] = args.opt(k)
+        }
+        ToolCore.checkArgs(def.params, values)?.let { return ToolOutcome("INVALID", it) }
+        if (def.action && !actions(ctx)) return ToolOutcome("OFF", "Actions are turned off in Nana's settings. Tell the user to turn on 'Allow actions'.")
+        if (name.startsWith("browser_")) AgentBrowser.onUse?.invoke()
+        val tries = if (def.readOnly) 3 else 1
+        var out: String? = null
+        var err = ""
+        for (i in 0 until tries) {
+            if (i > 0) Thread.sleep(600L * i)
+            try {
+                val t = def.run(ctx, args)
+                out = t
+                if (!(def.readOnly && isFailure(t))) break
+                err = t
+            } catch (e: Throwable) {
+                out = null
+                err = e.message ?: e.toString()
+            }
+        }
+        if (def.ui && name.startsWith("screen_")) Thread.sleep(800)
+        var text = out ?: ("Error: " + err)
+        if (def.screen) text = withScreen(text)
+        val status = if (out == null || isFailure(out)) "ERROR" else "OK"
+        return ToolOutcome(status, text)
     }
 
     private fun flashlight(ctx: Context, on: Boolean): String = try {
