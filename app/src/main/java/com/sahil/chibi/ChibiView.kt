@@ -45,6 +45,8 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
 
     companion object {
         @Volatile var lastError: String = ""
+        private const val PATCH_X = 124f
+        private const val PATCH_Y = 122f
         fun charId(c: Context): String = "nana"
         fun has3d(c: Context): Boolean = true
     }
@@ -55,8 +57,11 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
         BitmapFactory.decodeByteArray(b, 0, b.size)
     } catch (ex: Exception) { null }
 
-    private val open: Bitmap? by lazy { load("mascot.b64") }
-    private val closed: Bitmap? by lazy { load("mascot_closed.b64") }
+    // Resting pose (head on folded arms). rest_blink.b64 is only the eye area with the eyes closed,
+    // drawn on top of the pose at PATCH_X/PATCH_Y (bitmap pixels) while she blinks.
+    private val open: Bitmap? by lazy { load("rest.b64") }
+    private val blinkPatch: Bitmap? by lazy { load("rest_blink.b64") }
+    private val patchDst = RectF()
     private val bp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
     private val dst = RectF()
     private var nextBlink = SystemClock.uptimeMillis() + 1500L
@@ -209,18 +214,24 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
                 nextBlink = now + Random.nextLong(2500L, 5500L)
             }
         }
-        val cl = closed
-        val bm = if (now < blinkUntil && cl != null) cl else base
-        val s = min(width / bm.width.toFloat(), height / bm.height.toFloat())
-        val w = bm.width * s
-        val h = bm.height * s
+        val pb = blinkPatch
+        val blink = now < blinkUntil && pb != null
+        val s = min(width / base.width.toFloat(), height / base.height.toFloat())
+        val w = base.width * s
+        val h = base.height * s
         val x = (width - w) / 2f
-        val y = (height - h) / 2f
+        val dn = resources.displayMetrics.density
+        // chat open: the arms rest right on the top edge of the chat panel
+        val y = if (pose) height - h - 26f * dn + 3f * dn else (height - h) / 2f
         dst.set(x, y, x + w, y + h)
         c.save()
         c.scale(vsx, vsy, width / 2f, height.toFloat())
-        if (!facingRight) c.scale(-1f, 1f, width / 2f, 0f)
-        c.drawBitmap(bm, null, dst, bp)
+        if (!facingRight && !pose) c.scale(-1f, 1f, width / 2f, 0f)
+        c.drawBitmap(base, null, dst, bp)
+        if (blink && pb != null) {
+            patchDst.set(x + PATCH_X * s, y + PATCH_Y * s, x + (PATCH_X + pb.width) * s, y + (PATCH_Y + pb.height) * s)
+            c.drawBitmap(pb, null, patchDst, bp)
+        }
         c.restore()
         postInvalidateDelayed(60)
     }
