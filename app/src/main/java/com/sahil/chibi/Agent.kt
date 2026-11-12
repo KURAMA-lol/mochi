@@ -290,7 +290,6 @@ How to work:
                     if (gen == my) ev("tool", name + "\u0001" + args.toString().take(240))
                     val sig = name + args.toString()
                     val times = (sigs[sig] ?: 0) + 1
-                    sigs[sig] = times
                     if (gen != my) throw Interrupted()
                     val blocked = scopeBlock(name)
                     val risky = if (blocked == null && ask(ctx)) risk(name, args) else null
@@ -313,6 +312,7 @@ How to work:
                     } else {
                         runTool(ctx, name, args)
                     }
+                    if (outcome.status == "OK") sigs[sig] = times
                     if (gen == my) ev(if (blocked != null || denied || outcome.status != "OK") "fail" else "ok", outcome.text.replace('\n', ' ').take(300))
                     if (name != "screen_read" && name != "browser_read" && !denied) AuditLog.add(ctx, label.removeSuffix("...") + " -> " + outcome.text.replace('\n', ' ').take(70))
                     done.add(label.removeSuffix("..."))
@@ -507,7 +507,7 @@ How to work:
         reg("screen_home", "Go to the home screen.") { _, _ -> acc { it.home() } }
     }
 
-    private fun isFailure(t: String): Boolean = t.startsWith("Error") || t.startsWith("Could not") || t.startsWith("Screen control is off")
+    private fun isFailure(t: String): Boolean = t.startsWith("Error") || t.startsWith("Could not") || t.startsWith("Tried to") || t.startsWith("Screen control is off")
 
     /** Runs one registered tool: checks name, arguments and switches, retries read-only tools, and returns a structured outcome. */
     private fun runTool(ctx: Context, name: String, args: JSONObject): ToolOutcome {
