@@ -1268,6 +1268,7 @@ class CompanionService : Service() {
 
     /** Keeps her sitting on the top edge of the chat, also when the keyboard moves the chat up.
      *  If the keyboard leaves too little room above the chat, the chat gets a bit shorter. */
+    private var lastAnchorAdj = 0L
     private val anchorLoop = object : Runnable {
         override fun run() {
             if (!panelOpen) return
@@ -1291,8 +1292,19 @@ class CompanionService : Service() {
             try { wm.updateViewLayout(p, pl) } catch (ex: Exception) {}
             return
         }
-        val ny = (loc[1] - lp.height + dp(26)).coerceAtLeast(0)
-        if (ny != lp.y) { lp.y = ny; fy = lp.y.toFloat(); updateChibiPos() }
+        // measure where her window really is on screen (it can be offset, e.g. by the status bar)
+        // and move it so that her bottom edge sits exactly on the chat's top border
+        val c = chibi ?: return
+        if (c.height <= 0) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastAnchorAdj < 250) return
+        val cl = IntArray(2)
+        c.getLocationOnScreen(cl)
+        val diff = (loc[1] + dp(26)) - (cl[1] + lp.height)
+        if (kotlin.math.abs(diff) > 1) {
+            lastAnchorAdj = now
+            lp.y += diff; fy = lp.y.toFloat(); updateChibiPos()
+        }
     }
 
     private fun closePanel() {
