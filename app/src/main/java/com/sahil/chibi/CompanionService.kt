@@ -1250,13 +1250,21 @@ class CompanionService : Service() {
         panelOpen = true
         // chat open: she is a bit smaller and rests on the panel's top edge
         origW = lp.width; origH = lp.height
+        winOffset = 0
+        chibi?.let { c0 ->
+            if (attached && c0.isAttachedToWindow && c0.height > 0) {
+                val cl0 = IntArray(2); c0.getLocationOnScreen(cl0); winOffset = cl0[1] - lp.y
+            }
+        }
         val nw = (origW * 0.78f).toInt(); val nh = (origH * 0.78f).toInt()
         lp.x += (origW - nw) / 2; lp.width = nw; lp.height = nh
-        lp.y = (sh - ph - dp(8) - lp.height + dp(26)).coerceAtLeast(0)
+        lp.y = sh - ph - dp(8) - lp.height + dp(26) - winOffset
         detachChibi(); attachChibi()
         chibi?.action = "idle"
         chibi?.pose = true
-        main.removeCallbacks(anchorLoop); main.postDelayed(anchorLoop, 60)
+        stableFrames = 0
+        android.view.Choreographer.getInstance().removeFrameCallback(anchorFrame)
+        android.view.Choreographer.getInstance().postFrameCallback(anchorFrame)
         wake()
         say("Yes?", "happy")
     }
@@ -1266,16 +1274,18 @@ class CompanionService : Service() {
         return if (id > 0) resources.getDimensionPixelSize(id) else dp(28)
     }
 
-    /** Keeps her sitting on the top edge of the chat, also when the keyboard moves the chat up.
+    /** Keeps her glued to the top edge of the chat, also while the keyboard opens or closes.
+     *  Runs every frame (no polling delay), so she moves together with the chat.
      *  If the keyboard leaves too little room above the chat, the chat gets a bit shorter. */
-    private var lastAnchorAdj = 0L
-    private val anchorLoop = object : Runnable {
-        override fun run() {
+    private val anchorFrame = object : android.view.Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
             if (!panelOpen) return
             anchorChibi()
-            main.postDelayed(this, 120)
+            android.view.Choreographer.getInstance().postFrameCallback(this)
         }
     }
+    private var winOffset = 0   // how far her window is drawn from the y we ask for (e.g. status bar)
+    private var stableFrames = 0
 
     private fun anchorChibi() {
         val p = panel ?: return
@@ -1292,18 +1302,19 @@ class CompanionService : Service() {
             try { wm.updateViewLayout(p, pl) } catch (ex: Exception) {}
             return
         }
-        // measure where her window really is on screen (it can be offset, e.g. by the status bar)
-        // and move it so that her bottom edge sits exactly on the chat's top border
         val c = chibi ?: return
-        if (c.height <= 0) return
-        val now = SystemClock.uptimeMillis()
-        if (now - lastAnchorAdj < 250) return
-        val cl = IntArray(2)
-        c.getLocationOnScreen(cl)
-        val diff = (loc[1] + dp(26)) - (cl[1] + lp.height)
-        if (kotlin.math.abs(diff) > 1) {
-            lastAnchorAdj = now
-            lp.y += diff; fy = lp.y.toFloat(); updateChibiPos()
+        val ny = loc[1] + dp(26) - lp.height - winOffset
+        if (ny != lp.y) {
+            stableFrames = 0
+            lp.y = ny; fy = ny.toFloat(); updateChibiPos()
+        } else if (stableFrames < 5) {
+            stableFrames++
+        } else if (c.height > 0 && c.isAttachedToWindow) {
+            // she stands still: learn the real offset of her window once, so later moves need no feedback
+            val cl = IntArray(2)
+            c.getLocationOnScreen(cl)
+            val off = cl[1] - lp.y
+            if (off != winOffset) { winOffset = off; stableFrames = 0 }
         }
     }
 
@@ -1313,7 +1324,7 @@ class CompanionService : Service() {
         panelOpen = false
         val pv = panel
         if (pv != null && panelAttached) { try { wm.removeView(pv) } catch (ex: Exception) {}; panelAttached = false }
-        main.removeCallbacks(anchorLoop)
+        android.view.Choreographer.getInstance().removeFrameCallback(anchorFrame)
         if (origW > 0) { lp.width = origW; lp.height = origH; lp.x = preX }
         lp.y = preY
         chibi?.pose = false
