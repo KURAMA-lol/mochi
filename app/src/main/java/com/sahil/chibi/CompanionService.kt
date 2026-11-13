@@ -102,6 +102,9 @@ class CompanionService : Service() {
     private var panelOpen = false
     private var panelAttached = false
     private var preY = 0
+    private var preX = 0
+    private var origW = 0
+    private var origH = 0
 
     private var hidden = false
     private var dragging = false
@@ -635,6 +638,8 @@ class CompanionService : Service() {
             }
             MotionEvent.ACTION_MOVE -> {
                 if (radialOpen && longFired) { radial?.feed(e.rawX, e.rawY, false); return true }
+                // chat open: she stays on top of the chat and cannot be dragged away
+                if (panelOpen && !radialOpen) return true
                 val dx = e.rawX - downX
                 val dy = e.rawY - downY
                 if (!moved && hypot(dx, dy) > ViewConfiguration.get(this).scaledTouchSlop) {
@@ -1240,17 +1245,54 @@ class CompanionService : Service() {
         hideBubble()
         val (_, sh) = screen()
         val ph = panelLp!!.height
-        preY = lp.y
+        preY = lp.y; preX = lp.x
         try { wm.addView(panel, panelLp); panelAttached = true } catch (ex: Exception) {}
         panelOpen = true
-        // put her on the panel's top edge, drawn above it
+        // chat open: she is a bit smaller and rests on the panel's top edge
+        origW = lp.width; origH = lp.height
+        val nw = (origW * 0.78f).toInt(); val nh = (origH * 0.78f).toInt()
+        lp.x += (origW - nw) / 2; lp.width = nw; lp.height = nh
         lp.y = (sh - ph - dp(8) - lp.height + dp(26)).coerceAtLeast(0)
         detachChibi(); attachChibi()
-        // chat open: she shows the resting pose (head on arms)
         chibi?.action = "idle"
         chibi?.pose = true
+        main.removeCallbacks(anchorLoop); main.postDelayed(anchorLoop, 60)
         wake()
         say("Yes?", "happy")
+    }
+
+    private fun statusBarH(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(28)
+    }
+
+    /** Keeps her sitting on the top edge of the chat, also when the keyboard moves the chat up.
+     *  If the keyboard leaves too little room above the chat, the chat gets a bit shorter. */
+    private val anchorLoop = object : Runnable {
+        override fun run() {
+            if (!panelOpen) return
+            anchorChibi()
+            main.postDelayed(this, 120)
+        }
+    }
+
+    private fun anchorChibi() {
+        val p = panel ?: return
+        if (!panelOpen || !panelAttached || p.height <= 0) return
+        val loc = IntArray(2)
+        p.getLocationOnScreen(loc)
+        val (_, sh) = screen()
+        val bottom = loc[1] + p.height
+        val minTop = statusBarH() + lp.height - dp(26)
+        val want = minOf((sh * 0.5f).toInt(), bottom - minTop).coerceAtLeast(dp(220))
+        val pl = panelLp
+        if (pl != null && kotlin.math.abs(want - pl.height) > dp(6)) {
+            pl.height = want
+            try { wm.updateViewLayout(p, pl) } catch (ex: Exception) {}
+            return
+        }
+        val ny = (loc[1] - lp.height + dp(26)).coerceAtLeast(0)
+        if (ny != lp.y) { lp.y = ny; fy = lp.y.toFloat(); updateChibiPos() }
     }
 
     private fun closePanel() {
@@ -1259,8 +1301,11 @@ class CompanionService : Service() {
         panelOpen = false
         val pv = panel
         if (pv != null && panelAttached) { try { wm.removeView(pv) } catch (ex: Exception) {}; panelAttached = false }
+        main.removeCallbacks(anchorLoop)
+        if (origW > 0) { lp.width = origW; lp.height = origH; lp.x = preX }
         lp.y = preY
         chibi?.pose = false
+        panelLp?.let { it.height = (screen().second * 0.5f).toInt() }
         updateChibiPos()
         startFall()
         nextDecision = SystemClock.uptimeMillis() + 2000
