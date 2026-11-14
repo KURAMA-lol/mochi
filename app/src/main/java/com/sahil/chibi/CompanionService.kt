@@ -1258,6 +1258,13 @@ class CompanionService : Service() {
         }
         val nw = (origW * 0.78f).toInt(); val nh = (origH * 0.78f).toInt()
         lp.x += (origW - nw) / 2; lp.width = nw; lp.height = nh
+        // keep her over the straight part of the chat's top border, away from its rounded corners
+        run {
+            val sw0 = screen().first
+            val minX0 = dp(8) + dp(28)
+            val maxX0 = sw0 - dp(8) - dp(28) - lp.width
+            lp.x = lp.x.coerceIn(minX0, maxOf(minX0, maxX0))
+        }
         lp.y = sh - ph - dp(8) - lp.height + dp(23) - winOffset
         detachChibi(); attachChibi()
         chibi?.action = "idle"
@@ -1286,6 +1293,7 @@ class CompanionService : Service() {
     }
     private var winOffset = 0   // how far her window is drawn from the y we ask for (e.g. status bar)
     private var stableFrames = 0
+    private var lastNx = Int.MIN_VALUE
 
     private fun anchorChibi() {
         val p = panel ?: return
@@ -1303,8 +1311,14 @@ class CompanionService : Service() {
             return
         }
         val c = chibi ?: return
+        // stay over the straight part of the top border (the corners are rounded, 28dp)
+        val minX = loc[0] + dp(28)
+        val maxX = loc[0] + p.width - dp(28) - lp.width
+        val nx = lp.x.coerceIn(minX, maxOf(minX, maxX))
+        if (nx != lp.x) { lp.x = nx; fx = nx.toFloat() }
         val ny = loc[1] + dp(23) - lp.height - winOffset
-        if (ny != lp.y) {
+        if (ny != lp.y || nx != lastNx) {
+            lastNx = nx
             stableFrames = 0
             lp.y = ny; fy = ny.toFloat(); updateChibiPos()
         } else if (stableFrames < 5) {
