@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import android.webkit.WebChromeClient
+import android.webkit.JsResult
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -154,6 +156,21 @@ class MainActivity : Activity() {
         web = WebView(this)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult): Boolean {
+                android.app.AlertDialog.Builder(this@MainActivity).setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result.confirm() }
+                    .setNegativeButton("Cancel") { _, _ -> result.cancel() }
+                    .setOnCancelListener { result.cancel() }.show()
+                return true
+            }
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult): Boolean {
+                android.app.AlertDialog.Builder(this@MainActivity).setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result.confirm() }
+                    .setOnCancelListener { result.confirm() }.show()
+                return true
+            }
+        }
         web.setBackgroundColor(0)
         web.addJavascriptInterface(Bridge(), "Android")
         buildUi()
@@ -423,6 +440,27 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun resetStats() { Router.resetStats() }
+
+        /** Asks ONE provider's API which models it offers. Result arrives via window.onModels. */
+        @JavascriptInterface fun fetchModels(json: String) {
+            Thread {
+                var ok = false
+                var out: String
+                try {
+                    val p = Provider.fromJson(JSONObject(json))
+                    out = JSONArray(Adapters.listModels(p)).toString()
+                    ok = true
+                } catch (e: Exception) {
+                    out = e.message ?: e.toString()
+                }
+                val id = try { JSONObject(json).optString("id") } catch (e: Exception) { "" }
+                runOnUiThread {
+                    web.evaluateJavascript(
+                        "window.onModels && onModels(${JSONObject.quote(id)}, $ok, ${JSONObject.quote(out)})", null
+                    )
+                }
+            }.start()
+        }
 
         @JavascriptInterface fun defaultPrompt(): String = DEFAULT_PROMPT
 

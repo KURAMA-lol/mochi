@@ -107,6 +107,16 @@ nav button.on{color:var(--act)}
 .swatches button{width:34px;height:34px;border-radius:50%;border:2px solid transparent;padding:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 3px 10px var(--gs);position:relative}
 .swatches button.on{border-color:var(--tx);box-shadow:0 0 0 3px rgba(var(--acr),.28)}
 .dfoot{margin:18px 10px 0;font-size:11.5px;color:var(--mut)}
+.prow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.prow:first-child{border-top:0}.prow.off{opacity:.5}
+.rk{flex:0 0 26px;height:26px;border-radius:9px;background:var(--field);display:grid;place-items:center;font-size:12.5px;font-weight:600}
+.pnm{flex:1;min-width:0;display:flex;flex-direction:column}.pnm b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+button.ib{background:var(--field);color:var(--tx);border:1px solid var(--gl);border-radius:11px;min-width:40px;height:40px;padding:0 10px;font:inherit;font-size:13px;display:inline-grid;place-items:center}button.ib:disabled{opacity:.3}button.ib svg{width:20px;height:20px}
+button.pdot{background:none;border:0;padding:8px 6px}
+.kw{display:flex;gap:8px;align-items:center}.kw input{flex:1;min-width:0}.kw button{flex:0 0 auto}
+.mlist{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow:auto;margin-top:8px}
+.mc{background:var(--field);border:1px solid var(--gl);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;color:var(--tx)}.mc.on{background:linear-gradient(160deg,var(--ac2),var(--ac));color:var(--onac);border-color:transparent}
+button.sm{min-height:44px;padding:0 12px;font-size:13px;white-space:nowrap}
+.mdl{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:99;padding:20px}.mbox{background:var(--bg);color:var(--tx);border:1px solid var(--gl);border-radius:20px;padding:18px;max-width:340px;width:100%}
 </style>
 </head>
 <body>
@@ -233,7 +243,10 @@ nav button.on{color:var(--act)}
 
 <!-- PROVIDERS -->
 <section id="prov">
-  <div class="btns" style="margin-top:6px"><button class="b ghost" style="flex:1" onclick="testAll()">Test all</button></div>
+  <h2>Priority order <span class="tag">top is tried first</span></h2>
+  <div class="card" id="prio"></div>
+  <div class="btns" style="margin-top:12px"><button class="b ghost" style="flex:1" onclick="testAll()">Test all</button></div>
+  <h2>Your providers</h2>
   <div id="plist"></div>
   <h2>Add provider</h2>
   <div class="card">
@@ -439,8 +452,8 @@ let cfg = JSON.parse(Android.getConfig());
 cfg.router = cfg.router || {}; cfg.persona = cfg.persona || {}; cfg.providers = cfg.providers || []; cfg.router.rules = cfg.router.rules || [];
 const DEF_PROMPT = Android.defaultPrompt();
 
-let timer;
-function save(){ clearTimeout(timer); timer = setTimeout(() => Android.saveConfig(JSON.stringify(cfg)), 250); }
+let timer, pend = false;
+function save(){ pend = true; clearTimeout(timer); timer = setTimeout(() => { pend = false; Android.saveConfig(JSON.stringify(cfg)); }, 250); }
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
 // ---------- tabs ----------
@@ -573,17 +586,91 @@ const PRESETS = {
 };
 $('preset').innerHTML = Object.entries(PRESETS).map(([k,v]) => `<option value="${k}">${v.n}</option>`).join('');
 
+const openP = new Set(), MODELS = {};
+const IC_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const IC_EYEOFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19 19 0 0 1 5.1-5.9M9.9 5.2A10 10 0 0 1 12 5c7 0 11 7 11 7a19 19 0 0 1-3.2 4.2M14.1 14.1a3 3 0 1 1-4.2-4.2M1 1l22 22"/></svg>';
+function OP(id,o){ if (o) openP.add(id); else openP.delete(id); }
+function renum(){ cfg.providers.forEach((p,i) => p.priority = i + 1); }
+function flushSave(){ clearTimeout(timer); pend = false; try { Android.saveConfig(JSON.stringify(cfg)); } catch (e) {} }
+function refreshAI(){ renderProviders(); renderPrio(); renderRoute(); }
+cfg.providers.sort((a,b) => (a.priority||0) - (b.priority||0)); renum();
+
 function addProvider(){
   const p = PRESETS[$('preset').value];
-  cfg.providers.push({id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: p.n, type: p.t, baseUrl: p.u, apiKey: '', model: p.m,
+  const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  cfg.providers.push({id, name: p.n, type: p.t, baseUrl: p.u, apiKey: '', model: p.m,
     enabled: true, priority: cfg.providers.length + 1, weight: 1, tags: p.tags, timeoutSec: 30, maxTokens: 300, temperature: 0.8,
     method: 'GET', headers: '', bodyTemplate: '', responsePath: '', promptMode: 'full'});
-  save(); renderProviders();
-  const last = document.querySelector('#plist details:last-child'); if (last) last.open = true;
+  openP.add(id); renum(); flushSave(); refreshAI();
+  const last = document.querySelector('#plist details:last-child'); if (last) last.scrollIntoView({block:'center'});
 }
-function P(i,k,v){ cfg.providers[i][k] = v; save(); }
-function T(i,v){ P(i,'type',v); renderProviders(); const d = document.querySelectorAll('#plist details')[i]; if (d) d.open = true; }
-function delProvider(i){ if (confirm('Delete ' + cfg.providers[i].name + '?')) { cfg.providers.splice(i,1); save(); renderProviders(); } }
+function P(i,k,v){ cfg.providers[i][k] = v; save(); if (k === 'name' || k === 'model' || k === 'enabled') renderPrio(); }
+function T(i,v){ P(i,'type',v); renderProviders(); }
+function askYes(msg, yes, label){
+  const d = document.createElement('div'); d.className = 'mdl';
+  d.innerHTML = '<div class="mbox"><div>' + esc(msg) + '</div><div class="btns"><button class="b ghost" style="flex:1" id="mno">Cancel</button><button class="b red" style="flex:1" id="myes">' + esc(label || 'Yes') + '</button></div></div>';
+  document.body.appendChild(d);
+  d.querySelector('#mno').onclick = () => d.remove();
+  d.querySelector('#myes').onclick = () => { d.remove(); yes(); };
+}
+function delProvider(i){
+  const p = cfg.providers[i]; if (!p) return;
+  askYes('Delete ' + p.name + '?', () => {
+    openP.delete(p.id); delete MODELS[p.id];
+    cfg.providers.splice(i,1); renum(); flushSave(); refreshAI();
+  }, 'Delete');
+}
+function mv(i,d){ const a = cfg.providers, j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; renum(); flushSave(); refreshAI(); }
+function toTop(i){ const a = cfg.providers; if (i <= 0) return; a.unshift(a.splice(i,1)[0]); renum(); flushSave(); refreshAI(); }
+function tgl(i){ cfg.providers[i].enabled = !cfg.providers[i].enabled; flushSave(); refreshAI(); }
+function renderPrio(){
+  const el = $('prio'); if (!el) return;
+  const n = cfg.providers.length;
+  el.innerHTML = (cfg.providers.map((p,i) => `
+    <div class="prow ${p.enabled ? '' : 'off'}">
+      <button class="pdot" onclick="tgl(${i})" aria-label="Turn on or off"><i class="pd ${p.enabled ? 'on' : ''}"></i></button>
+      <span class="rk">${i+1}</span>
+      <span class="pnm"><b>${esc(p.name)}</b><span class="tag">${esc(p.model || p.type)}${p.enabled ? '' : ' · off'}</span></span>
+      <button class="ib" onclick="toTop(${i})" ${i ? '' : 'disabled'}>Top</button>
+      <button class="ib" onclick="mv(${i},-1)" ${i ? '' : 'disabled'}>&#9650;</button>
+      <button class="ib" onclick="mv(${i},1)" ${i < n - 1 ? '' : 'disabled'}>&#9660;</button>
+    </div>`).join('') || '<div class="mut">No providers yet. Add one below.</div>')
+    + (n > 1 ? '<div class="mut" style="margin-top:8px">Tap the dot to switch a provider on or off. The Priority + failover strategy uses this order (see Routing).</div>' : '');
+}
+function eye(i){
+  const e = $('key'+i), b = $('eye'+i); if (!e || !b) return;
+  const show = e.type === 'password'; e.type = show ? 'text' : 'password'; b.innerHTML = show ? IC_EYEOFF : IC_EYE;
+}
+function renderModels(i){
+  const p = cfg.providers[i], box = $('ml'+i), c = $('mc'+i); if (!p || !box || !c) return;
+  const list = MODELS[p.id]; if (!list || !list.length) { box.style.display = 'none'; return; }
+  box.style.display = ''; const q = $('mq'+i);
+  q.style.display = list.length > 10 ? '' : 'none';
+  const f = (q.value || '').toLowerCase();
+  c.innerHTML = list.filter(m => !f || m.toLowerCase().includes(f)).map(m =>
+    `<button type="button" class="mc ${m === p.model ? 'on' : ''}" data-m="${esc(m)}" onclick="pickM(${i},this.dataset.m)">${esc(m)}</button>`).join('')
+    || '<span class="mut">No match</span>';
+}
+function pickM(i,m){
+  P(i,'model',m); const inp = $('mdl'+i); if (inp) inp.value = m;
+  const tt = $('tst'+i); if (tt) { tt.textContent = m; tt.style.color = ''; }
+  renderModels(i);
+}
+function fetchM(i){
+  const p = cfg.providers[i], b = $('fm'+i), n = $('mn'+i); if (!p || !b || !n) return;
+  b.disabled = true; b.textContent = 'Fetching...'; n.style.color = ''; n.textContent = '';
+  try { Android.fetchModels(JSON.stringify(p)); } catch (e) { window.onModels(p.id, false, 'Needs the latest app version.'); }
+}
+window.onModels = (id, ok, data) => {
+  const i = cfg.providers.findIndex(p => p.id === id); if (i < 0) return;
+  const b = $('fm'+i), n = $('mn'+i); if (b) { b.disabled = false; b.textContent = 'Fetch models'; } if (!n) return;
+  if (ok) {
+    let l = []; try { l = JSON.parse(data); } catch (e) {}
+    MODELS[id] = l; n.style.color = 'var(--ac)';
+    n.textContent = l.length ? ('Found ' + l.length + ' models. Tap one to use it.') : 'The provider returned no models.';
+    renderModels(i);
+  } else { n.style.color = 'var(--bad)'; n.textContent = String(data); }
+};
 function testAll(){ cfg.providers.forEach((p,i) => { if (p.enabled) { const t = $('tst'+i); if (t) { t.textContent = 'Testing...'; t.style.color = ''; } testP(i); } }); }
 function testP(i){
   const el = $('res'+i); el.className = 'res'; el.textContent = 'Testing...';
@@ -597,16 +684,20 @@ window.onTest = (id, ok, text) => {
 };
 function renderProviders(){
   $('plist').innerHTML = cfg.providers.map((p,i) => `
-  <details class="p">
-    <summary><span class="pn"><i class="pd ${p.enabled?'on':''}"></i><span><b>${esc(p.name)}</b><span class="tag" id="tst${i}">${esc(p.model||p.type)}${(!p.apiKey&&p.type!=='generic')?' · no key':''}</span></span></span><span class="tag">#${p.priority}</span></summary>
+  <details class="p" ${openP.has(p.id) ? 'open' : ''} ontoggle="OP('${p.id}',this.open)">
+    <summary><span class="pn"><i class="pd ${p.enabled?'on':''}"></i><span><b>${esc(p.name)}</b><span class="tag" id="tst${i}">${esc(p.model||p.type)}${(!p.apiKey&&p.type!=='generic')?' · no key':''}</span></span></span><span class="tag">#${i+1}</span></summary>
     <label>Name</label><input value="${esc(p.name)}" oninput="P(${i},'name',this.value)">
     <label>API type</label>
     <select onchange="T(${i},this.value)">
       ${[['openai','OpenAI-compatible'],['anthropic','Anthropic'],['gemini','Gemini'],['generic','Custom endpoint (any URL: GET / POST)']].map(t => `<option value="${t[0]}" ${p.type===t[0]?'selected':''}>${t[1]}</option>`).join('')}
     </select>
     <label>${p.type==='generic'?'URL template  (use {prompt}, {message}, {key}, {model})':'Base URL'}</label><input value="${esc(p.baseUrl)}" oninput="P(${i},'baseUrl',this.value.trim())" autocapitalize="off">
-    <label>API key</label><input type="password" value="${esc(p.apiKey)}" oninput="P(${i},'apiKey',this.value.trim())" autocapitalize="off" placeholder="paste key here">
-    <label>${p.type==='generic'?'Model (optional, only if the URL uses {model})':'Model'}</label><input value="${esc(p.model)}" oninput="P(${i},'model',this.value.trim())" autocapitalize="off">
+    <label>API key</label>
+    <div class="kw"><input id="key${i}" type="password" value="${esc(p.apiKey)}" oninput="P(${i},'apiKey',this.value.trim())" autocapitalize="off" autocomplete="off" placeholder="paste key here"><button type="button" class="ib" id="eye${i}" onclick="eye(${i})" aria-label="Show or hide key">${IC_EYE}</button></div>
+    <label>${p.type==='generic'?'Model (optional, only if the URL uses {model})':'Model'}</label>
+    <div class="kw"><input id="mdl${i}" value="${esc(p.model)}" oninput="P(${i},'model',this.value.trim())" autocapitalize="off">${p.type==='generic' ? '' : `<button type="button" class="b ghost sm" id="fm${i}" onclick="fetchM(${i})">Fetch models</button>`}</div>
+    <div class="mut" id="mn${i}" style="margin-top:6px"></div>
+    <div id="ml${i}" style="display:none;margin-top:6px"><input id="mq${i}" placeholder="Search models" oninput="renderModels(${i})" autocapitalize="off" style="display:none"><div class="mlist" id="mc${i}"></div></div>
     ${p.type==='generic' ? `
     <div class="card2" style="background:var(--card2);border-radius:12px;padding:4px 10px 10px;margin-top:10px">
       <div class="mut" style="margin-top:8px">If the URL has no {prompt}, the text is added at the very end (so <i>...?prompt=</i> works).</div>
@@ -622,7 +713,8 @@ function renderProviders(){
       <textarea style="min-height:60px" oninput="P(${i},'headers',this.value)" autocapitalize="off">${esc(p.headers||'')}</textarea>
     </div>` : ''}
     <div class="row">
-      <div><label>Priority (low first)</label><input type="number" value="${p.priority}" onchange="P(${i},'priority',+this.value)"></div>
+      <div><label>Priority (#${i+1} of ${cfg.providers.length})</label>
+        <div class="btns" style="margin-top:0"><button class="ib" onclick="mv(${i},-1)" ${i ? '' : 'disabled'}>&#9650; Up</button><button class="ib" onclick="mv(${i},1)" ${i < cfg.providers.length - 1 ? '' : 'disabled'}>&#9660; Down</button></div></div>
       <div><label>Weight</label><input type="number" min="1" value="${p.weight}" onchange="P(${i},'weight',+this.value)"></div>
     </div>
     <label>Tags (comma separated, used by routing rules)</label><input value="${esc(p.tags)}" oninput="P(${i},'tags',this.value)" autocapitalize="off">
@@ -638,6 +730,7 @@ function renderProviders(){
     </div>
     <div id="res${i}" class="res" style="margin-bottom:12px"></div>
   </details>`).join('') || '<div class="card mut">No providers yet. Add one below and paste your API key.</div>';
+  cfg.providers.forEach((p,i) => { if (MODELS[p.id]) renderModels(i); });
 }
 
 // ---------- routing ----------
@@ -674,8 +767,10 @@ function renderRoute(){
       <select onchange="Rl(${i},'target',this.value)">${(tg.includes(r.target)?tg:[r.target,...tg]).map(t => `<option ${t===r.target?'selected':''}>${esc(t)}</option>`).join('')}</select>
       <div class="btns"><button class="b red" onclick="delRule(${i})">Remove</button></div>
     </div>`).join('') || '<div class="card mut">No rules - the strategy decides everything.</div>';
+  if (window.__ready) { try { dry(); } catch (e) {} }
 }
 function dry(){
+  if (pend) flushSave();
   const r = JSON.parse(Android.dryRun($('dtext').value, $('dvoice').checked));
   $('dres').innerHTML = (r.rule ? `<div class="mut">Matched rule: ${esc(r.rule)}</div>` : '<div class="mut">No rule matched - strategy order</div>')
     + '<div class="order">' + (r.order.map((n,i) => `<span>${i+1}. ${esc(n)}</span>`).join('') || '<span style="color:var(--bad)">no usable providers</span>') + '</div>';
@@ -693,6 +788,7 @@ function renderPersona(){
 
 // ---------- stats ----------
 function loadStats(){
+  if (pend) flushSave();
   const rows = JSON.parse(Android.getStats());
   const tc = rows.reduce((a,r) => a + r.calls, 0), tf = rows.reduce((a,r) => a + r.fails, 0);
   $('stSum').innerHTML = `<div class="kpi"><b>${tc}</b><span>requests</span></div><div class="kpi"><b>${tc ? Math.max(0, Math.round((tc-tf)/tc*100)) : 100}%</b><span>success</span></div><div class="kpi"><b>${rows.filter(r => r.cooldownSec > 0).length}</b><span>paused</span></div>`;
@@ -705,8 +801,8 @@ function loadStats(){
   }).join('') || '<div class="card mut">No data yet. Chat with Nana first.</div>';
 }
 
-function renderAll(){ refreshStatus(); renderProviders(); renderRoute(); renderPersona(); }
-renderAll(); tab('home'); applyTheme(false);
+function renderAll(){ refreshStatus(); renderProviders(); renderPrio(); renderRoute(); renderPersona(); }
+renderAll(); window.__ready = true; tab('home'); applyTheme(false);
 </script>
 <script>
 function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var am=document.getElementById('askMode');if(am&&Android.getAskMode)am.value=Android.getAskMode();var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}

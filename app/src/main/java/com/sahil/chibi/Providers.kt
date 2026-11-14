@@ -47,6 +47,49 @@ object Adapters {
         }
     }
 
+    /** Model ids the provider's own API offers (for the "Fetch models" button). */
+    fun listModels(p: Provider): List<String> {
+        if (p.type == "generic") throw Exception("Custom endpoints have no model list. Type the model name only if the URL uses {model}.")
+        if (p.baseUrl.isBlank()) throw Exception("Fill the Base URL first.")
+        val base = p.baseUrl.trimEnd('/')
+        val out = LinkedHashSet<String>()
+        val t = 20000
+        when (p.type) {
+            "anthropic" -> {
+                val o = JSONObject(Http.request("GET", "$base/v1/models?limit=1000",
+                    mapOf("x-api-key" to p.apiKey, "anthropic-version" to "2023-06-01"), null, t))
+                val a = o.optJSONArray("data") ?: JSONArray()
+                for (i in 0 until a.length()) out.add(a.getJSONObject(i).optString("id"))
+            }
+            "gemini" -> {
+                val o = JSONObject(Http.request("GET", "$base/v1beta/models?pageSize=1000",
+                    mapOf("x-goog-api-key" to p.apiKey), null, t))
+                val a = o.optJSONArray("models") ?: JSONArray()
+                for (i in 0 until a.length()) {
+                    val m = a.getJSONObject(i)
+                    val methods = m.optJSONArray("supportedGenerationMethods")
+                    var chat = methods == null
+                    if (methods != null) for (j in 0 until methods.length()) if (methods.optString(j) == "generateContent") chat = true
+                    if (chat) out.add(m.optString("name").removePrefix("models/"))
+                }
+            }
+            else -> {
+                val headers = HashMap<String, String>()
+                if (p.apiKey.isNotBlank()) headers["Authorization"] = "Bearer ${p.apiKey}"
+                val text = Http.request("GET", "$base/models", headers, null, t).trim()
+                val arr: JSONArray = if (text.startsWith("[")) JSONArray(text) else {
+                    val o = JSONObject(text)
+                    o.optJSONArray("data") ?: o.optJSONArray("models") ?: JSONArray()
+                }
+                for (i in 0 until arr.length()) {
+                    val e = arr.opt(i)
+                    if (e is JSONObject) out.add(e.optString("id").ifBlank { e.optString("name") }) else if (e is String) out.add(e)
+                }
+            }
+        }
+        return out.filter { it.isNotBlank() }.sortedBy { it.lowercase() }
+    }
+
     /** Merge consecutive same-role messages and make sure the list starts with "user". */
     private fun normalize(msgs: List<Msg>): List<Msg> {
         val out = ArrayList<Msg>()
