@@ -339,7 +339,8 @@ class CompanionService : Service() {
                 val l = WindowManager.LayoutParams(
                     dp(230), WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT
                 )
                 l.gravity = Gravity.TOP or Gravity.END
@@ -736,7 +737,8 @@ class CompanionService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         )
         l.gravity = Gravity.TOP or Gravity.START
@@ -772,7 +774,7 @@ class CompanionService : Service() {
     private val tick = object : Runnable {
         override fun run() {
             try { step() } catch (ex: Exception) {}
-            main.postDelayed(this, 33)
+            main.postDelayed(this, if (hidden || !attached) 250L else 33L)
         }
     }
 
@@ -999,7 +1001,8 @@ class CompanionService : Service() {
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
             )
         }
         b.text = text
@@ -1221,7 +1224,8 @@ class CompanionService : Service() {
         panelLp = WindowManager.LayoutParams(
             sw - dp(16), (sh * 0.5f).toInt(),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -1244,6 +1248,7 @@ class CompanionService : Service() {
         if (panel == null) buildPanel()
         hideBubble()
         val (_, sh) = screen()
+        panelSbH = statusBarH(); panelBaseH = (sh * 0.5f).toInt()
         val ph = panelLp!!.height
         preY = lp.y; preX = lp.x
         try { wm.addView(panel, panelLp); panelAttached = true } catch (ex: Exception) {}
@@ -1293,6 +1298,8 @@ class CompanionService : Service() {
     }
     private var winOffset = 0   // how far her window is drawn from the y we ask for (e.g. status bar)
     private var stableFrames = 0
+    private var panelSbH = 0
+    private var panelBaseH = 0
     private var lastNx = Int.MIN_VALUE
 
     private fun anchorChibi() {
@@ -1300,10 +1307,9 @@ class CompanionService : Service() {
         if (!panelOpen || !panelAttached || p.height <= 0) return
         val loc = IntArray(2)
         p.getLocationOnScreen(loc)
-        val (_, sh) = screen()
         val bottom = loc[1] + p.height
-        val minTop = statusBarH() + lp.height - dp(23)
-        val want = minOf((sh * 0.5f).toInt(), bottom - minTop).coerceAtLeast(dp(220))
+        val minTop = panelSbH + lp.height - dp(23)
+        val want = minOf(panelBaseH, bottom - minTop).coerceAtLeast(dp(220))
         val pl = panelLp
         if (pl != null && kotlin.math.abs(want - pl.height) > dp(6)) {
             pl.height = want

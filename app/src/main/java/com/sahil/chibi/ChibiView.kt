@@ -233,6 +233,10 @@ class ChibiView(ctx: Context) : FrameLayout(ctx) {
             c.drawBitmap(pb, null, patchDst, bp)
         }
         c.restore()
-        postInvalidateDelayed(60)
+        if (pose) {
+            // still pose: redraw only when the blink starts or ends
+            val t = if (now < blinkUntil) blinkUntil else nextBlink
+            postInvalidateDelayed((t - now).coerceIn(16L, 3000L))
+        } else postInvalidateDelayed(60)
     }
 }
