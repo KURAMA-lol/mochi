@@ -26,7 +26,7 @@ jobs:
       - name: Fetch LivLiv Player and Nana (not stored in this repo)
         run: |
           git clone https://github.com/livliv-dev/player /tmp/livliv
-          git -C /tmp/livliv checkout 91cd1f7b2cf2290977ccccbc2fe47dc555963045
+          git -C /tmp/livliv checkout e8a47e79a7358e4ae87208f20930442dc56fc6bc
           sed -i 's/^    if (!text) return$/    return/' /tmp/livliv/src/mark.ts
           grep -n '^    return$' /tmp/livliv/src/mark.ts
           mkdir -p app/src/main/assets/nana/model

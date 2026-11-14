@@ -37,7 +37,7 @@ function loop(now) {
   if (st.a === 'sus' && now - lastLook > 1300) { lastLook = now; lookDir = -lookDir; P.lookAt(lookDir * 0.9, 0.1); }
 }
 try {
-  P = new Player(c, { followPointer: false, maxPixelRatio: 2 });
+  P = new Player(c, { followPointer: false, maxPixelRatio: 3 });
   await P.load('model/');
   apply();
   requestAnimationFrame(loop);
