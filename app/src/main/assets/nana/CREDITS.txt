@@ -1,4 +1,4 @@
 Characters: LivLiv (livliv.ai)
-Nana (d03) is a LivLiv Featured Character, used under the LivLiv Featured Characters License v1.0 (free for personal, non-commercial use; no selling or separate distribution).
+Nana, refined (d03ft) is a LivLiv Featured Character, used under the LivLiv Featured Characters License v1.0 (free for personal, non-commercial use; no selling or separate distribution).
 Rendered with LivLiv Player (Apache-2.0), https://github.com/livliv-dev/player
 The CI build downloads both from that repository (pinned commit) into this app's assets; they are not stored in this repo.

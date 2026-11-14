@@ -30,7 +30,7 @@ jobs:
           sed -i 's/^    if (!text) return$/    return/' /tmp/livliv/src/mark.ts
           grep -n '^    return$' /tmp/livliv/src/mark.ts
           mkdir -p app/src/main/assets/nana/model
-          cp -r /tmp/livliv/characters/d03/. app/src/main/assets/nana/model/
+          cp -r /tmp/livliv/characters/d03ft/. app/src/main/assets/nana/model/
           rm -f app/src/main/assets/nana/model/cover.webp app/src/main/assets/nana/model/avatar.webp
           cp /tmp/livliv/characters/LICENSE.md app/src/main/assets/nana/LICENSE-characters.md
           cp /tmp/livliv/LICENSE app/src/main/assets/nana/LICENSE-player.txt
