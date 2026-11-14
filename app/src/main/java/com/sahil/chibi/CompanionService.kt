@@ -1258,7 +1258,7 @@ class CompanionService : Service() {
         }
         val nw = (origW * 0.78f).toInt(); val nh = (origH * 0.78f).toInt()
         lp.x += (origW - nw) / 2; lp.width = nw; lp.height = nh
-        lp.y = sh - ph - dp(8) - lp.height + dp(17) - winOffset
+        lp.y = sh - ph - dp(8) - lp.height + dp(23) - winOffset
         detachChibi(); attachChibi()
         chibi?.action = "idle"
         chibi?.pose = true
@@ -1294,7 +1294,7 @@ class CompanionService : Service() {
         p.getLocationOnScreen(loc)
         val (_, sh) = screen()
         val bottom = loc[1] + p.height
-        val minTop = statusBarH() + lp.height - dp(17)
+        val minTop = statusBarH() + lp.height - dp(23)
         val want = minOf((sh * 0.5f).toInt(), bottom - minTop).coerceAtLeast(dp(220))
         val pl = panelLp
         if (pl != null && kotlin.math.abs(want - pl.height) > dp(6)) {
@@ -1303,7 +1303,7 @@ class CompanionService : Service() {
             return
         }
         val c = chibi ?: return
-        val ny = loc[1] + dp(17) - lp.height - winOffset
+        val ny = loc[1] + dp(23) - lp.height - winOffset
         if (ny != lp.y) {
             stableFrames = 0
             lp.y = ny; fy = ny.toFloat(); updateChibiPos()
