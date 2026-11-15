@@ -23,6 +23,10 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Fetch LivLiv Player and Nana (not stored in this repo)
         run: |
           git clone https://github.com/livliv-dev/player /tmp/livliv
@@ -38,6 +42,15 @@ jobs:
           npm install -g bun
           bun build /tmp/livliv/src/index.ts --outfile app/src/main/assets/nana/player.js --minify --target browser
           ls -la app/src/main/assets/nana app/src/main/assets/nana/model
+
+      - name: Fetch Agent-Reach (MIT, not stored in this repo)
+        run: |
+          git clone https://github.com/Panniantong/Agent-Reach /tmp/agentreach
+          git -C /tmp/agentreach checkout c70ae6da5d39bc90e09ad2ae0575ccc89f31e284
+          mkdir -p app/src/main/python
+          cp -r /tmp/agentreach/agent_reach app/src/main/python/agent_reach
+          cp /tmp/agentreach/LICENSE app/src/main/assets/nana/LICENSE-agent-reach.txt
+          ls app/src/main/python app/src/main/python/agent_reach | head -40
 
       - name: Build debug APK
         run: gradle testDebugUnitTest assembleDebug --no-daemon --stacktrace
