@@ -298,7 +298,7 @@ class CompanionService : Service() {
                 val c = LinearLayout(this)
                 c.orientation = LinearLayout.VERTICAL
                 c.setPadding(dp(12), dp(9), dp(12), dp(10))
-                c.background = GradientDrawable().apply { setColor(Theme.panelBg); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Theme.alpha(Theme.ac, 0x99)) }
+                c.background = liquid(Theme.panelBg, 16, Theme.alpha(Theme.ac, 0x99))
                 val t = TextView(this)
                 val h = TextView(this)
                 h.text = "Nana asks"
@@ -1048,6 +1048,14 @@ class CompanionService : Service() {
     private var sendBtn: android.widget.ImageView? = null
     private var subtitle: TextView? = null
 
+    /** Liquid-glass surface: translucent base, bright top-left specular sheen and a light rim. */
+    private fun liquid(base: Int, r: Int, stroke: Int = 0x38FFFFFF): android.graphics.drawable.Drawable {
+        val rr = dp(r).toFloat()
+        val a = GradientDrawable().apply { setColor(base); cornerRadius = rr; setStroke(dp(1), stroke) }
+        val spec = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0x30FFFFFF, 0x0CFFFFFF, 0x00FFFFFF, 0x14FFFFFF)).apply { cornerRadius = rr }
+        return android.graphics.drawable.LayerDrawable(arrayOf(a, spec))
+    }
+
     private fun glass(fill: Int, stroke: Int, r: Int) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(r).toFloat(); setStroke(dp(1), stroke)
     }
@@ -1149,9 +1157,7 @@ class CompanionService : Service() {
         val root = PanelLayout(this)
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(16), dp(10), dp(12), dp(12))
-        root.background = GradientDrawable().apply {
-            setColor(Theme.alpha(Theme.panelBg, 0xEC)); cornerRadius = dp(28).toFloat(); setStroke(dp(1), 0x2EFFFFFF)
-        }
+        root.background = liquid(Theme.alpha(Theme.panelBg, 0xEC), 28, 0x40FFFFFF)
         root.onBack = { closePanel() }
 
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
