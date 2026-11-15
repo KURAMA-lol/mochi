@@ -100,6 +100,45 @@ def _youtube(argv):
     raise ValueError("youtube actions: read <link>, search <query>, subtitle <link> [--lang en]")
 
 
+_patched = False
+
+
+def _relax_symlink_check(home):
+    # Android app dirs live under symlinked parents (/data/user/0). Agent-Reach rejects any symlink
+    # in the whole path, so only check the part below our private home folder.
+    global _patched
+    if _patched:
+        return
+    import stat
+    from agent_reach.utils import paths
+    base = os.path.abspath(home)
+
+    def check(path, label="path"):
+        target = os.fspath(path)
+        absolute = os.path.abspath(target)
+        if absolute != base and not absolute.startswith(base + os.sep):
+            return paths._orig_check(path, label)
+        cur = base
+        for part in absolute[len(base):].split(os.sep):
+            if not part:
+                continue
+            cur = os.path.join(cur, part)
+            try:
+                mode = os.lstat(cur).st_mode
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(mode):
+                raise paths.PrivatePathError("symlink not allowed: " + cur)
+        return type(path)(path) if not isinstance(path, str) else __import__("pathlib").Path(path)
+
+    paths._orig_check = paths.ensure_no_symlink_path
+    paths.ensure_no_symlink_path = check
+    for m in list(sys.modules.values()):
+        if m is not None and getattr(m, "__name__", "").startswith("agent_reach") and hasattr(m, "ensure_no_symlink_path"):
+            m.ensure_no_symlink_path = check
+    _patched = True
+
+
 def run(command, home):
     os.makedirs(home, exist_ok=True)
     os.environ["HOME"] = home
@@ -114,6 +153,7 @@ def run(command, home):
                 out.write(_yt_read(argv[1]) + "\n\n" + _yt_subtitle(argv[1]))
             else:
                 from agent_reach import cli
+                _relax_symlink_check(home)
                 old = sys.argv
                 sys.argv = ["agent-reach"] + argv
                 try:
