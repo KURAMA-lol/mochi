@@ -17,7 +17,9 @@ object PyRuntime {
     /** Runs one Agent-Reach command line, e.g. "github read owner/repo", and returns text for the model. */
     fun reach(ctx: Context, command: String): String {
         if (command.isBlank()) return "No command given. Example: youtube subtitle <link>"
-        val home = java.io.File(ctx.filesDir, "reach").absolutePath
+        // /data/user/0 is a symlink on Android; Agent-Reach rejects symlinked config dirs, so use the real path.
+        val dir = java.io.File(ctx.filesDir, "reach"); dir.mkdirs()
+        val home = dir.canonicalPath
         val raw = py(ctx).getModule("nana_reach").callAttr("run", command, home).toString()
         val o = JSONObject(raw)
         val out = o.optString("out").trim()
