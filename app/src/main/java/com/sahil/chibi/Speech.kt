@@ -499,7 +499,7 @@ object Ears {
             host?.state("error:" + (e.message ?: e.javaClass.simpleName).take(60))
             val r = req
             req = null
-            r?.onFail("error")
+            r?.onFail?.invoke("error")
             synchronized(this) { th = null }
         } finally {
             closeRec(rec)
