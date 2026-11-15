@@ -276,6 +276,17 @@ class MainActivity : Activity() {
         @JavascriptInterface fun getAgent(): String = Agent.cfgJson(this@MainActivity)
         @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
         @JavascriptInterface fun getAskMode(): String = Agent.askMode(this@MainActivity)
+        @JavascriptInterface fun getWatchAlong(): Boolean = getSharedPreferences("nana_watch", MODE_PRIVATE).getBoolean("on", false)
+        @JavascriptInterface fun setWatchAlong(on: Boolean) { getSharedPreferences("nana_watch", MODE_PRIVATE).edit().putBoolean("on", on).apply() }
+        @JavascriptInterface fun watchLink(url: String) {
+            runOnUiThread {
+                if (!Settings.canDrawOverlays(this@MainActivity)) { Toast.makeText(this@MainActivity, "Allow display over other apps first", Toast.LENGTH_SHORT).show(); return@runOnUiThread }
+                try {
+                    startForegroundService(Intent(this@MainActivity, CompanionService::class.java)
+                        .setAction(CompanionService.ACT_ASK).putExtra("text", url.trim().take(2000)))
+                } catch (e: Exception) {}
+            }
+        }
         @JavascriptInterface fun setAskMode(v: String) { Agent.setAskMode(this@MainActivity, v) }
         @JavascriptInterface fun getWakeState(): String = CompanionService.wakeState
         @JavascriptInterface fun batteryOk(): Boolean = try { (this@MainActivity.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isIgnoringBatteryOptimizations(packageName) } catch (e: Exception) { false }

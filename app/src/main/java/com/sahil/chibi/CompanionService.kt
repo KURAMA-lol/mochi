@@ -235,7 +235,9 @@ class CompanionService : Service() {
                 val t = intent?.getStringExtra("text") ?: ""
                 if (t.isNotBlank()) {
                     if (!panelOpen) openPanel()
-                    val q = if (t.length < 60) "Explain this simply (translate it to English if it is in another language): $t"
+                    val vurl = Watch.videoUrl(t)
+                    val q = if (vurl != null) "Watch this with me and react: $vurl (call the watch_video tool first, then tell me what it is about in your own words, like we watched it together)"
+                    else if (t.length < 60) "Explain this simply (translate it to English if it is in another language): $t"
                     else "Summarize this in a few short points: $t"
                     sendUserText(q, false)
                 }
@@ -789,6 +791,8 @@ class CompanionService : Service() {
         if (talkUntil in 1..now) { c.talking = false; talkUntil = 0 }
         if (moodResetAt in 1..now) { c.mood = "neutral"; moodResetAt = 0 }
         if (dragging || panelOpen || radialOpen) return
+
+        if (now >= nextWatchAt) { nextWatchAt = now + 8000; watchAlongTick() }
 
         if (now >= kbCheckAt) {
             kbCheckAt = now + 300
@@ -1480,6 +1484,48 @@ class CompanionService : Service() {
         endTyping(false, "failed")
         addMsg("Error: $msg", false, null)
         say("Something went wrong...", "sad")
+    }
+
+    // ---- watch-along: opt-in; reads the on-screen text of video apps and makes one tiny remark ----
+    private var nextWatchAt = 0L
+    private var lastWatchAt = 0L
+    private var lastWatchSig = 0
+    private val watchBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val WATCH_APPS = setOf(
+        "com.instagram.android", "com.instagram.lite", "com.google.android.youtube", "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill", "com.facebook.katana", "com.facebook.lite", "com.snapchat.android"
+    )
+
+    private fun watchAlongTick() {
+        if (!getSharedPreferences("nana_watch", MODE_PRIVATE).getBoolean("on", false)) return
+        val a = NanaAccess.inst ?: return
+        val pkg = a.foregroundPkg() ?: return
+        if (pkg !in WATCH_APPS) return
+        if (SystemClock.uptimeMillis() - lastWatchAt < 22_000) return
+        if (!watchBusy.compareAndSet(false, true)) return
+        val conf = cfg
+        Thread {
+            try {
+                val screen = a.read()
+                val low = screen.lowercase()
+                val video = listOf("reel", "shorts", "original audio", "for you", "remix").any { low.contains(it) }
+                val priv = listOf("type a message", "message...", "password", "inbox", "send message").any { low.contains(it) }
+                if (!video || priv) return@Thread
+                val txt = screen.take(1800)
+                val sig = txt.hashCode()
+                if (sig == lastWatchSig) return@Thread
+                lastWatchSig = sig
+                lastWatchAt = SystemClock.uptimeMillis()
+                val ask = Msg("user", "(You are watching short videos on the phone together with ${conf.persona.userName}. This is the text visible on screen right now:\n$txt\n\nGive ONE tiny natural reaction, under 14 words, about what the text tells you (caption, creator, comments). If it does not show a video or tells you nothing, reply exactly SKIP. Never mention reading the screen text.)")
+                val res = Router.chat(conf, Persona.system(conf), listOf(ask), false)
+                val (m, t) = parseMood(res.text)
+                if (t.isBlank() || t.trim().startsWith("SKIP", true)) return@Thread
+                main.post { if (!panelOpen && !hidden) say(t, m) }
+            } catch (ex: Exception) {
+            } finally {
+                watchBusy.set(false)
+            }
+        }.start()
     }
 
     private fun aiChatter() {

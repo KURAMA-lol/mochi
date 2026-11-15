@@ -217,6 +217,14 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
     <p class="mut">She never types passwords, cards or OTPs and never acts unless you ask.</p>
   </div>
 
+  <h2>Watching</h2>
+  <div class="card">
+    <label class="sw"><span>Watch along<small>she comments now and then on Reels / Shorts you scroll (needs screen control, off by default)</small></span><input type="checkbox" id="waOn" onchange="waSave()"></label>
+    <label>Make her watch a link</label>
+    <div class="kw"><input id="waUrl" placeholder="Reel, Short, TikTok or YouTube link" autocapitalize="off" autocomplete="off"><button type="button" class="b sm" onclick="waGo()">Watch</button></div>
+    <p class="mut">YouTube and Shorts: she reads the captions. TikTok, Instagram and others: only the public caption, so she tells you when she did not see the video itself. You can also share a link to Nana from any app. Watch along sends the visible text of video apps to your AI provider, only while it is on.</p>
+  </div>
+
   <h2>Ways to call her</h2>
   <div class="card mut">
     Hold the <b>power button</b> or swipe from a corner (after choosing Nana as default assistant)<br>
@@ -843,9 +851,11 @@ function renderAll(){ refreshStatus(); renderProviders(); renderPrio(); renderRo
 renderAll(); window.__ready = true; tab('home'); applyTheme(false);
 </script>
 <script>
-function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var am=document.getElementById('askMode');if(am&&Android.getAskMode)am.value=Android.getAskMode();var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}
+function agLoad(){try{if(!Android.getAgent)return;var a=JSON.parse(Android.getAgent());document.getElementById('agOn').checked=a.on;document.getElementById('agAct').checked=a.act;document.getElementById('kbOn').checked=a.kb;document.getElementById('askOn').checked=a.ask!==false;var am=document.getElementById('askMode');if(am&&Android.getAskMode)am.value=Android.getAskMode();var wa=document.getElementById('waOn');if(wa&&Android.getWatchAlong)wa.checked=!!Android.getWatchAlong();var w=document.getElementById('wakeOn');if(w)w.checked=!!a.wake;remLoad();logLoad();}catch(x){}}
 function agSave(){try{Android.setAgent(document.getElementById('agOn').checked,document.getElementById('agAct').checked,document.getElementById('kbOn').checked,document.getElementById('askOn').checked)}catch(x){}}
 function logLoad(){try{var el=document.getElementById('logList');if(!el||!Android.getLog)return;var a=JSON.parse(Android.getLog());el.innerHTML=a.length?a.map(function(x){return '<div class="lg">'+esc(x)+'</div>'}).join(''):'Nothing yet.'}catch(x){}}
+function waSave(){try{Android.setWatchAlong(document.getElementById('waOn').checked)}catch(x){}}
+function waGo(){try{var u=document.getElementById('waUrl').value.trim();if(u)Android.watchLink(u)}catch(x){}}
 function askModeSave(){try{Android.setAskMode(document.getElementById('askMode').value)}catch(x){}}
 function wakeSave(){try{var on=document.getElementById('wakeOn').checked;var r=String(Android.setWake(on));var el=document.getElementById('wakeStat');if(on&&r==='mic')el.textContent='Allow the microphone in the popup';else if(on&&r==='overlay')el.textContent='Allow display over other apps first';setTimeout(renderStatus,1500)}catch(x){}}
 function remLoad(){try{var el=document.getElementById('remList');if(!el||!Android.getReminders)return;var a=JSON.parse(Android.getReminders());if(!a.length){el.textContent='None. Say: "remind me in 30 min to drink water".';return}a.sort(function(x,y){return x.at-y.at});el.innerHTML=a.map(function(r){return '<div class="li"><span>'+esc(r.text)+'<small>'+new Date(r.at).toLocaleString()+'</small></span><button class="x" onclick="Android.cancelReminder(\''+r.id+'\');remLoad()">'+IC_NO+'</button></div>'}).join('')}catch(x){}}
