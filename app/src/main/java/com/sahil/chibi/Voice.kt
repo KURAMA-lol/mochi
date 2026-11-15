@@ -18,6 +18,9 @@ object Voice {
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
     @Volatile private var gen = 0
+    @Volatile private var piperBusy = false
+
+    fun playing(): Boolean = player != null || piperBusy
 
     fun raw(ctx: Context): String = ctx.getSharedPreferences("voice_cfg", Context.MODE_PRIVATE).getString("json", "{}") ?: "{}"
 
@@ -76,6 +79,7 @@ object Voice {
                 return http("POST", "https://api.elevenlabs.io/v1/text-to-speech/" + vid + "?output_format=mp3_44100_128",
                     mapOf("xi-api-key" to e.optString("key").trim()), body.toString().toByteArray(), "application/json")
             }
+            "piper" -> return Speech.synth(ctx, text)
             else -> throw RuntimeException("no cloud voice engine selected")
         }
     }
@@ -97,6 +101,7 @@ object Voice {
         val clean = clean(text)
         if (clean.isBlank()) { onDone(null); return }
         val my = ++gen
+        if (engine(ctx) == "piper") { speakPiper(ctx, clean, my, onDone); return }
         Thread {
             try {
                 val audio = synth(ctx, clean)
@@ -104,6 +109,43 @@ object Voice {
                 onDone(null)
             } catch (e: Throwable) {
                 onDone((e.message ?: e.toString()).take(240))
+            }
+        }.start()
+    }
+
+    private fun sentences(t: String): List<String> {
+        val raw = t.split(Regex("(?<=[.!?\\u2026\\u0964])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+        val out = ArrayList<String>()
+        var cur = ""
+        for (s in raw) {
+            cur = if (cur.isEmpty()) s else "$cur $s"
+            if (cur.length >= 25) { out.add(cur); cur = "" }
+        }
+        if (cur.isNotEmpty()) { if (out.isEmpty()) out.add(cur) else out[out.size - 1] = out[out.size - 1] + " " + cur }
+        return out
+    }
+
+    /** Piper voices: synthesise sentence by sentence in the background while the previous one is playing. */
+    private fun speakPiper(ctx: Context, text: String, my: Int, onDone: (String?) -> Unit) {
+        Thread {
+            val ex = java.util.concurrent.Executors.newSingleThreadExecutor()
+            var started = false
+            piperBusy = true
+            try {
+                val futs = sentences(text).map { s -> ex.submit<ByteArray> { Speech.synth(ctx, s) } }
+                for (f in futs) {
+                    if (my != gen) break
+                    val a = f.get()
+                    if (my != gen) break
+                    if (!started) { started = true; onDone(null) }
+                    playAndWait(ctx, a, my)
+                }
+            } catch (e: Throwable) {
+                if (!started) { started = true; onDone((e.cause?.message ?: e.message ?: e.toString()).take(240)) }
+            } finally {
+                ex.shutdownNow()
+                piperBusy = false
+                if (!started) onDone(null)
             }
         }.start()
     }

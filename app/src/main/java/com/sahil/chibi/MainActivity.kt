@@ -309,6 +309,11 @@ class MainActivity : Activity() {
             return "ok"
         }
         @JavascriptInterface fun getWakeHeard(): String = CompanionService.wakeHeard
+        @JavascriptInterface fun speechStatus(): String = Speech.status(this@MainActivity).toString()
+        @JavascriptInterface fun piperVoices(): String = Speech.voicesJson(this@MainActivity)
+        @JavascriptInterface fun speechInstall(kind: String, id: String) { Speech.install(this@MainActivity, kind, id) }
+        @JavascriptInterface fun speechRemove(kind: String, id: String) { Speech.remove(this@MainActivity, kind, id); earsApply() }
+        @JavascriptInterface fun earsApply() { if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE) }
         @JavascriptInterface fun openAppSettings() {
             runOnUiThread { try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + packageName))) } catch (e: Exception) {} }
         }

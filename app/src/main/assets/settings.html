@@ -200,11 +200,11 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
 
   <h2>Hey Nana</h2>
   <div class="card">
-    <label class="sw"><span>Wake word<small>say "Hey Nana" or just "Nana, ..." (screen on only)</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
+    <label class="sw"><span>Wake word<small>say "Hey Nana", "Hi Nana" or "Okay Nana"</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
     <div class="setrow"><span class="mut">Status</span><span id="wakeStat" class="tag">...</span></div>
     <div class="setrow" style="border-bottom:0"><span class="mut">Last heard</span><span id="wakeHeard" class="tag">-</span></div>
     <div class="btns"><button id="wakeFix" class="b" style="display:none" onclick="wakeSave()">Fix / retry</button><button class="b ghost" onclick="Android.openAppSettings()">App permissions</button></div>
-    <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Needs internet (Google speech) and the screen on. When she hears her name she pops up like the power button does, says Yes? and listens. "Last heard" shows what the phone understood, handy if it keeps missing.</p>
+    <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Best with the offline wake model from Settings > Voice > Offline ears (no internet, no beeps). Without it she uses Google speech, which needs internet and the screen on. When she hears her name she pops up like the power button does, says Yes? and listens. "Last heard" shows what the phone understood, handy if it keeps missing.</p>
   </div>
 
   <h2>Abilities</h2>
@@ -391,16 +391,17 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
     <label>Voice engine <span class="mut">(natural voices instead of the robotic phone voice)</span></label>
     <select id="vEng" onchange="vSave()">
       <option value="system">Phone default (robotic)</option>
+      <option value="piper">Piper: natural voices on your phone (free, offline)</option>
       <option value="openai">Natural: Kokoro / OpenAI-style API (needs key)</option>
       <option value="eleven">ElevenLabs (voice cloning, needs key)</option>
     </select>
-    <div id="vLocal" style="display:none">
-      <div id="lStat" style="color:var(--mut);font-size:13px;margin:8px 0">Not downloaded yet.</div>
-      <div class="btns"><button class="b" onclick="Android.localInstall();lPoll()">Download voice (about 132 MB, once)</button>
-        <button class="b ghost" onclick="if(confirm('Delete the voice files?')){Android.localRemove();lPoll()}">Delete</button></div>
-      <label>Voice</label><select id="lSid" onchange="vSave()"></select>
-      <label>Speed</label><input id="lSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
-      <p class="mu">Runs fully on your phone: free, no internet after the download. On slower phones the first sentence can take a few seconds.</p>
+    <div id="vPiper" style="display:none">
+      <label>Piper voice <span class="mut">(natural, runs on your phone)</span></label>
+      <select id="pVoice" onchange="vSave();sTick()"></select>
+      <div id="pStat" style="color:var(--mut);font-size:13px;margin:8px 0">...</div>
+      <div class="btns"><button class="b" onclick="pInstall()">Download this voice</button><button class="b ghost" onclick="pRemove()">Delete</button></div>
+      <label>Speed</label><input id="pSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
+      <p class="mu">Free and offline after the one-time download (about 21 MB each). English voices read English; Hinglish typed in English letters will sound odd. Hindi voices need Devanagari text.</p>
     </div>
     <div id="vOpenai" style="display:none">
       <label>Preset</label>
@@ -436,29 +437,56 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
     <div class="btns"><button class="b" onclick="vTest()">Test voice</button></div>
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:6px"></div>
   </div>
+  <div class="card">
+    <label style="margin-top:0">Offline ears <span class="mut">(wake word and speech recognition that run on your phone)</span></label>
+    <div class="setrow"><span class="mut">Wake word model</span><span id="wkStat" class="tag">...</span></div>
+    <div class="btns"><button class="b" onclick="eGet('kws')">Download (17 MB)</button><button class="b ghost" onclick="eDel('kws')">Delete</button></div>
+    <div class="setrow"><span class="mut">Speech recognition model</span><span id="asStat" class="tag">...</span></div>
+    <div class="btns"><button class="b" onclick="eGet('asr')">Download (57 MB)</button><button class="b ghost" onclick="eDel('asr')">Delete</button></div>
+    <label>Wake word engine</label>
+    <select id="wkEng" onchange="vSave();eApply()"><option value="local">Offline (fast, no internet)</option><option value="system">Google speech (old way)</option></select>
+    <label>Speech recognition</label>
+    <select id="asEng" onchange="vSave()"><option value="local">Offline (fast, English)</option><option value="system">Google speech (needs internet)</option></select>
+    <label>Wake sensitivity</label>
+    <select id="wkSens" onchange="vSave();eApply()"><option value="low">Low (fewer false wakes)</option><option value="normal">Normal</option><option value="high">High (hears you easier)</option></select>
+    <label class="sw"><span>Listen when the screen is off<small>uses more battery</small></span><input type="checkbox" id="wkScr" onchange="vSave();eApply()"></label>
+    <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. Turn on Hey Nana in the Hey Nana card first. Offline recognition understands English only.</p>
+  </div>
     <script>
-  var VC={engine:'system',local:{sid:3,speed:1},openai:{},eleven:{}};
-  var LV=[["Female - warm (af_heart)",3],["Female - bella",2],["Female - nicole (soft)",6],["Female - sarah",9],["Female - sky",10],["Female - nova",7],["Female - jessica",4],["Female - alloy",0],["Female - aoede",1],["Female - kore",5],["Female - river",8],["Male - adam",11],["Male - michael",16],["Male - puck",18],["Male - echo",12],["Male - liam",15],["Male - onyx",17],["Male - fenrir",14],["British F - emma",21],["British F - isabella",22],["British F - alice",20],["British F - lily",23],["British M - george",26],["British M - lewis",27],["British M - daniel",24],["British M - fable",25],["Hindi F - alpha",31],["Hindi F - beta",32],["Hindi M - omega",33],["Hindi M - psi",34]];
+  var VC={engine:'system',piper:{voice:'en_US-amy-medium',speed:1},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false},openai:{},eleven:{}};
   function vg(i){return document.getElementById(i)}
   var VP={di:['https://api.deepinfra.com/v1/openai/audio/speech','hexgrad/Kokoro-82M','af_bella'],
           self:['http://192.168.1.10:8880/v1/audio/speech','kokoro','af_bella'],
           oa:['https://api.openai.com/v1/audio/speech','gpt-4o-mini-tts','nova']};
-  var lTimer=null;
-  function lTick(){try{var s=JSON.parse(Android.localStatus());
-    var t=s.busy?s.msg:(s.disabled?'Turned off because it crashed on this phone. Delete and download again, or use another engine.':(s.installed?'Installed and ready.':(s.msg||'Not downloaded yet.')));
-    vg('lStat').textContent=t;if(!s.busy&&lTimer){clearInterval(lTimer);lTimer=null;}}catch(x){}}
-  function lPoll(){if(lTimer)clearInterval(lTimer);lTimer=setInterval(lTick,800);lTick();}
-  function vShow(){vg('vLocal').style.display=VC.engine=='local'?'block':'none';
-    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';
-    if(VC.engine=='local')lPoll();}
-  function vFill(){vg('vEng').value=VC.engine||'system';var o=VC.openai||{},e=VC.eleven||{},l=VC.local||{};
-    var s=vg('lSid');if(!s.options.length)LV.forEach(function(v){var op=document.createElement('option');op.value=v[1];op.textContent=v[0];s.appendChild(op);});
-    s.value=(l.sid===undefined?3:l.sid);vg('lSpeed').value=l.speed||1;
+
+  var PV=[],sTimer=null;
+  function sTick(){try{var s=JSON.parse(Android.speechStatus());
+    var cur=vg('pVoice')?vg('pVoice').value:'',inst=(s.voices||[]).indexOf(cur)>=0,dis=s.disabled||[];
+    if(vg('pStat'))vg('pStat').textContent=(s.busy&&s.busyKind=='voice')?s.msg:(dis.indexOf('tts')>=0?'Turned off: it crashed on this phone. Delete and download again.':(inst?'Downloaded and ready.':'Not downloaded yet.'));
+    if(vg('wkStat'))vg('wkStat').textContent=(s.busy&&s.busyKind=='kws')?s.msg:(dis.indexOf('kws')>=0?'Turned off (crashed)':(s.kws?'Ready':'Not downloaded'));
+    if(vg('asStat'))vg('asStat').textContent=(s.busy&&s.busyKind=='asr')?s.msg:(dis.indexOf('asr')>=0?'Turned off (crashed)':(s.asr?'Ready':'Not downloaded'));
+    if(!s.busy&&sTimer){clearInterval(sTimer);sTimer=null;pFill();try{Android.earsApply()}catch(x){}}
+  }catch(x){}}
+  function sPoll(){if(sTimer)clearInterval(sTimer);sTimer=setInterval(sTick,700);sTick();}
+  function pFill(){try{PV=JSON.parse(Android.piperVoices());}catch(x){PV=[];}
+    var s=vg('pVoice'),cur=s.value||(VC.piper&&VC.piper.voice)||'en_US-amy-medium';s.innerHTML='';
+    PV.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=(v.installed?'\u2713 ':'')+v.label+' ('+v.mb+' MB)';s.appendChild(o);});s.value=cur;}
+  function pInstall(){vSave();Android.speechInstall('voice',vg('pVoice').value);sPoll();}
+  function pRemove(){if(confirm('Delete this voice from the phone?')){Android.speechRemove('voice',vg('pVoice').value);pFill();sTick();}}
+  function eGet(k){Android.speechInstall(k,'');sPoll();}
+  function eDel(k){if(confirm('Delete this model from the phone?')){Android.speechRemove(k,'');sTick();}}
+  function eApply(){try{Android.earsApply()}catch(x){}}
+  function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';
+    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
+  function vFill(){vg('vEng').value=VC.engine=='local'?'system':(VC.engine||'system');var o=VC.openai||{},e=VC.eleven||{},p=VC.piper||{},x=VC.ears||{};
+    vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;
+    vg('wkEng').value=x.wake||'local';vg('asEng').value=x.asr||'local';vg('wkSens').value=x.sens||'normal';vg('wkScr').checked=!!x.screenOff;
     vg('oUrl').value=o.url||'';vg('oKey').value=o.key||'';vg('oModel').value=o.model||'';vg('oVoice').value=o.voice||'';vg('oSpeed').value=o.speed||1;
-    vg('eKey').value=e.key||'';vg('eId').value=e.voiceId||'';vg('eModel').value=e.model||'eleven_multilingual_v2';vShow();}
-  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};VC.local=VC.local||{sid:3,speed:1};vFill();}
+    vg('eKey').value=e.key||'';vg('eId').value=e.voiceId||'';vg('eModel').value=e.model||'eleven_multilingual_v2';vShow();sTick();}
+  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};VC.piper=VC.piper||{voice:'en_US-amy-medium',speed:1};VC.ears=VC.ears||{wake:'local',asr:'local',sens:'normal',screenOff:false};vFill();}
   function vSave(){VC.engine=vg('vEng').value;
-    VC.local={sid:+vg('lSid').value,speed:+vg('lSpeed').value||1};
+    VC.piper={voice:vg('pVoice').value,speed:+vg('pSpeed').value||1};
+    VC.ears={wake:vg('wkEng').value,asr:vg('asEng').value,sens:vg('wkSens').value,screenOff:vg('wkScr').checked};
     VC.openai={url:vg('oUrl').value,key:vg('oKey').value,model:vg('oModel').value,voice:vg('oVoice').value,speed:+vg('oSpeed').value||1};
     VC.eleven={key:vg('eKey').value,voiceId:vg('eId').value,model:vg('eModel').value||'eleven_multilingual_v2'};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
@@ -592,12 +620,14 @@ function renderStatus(){
   $('setupCount').textContent = n + '/' + items.length + ' ready';
   const miss = items.length - n;
   if ($('attn')) { $('attn').style.display = miss ? 'block' : 'none'; $('attn').innerHTML = miss ? `<div class="hero"><div><b>${miss} setup ${miss===1?'item needs':'items need'} attention</b><div class="mut">Nana works best when these are on</div></div><button class="b" onclick="tab('cfg')">Fix</button></div>` : ''; }
-  try { if (Android.getWakeState && $('wakeStat')) { const w = Android.getWakeState(); $('wakeStat').textContent = WS(w); const fx = $('wakeFix'); if (fx) fx.style.display = /^(no-mic|error:|no-recognizer)/.test(w) ? '' : 'none'; if (Android.getWakeHeard && $('wakeHeard')) $('wakeHeard').textContent = Android.getWakeHeard() || '-'; } } catch (e) {}
+  try { if (Android.getWakeState && $('wakeStat')) { const w = Android.getWakeState(); $('wakeStat').textContent = WS(w); const fx = $('wakeFix'); if (fx) fx.style.display = /^(no-mic|error:|no-recognizer|mic-blocked)/.test(w) ? '' : 'none'; if (Android.getWakeHeard && $('wakeHeard')) $('wakeHeard').textContent = Android.getWakeHeard() || '-'; } } catch (e) {}
   $('setup').innerHTML = items.map(x => `<div class="setrow"><span>${x[0]}</span>${x[1] ? '<span class="pill">Ready</span>' : `<button class="b" onclick="${x[2]}">Enable</button>`}</div>`).join('')
     + '<div class="setrow"><span>Default assistant<div class="mut">power-button hold opens her</div></span><button class="b ghost" onclick="Android.openAssistSettings()">Set</button></div>';
 }
 function WS(w){
-  const m = {off:'Off', listening:'Listening for "Nana"', 'no-mic':'Microphone permission missing, tap Fix', 'no-recognizer':'No speech recognizer (enable the Google app)', 'screen-off':'Waiting, screen is off', busy:'Paused while she works'};
+  const m = {off:'Off', listening:'Listening for "Nana"', 'no-mic':'Microphone permission missing, tap Fix', 'no-recognizer':'No speech recognizer (enable the Google app)', 'screen-off':'Waiting, screen is off', busy:'Paused while she works', 'listening-local':'Listening for "Hey Nana" (offline)', loading:'Loading the wake model...', paused:'Paused while the mic is in use', 'mic-blocked':'Android is blocking the mic in the background. Open the Nana app once, then tap Fix'};
+  if (w === 'error:mic') return 'Cannot open the microphone (is another app using it?)';
+  if (/^error:\D/.test(w)) return 'Problem: ' + w.slice(6);
   if (m[w]) return m[w];
   if (/^error:/.test(w)) { const c = +w.slice(6); const n = {1:'network timeout',2:'no internet',3:'audio problem',4:'server error',5:'client error',8:'recognizer busy',11:'server disconnected',12:'language not supported',13:'language unavailable'}[c]; return 'Retrying (' + (n || 'error ' + c) + ')'; }
   return w;

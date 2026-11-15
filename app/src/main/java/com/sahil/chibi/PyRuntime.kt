@@ -28,6 +28,10 @@ object PyRuntime {
         return compact(out).take(6000)
     }
 
+    /** Unpacks a downloaded model archive (tar.bz2) with Python's stdlib. Returns "ok" or an error text. */
+    fun unpack(ctx: Context, tar: String, dest: String): String =
+        py(ctx).getModule("nana_models").callAttr("unpack", tar, dest).toString()
+
     /** Agent-Reach prints a JSON envelope; keep only what a model needs. */
     private fun compact(out: String): String {
         if (!out.startsWith("{")) return out

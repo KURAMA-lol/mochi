@@ -52,6 +52,22 @@ jobs:
           cp /tmp/agentreach/LICENSE app/src/main/assets/nana/LICENSE-agent-reach.txt
           ls app/src/main/python app/src/main/python/agent_reach | head -40
 
+      - name: Fetch sherpa-onnx (Apache-2.0, not stored in this repo)
+        run: |
+          set -e
+          T=v1.13.8
+          curl -sSL -o /tmp/sherpa.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/$T/sherpa-onnx-$T-android.tar.bz2
+          mkdir -p /tmp/sherpa && tar xjf /tmp/sherpa.tar.bz2 -C /tmp/sherpa
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp /tmp/sherpa/jniLibs/arm64-v8a/libonnxruntime.so /tmp/sherpa/jniLibs/arm64-v8a/libsherpa-onnx-jni.so app/src/main/jniLibs/arm64-v8a/
+          git clone --depth 1 --branch $T https://github.com/k2-fsa/sherpa-onnx /tmp/sherpa-src
+          mkdir -p app/src/main/java/com/k2fsa/sherpa/onnx
+          for f in KeywordSpotter OnlineRecognizer OnlineStream FeatureConfig Tts HomophoneReplacerConfig QnnConfig; do
+            cp /tmp/sherpa-src/sherpa-onnx/kotlin-api/$f.kt app/src/main/java/com/k2fsa/sherpa/onnx/
+          done
+          cp /tmp/sherpa-src/LICENSE app/src/main/assets/nana/LICENSE-sherpa-onnx.txt
+          ls -la app/src/main/jniLibs/arm64-v8a app/src/main/java/com/k2fsa/sherpa/onnx
+
       - name: Build debug APK
         run: gradle testDebugUnitTest assembleDebug --no-daemon --stacktrace
 

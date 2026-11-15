@@ -227,7 +227,7 @@ class CompanionService : Service() {
                 ensureChibi()
                 if (hidden) showChibi()
                 if (!panelOpen) openPanel()
-                main.postDelayed({ if (recognizer == null) startListening() }, 500)
+                main.postDelayed({ if (!listeningNow()) startListening() }, 500)
             }
             ACT_SHOW -> { ensureChibi(); if (hidden) showChibi(); greetNow() }
             ACT_ASK -> {
@@ -264,6 +264,7 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         running = false
+        Ears.stopAll()
         endWake()
         AgentBrowser.onUse = null
         Agent.approver = null
@@ -720,7 +721,7 @@ class CompanionService : Service() {
         rm.onPick = { it2 ->
             when (it2.id) {
                 "chat" -> openPanel()
-                "talk" -> { openPanel(); main.postDelayed({ if (recognizer == null) startListening() }, 500) }
+                "talk" -> { openPanel(); main.postDelayed({ if (!listeningNow()) startListening() }, 500) }
                 "screen" -> { openPanel(); sendUserText("What's on my screen right now?", false) }
                 "notifs" -> { openPanel(); sendUserText("Read my recent notifications", false) }
                 "remind" -> { openPanel(); fill("Remind me in 30 minutes to ") }
@@ -1218,7 +1219,7 @@ class CompanionService : Service() {
                 override fun afterTextChanged(s: android.text.Editable?) { refreshBusy() }
             })
         }
-        val mic = ghostBtn(R.drawable.ni_mic) { if (recognizer == null) startListening() else stopListening() }
+        val mic = ghostBtn(R.drawable.ni_mic) { if (!listeningNow()) startListening() else stopListening() }
         val send = iconBtn(R.drawable.ni_send, Theme.ac, Theme.onAc) { if (typing != null && (input?.text?.toString()?.trim() ?: "").isEmpty()) stopTask() else doSend(false) }.apply {
             layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(2) }
             background = glass(Theme.ac, 0x00000000, 18)
@@ -1569,6 +1570,47 @@ class CompanionService : Service() {
     private var wakeSr: SpeechRecognizer? = null
     private var wakeFails = 0
 
+    // ---- offline wake word + offline dictation (sherpa-onnx) ----
+    private var localListening = false
+    private val wakeDog = Runnable { startWake() }
+    private val earsHost = object : Ears.Host {
+        override fun onWake(keyword: String) {
+            wakeHeard = "\"" + keyword.replace('_', ' ') + "\" at " + java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
+            main.post { triggerWake("") }
+        }
+        override fun speaking(): Boolean = Voice.playing() || (tts?.isSpeaking == true)
+        override fun state(s: String) { wakeState = s }
+    }
+    private val WAKE_HEAD = Regex("^\\s*(?:(?:hey|hi|ok|okay)\\s+)?(?:nana|nanna|na\\s+na)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
+
+    private fun listeningNow(): Boolean = recognizer != null || localListening
+
+    private fun startLocalWake() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { wakeState = "no-mic"; scheduleWake(6000); return }
+        Ears.ensureWake(this, earsHost)
+        main.removeCallbacks(wakeDog)
+        main.postDelayed(wakeDog, 20000)
+    }
+
+    private fun startLocalListening() {
+        localListening = true
+        micBtn?.setColorFilter(0xFFFF6B7A.toInt()); chibi?.mood = "excited"
+        Ears.listen(this, earsHost,
+            { t -> main.post { if (localListening && panelOpen) input?.setText(t) } },
+            { t -> main.post {
+                localListening = false
+                micBtn?.setColorFilter(0xFFFFFFFF.toInt())
+                input?.setText("")
+                val x = t.replace(WAKE_HEAD, "").trim()
+                if (x.isNotBlank()) { if (!panelOpen) openPanel(); sendUserText(x, true) }
+                scheduleWake(1500)
+            } },
+            { _ -> main.post {
+                if (localListening) { localListening = false; micBtn?.setColorFilter(0xFFFFFFFF.toInt()); if (!panelOpen) say("I didn't catch that.", "neutral") }
+                scheduleWake(1500)
+            } })
+    }
+
     /** Nana is also the "assistant", and its own recognition service is only a stub, so always pick a real recognizer (Google) explicitly. */
     private fun newRecognizer(): SpeechRecognizer {
         try {
@@ -1601,6 +1643,7 @@ class CompanionService : Service() {
         ensureChibi()
         if (hidden) showChibi()
         if (rest.length >= 3) { if (!panelOpen) openPanel(); sendUserText(rest, true) }
+        else if (Speech.asrLocal(this)) { say("Yes?", "happy"); startListening() }
         else { say("Yes?", "happy"); main.postDelayed({ startListening() }, 350) }
         scheduleWake(3000)
     }
@@ -1615,7 +1658,9 @@ class CompanionService : Service() {
 
     private fun startWake() {
         if (!running) return
-        if (!Agent.wake(this)) { wakeState = "off"; return }
+        if (!Agent.wake(this)) { Ears.stopWake(); wakeState = "off"; return }
+        if (Speech.wakeLocal(this)) { endWake(); startLocalWake(); return }
+        Ears.stopWake()
         if (wakeSr != null || recognizer != null) return
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { wakeState = "no-mic"; scheduleWake(6000); return }
         if (!recognizerAvailable()) { wakeState = "no-recognizer"; return }
@@ -1663,6 +1708,8 @@ class CompanionService : Service() {
     }
 
     private fun startListening() {
+        if (Speech.asrLocal(this) && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { startLocalListening(); return }
+        Ears.pause(true)
         endWake()
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             addMsg("I need mic permission. Open the Nana app and tap 'Grant mic'.", false, null); return
@@ -1700,6 +1747,11 @@ class CompanionService : Service() {
     }
 
     private fun stopListening() {
+        if (localListening) {
+            localListening = false; Ears.cancelListen()
+            micBtn?.setColorFilter(0xFFFFFFFF.toInt()); scheduleWake(1500); return
+        }
+        Ears.pause(false)
         val sr = recognizer ?: run { micBtn?.setColorFilter(0xFFFFFFFF.toInt()); return }
         recognizer = null
         try { sr.stopListening(); sr.destroy() } catch (ex: Exception) {}
