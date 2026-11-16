@@ -155,6 +155,36 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
 .dl.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset -1px -1px 0 var(--rim2)}
 .dl{transition:transform .3s var(--spring)}.dl:active{transform:scale(.97)}
 .dseg button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset -1px -1px 0 var(--rim2)}
+/* ---- Glass picker + download rows (Glasmio-style popup: springs out of its trigger, blur-in, 22px radius, shrinks back on dismiss) ---- */
+.gsb{width:100%;display:flex;align-items:center;gap:8px;text-align:left;background:var(--lens);color:var(--tx);border:1px solid var(--gl);border-radius:16px;padding:11px 12px;font:inherit;font-size:14.5px;box-shadow:inset 1.5px 1.5px 0 var(--rim),inset -1px -1px 0 var(--rim2),0 6px 16px var(--gs);transition:transform .3s var(--spring)}
+.gsb:active{transform:scale(.97)}
+.gsb .gt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gsb .gc{width:18px;height:18px;opacity:.7;flex:none}
+.gk{flex:none;width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--onac);background:linear-gradient(160deg,var(--ac2),var(--ac));box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
+.gk0{flex:none;width:18px;height:18px}
+.gscrim{position:fixed;left:0;top:0;right:0;bottom:0;z-index:90;background:rgba(0,0,0,.30);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);opacity:0;transition:opacity .25s}
+.gscrim.open{opacity:1}
+.gmenu{position:fixed;z-index:91;overflow:auto;border-radius:22px;padding:6px;background:radial-gradient(130% 100% at 0% 0%,var(--spec),transparent 55%),linear-gradient(145deg,var(--g1),var(--g2)),var(--drawbg);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);box-shadow:inset 1.5px 1.5px 0 var(--rim),inset -1px -1px 0 var(--rim2),0 22px 50px rgba(0,0,0,.45);transform:scale(.2);opacity:0;transition:transform .42s var(--spring),opacity .22s;overscroll-behavior:contain}
+.gmenu .gin{filter:blur(8px);transition:filter .32s}
+.gmenu.open{transform:none;opacity:1}
+.gmenu.open .gin{filter:none}
+.gmenu.out{transform:scale(.2);opacity:0;transition:transform .26s cubic-bezier(.4,0,1,1),opacity .2s}
+.gtitle{padding:8px 12px 4px;color:var(--mut);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+.gi{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:16px;color:var(--tx);font-size:14.5px;transition:background .2s,transform .3s var(--spring)}
+.gi:active{transform:scale(.97)}
+.gi.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset -1px -1px 0 var(--rim2)}
+.gi .gn{flex:1;min-width:0}
+.gi .gs{color:var(--mut);font-size:12px;flex:none}
+.mdl .mbox{animation:gpop .42s var(--spring)}
+@keyframes gpop{from{transform:scale(.2);opacity:0}to{transform:none;opacity:1}}
+.pbar{height:10px;border-radius:99px;background:var(--field);box-shadow:inset 0 2px 5px var(--gs),inset 0 0 0 1px var(--rim2);overflow:hidden;margin:9px 0;position:relative}
+.pbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(160deg,var(--ac2),var(--ac));box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 12px rgba(var(--acr),.5);transition:width .45s cubic-bezier(.25,1,.5,1)}
+.pbar.ind i{width:35%;animation:pind 1.1s ease-in-out infinite}
+@keyframes pind{0%{margin-left:-35%}100%{margin-left:100%}}
+.dl-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+.dl-msg{color:var(--mut);font-size:13px}
+.dl-ok{color:var(--ac);font-weight:700;font-size:13px;white-space:nowrap}
+button.b:disabled{opacity:.45}
 </style>
 </head>
 <body>
@@ -398,8 +428,9 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
     <div id="vPiper" style="display:none">
       <label>Piper voice <span class="mut">(natural, runs on your phone)</span></label>
       <select id="pVoice" onchange="vSave();sTick()"></select>
-      <div id="pStat" style="color:var(--mut);font-size:13px;margin:8px 0">...</div>
-      <div class="btns"><button class="b" onclick="pInstall()">Download this voice</button><button class="b ghost" onclick="pRemove()">Delete</button></div>
+      <div class="dl-top"><span id="pStat" class="dl-msg">...</span><span id="pTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+      <div class="pbar" id="pBar" style="display:none"><i id="pBarI"></i></div>
+      <div class="btns"><button class="b" id="pGet" onclick="pInstall()">Download this voice</button><button class="b ghost" id="pCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="pDel" style="display:none" onclick="pRemove()">Delete</button></div>
       <label>Speed</label><input id="pSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
       <p class="mu">Free and offline after the one-time download (about 21 MB each). English voices read English; Hinglish typed in English letters will sound odd. Hindi voices need Devanagari text.</p>
     </div>
@@ -439,10 +470,14 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
   </div>
   <div class="card">
     <label style="margin-top:0">Offline ears <span class="mut">(wake word and speech recognition that run on your phone)</span></label>
-    <div class="setrow"><span class="mut">Wake word model</span><span id="wkStat" class="tag">...</span></div>
-    <div class="btns"><button class="b" onclick="eGet('kws')">Download (17 MB)</button><button class="b ghost" onclick="eDel('kws')">Delete</button></div>
-    <div class="setrow"><span class="mut">Speech recognition model</span><span id="asStat" class="tag">...</span></div>
-    <div class="btns"><button class="b" onclick="eGet('asr')">Download (57 MB)</button><button class="b ghost" onclick="eDel('asr')">Delete</button></div>
+    <div class="dl-top"><span class="mut">Wake word model</span><span id="kwTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+    <div class="dl-msg" id="wkStat" style="margin-top:4px">...</div>
+    <div class="pbar" id="kwBar" style="display:none"><i id="kwBarI"></i></div>
+    <div class="btns"><button class="b" id="kwGet" onclick="eGet('kws')">Download (17 MB)</button><button class="b ghost" id="kwCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="kwDel" style="display:none" onclick="eDel('kws')">Delete</button></div>
+    <div class="dl-top"><span class="mut">Speech recognition model</span><span id="asTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+    <div class="dl-msg" id="asStat" style="margin-top:4px">...</div>
+    <div class="pbar" id="asBar" style="display:none"><i id="asBarI"></i></div>
+    <div class="btns"><button class="b" id="asGet" onclick="eGet('asr')">Download (57 MB)</button><button class="b ghost" id="asCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="asDel" style="display:none" onclick="eDel('asr')">Delete</button></div>
     <label>Wake word engine</label>
     <select id="wkEng" onchange="vSave();eApply()"><option value="local">Offline (fast, no internet)</option><option value="system">Google speech (old way)</option></select>
     <label>Speech recognition</label>
@@ -460,23 +495,69 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
           oa:['https://api.openai.com/v1/audio/speech','gpt-4o-mini-tts','nova']};
 
   var PV=[],sTimer=null;
+  function setDl(p,st,dis){var g=function(i){return vg(p+i)};
+    g('Get').style.display=(st=='none')?'':'none';g('Cancel').style.display=(st=='busy')?'':'none';g('Del').style.display=(st=='ready')?'':'none';
+    g('Bar').style.display=(st=='busy')?'':'none';g('Tick').style.display=(st=='ready')?'':'none';g('Get').disabled=!!dis;}
+  function sRow(s,p,kind,ready,dkey,idle,cur,statId){
+    var busyMe=s.busy&&s.busyKind==kind&&(kind!='voice'||s.busyId==cur);
+    var st=busyMe?'busy':(ready?'ready':'none');
+    var failed=!s.busy&&(s.lastKind==kind)&&(kind!='voice'||s.lastId==cur)&&/^(Failed|Cancelled)/.test(s.msg||'');
+    var dd=(s.disabled||[]).indexOf(dkey)>=0;
+    vg(statId).textContent=busyMe?(s.msg||'Starting...'):(dd?'Turned off (crashed on this phone). Delete and download again.':(ready?'Ready on this phone':(failed?s.msg:idle)));
+    setDl(p,st,s.busy&&!busyMe);
+    if(busyMe){var f=vg(p+'BarI'),bar=vg(p+'Bar');if(s.pct>=0){f.style.width=s.pct+'%';bar.classList.remove('ind');}else{f.style.width='';bar.classList.add('ind');}}
+  }
   function sTick(){try{var s=JSON.parse(Android.speechStatus());
-    var cur=vg('pVoice')?vg('pVoice').value:'',inst=(s.voices||[]).indexOf(cur)>=0,dis=s.disabled||[];
-    if(vg('pStat'))vg('pStat').textContent=(s.busy&&s.busyKind=='voice')?s.msg:(dis.indexOf('tts')>=0?'Turned off: it crashed on this phone. Delete and download again.':(inst?'Downloaded and ready.':'Not downloaded yet.'));
-    if(vg('wkStat'))vg('wkStat').textContent=(s.busy&&s.busyKind=='kws')?s.msg:(dis.indexOf('kws')>=0?'Turned off (crashed)':(s.kws?'Ready':'Not downloaded'));
-    if(vg('asStat'))vg('asStat').textContent=(s.busy&&s.busyKind=='asr')?s.msg:(dis.indexOf('asr')>=0?'Turned off (crashed)':(s.asr?'Ready':'Not downloaded'));
-    if(!s.busy&&sTimer){clearInterval(sTimer);sTimer=null;pFill();try{Android.earsApply()}catch(x){}}
+    var cur=vg('pVoice').value,inst=(s.voices||[]).indexOf(cur)>=0;
+    sRow(s,'p','voice',inst,'tts','Not downloaded yet',cur,'pStat');
+    sRow(s,'kw','kws',s.kws,'kws','Not downloaded yet',cur,'wkStat');
+    sRow(s,'as','asr',s.asr,'asr','Not downloaded yet',cur,'asStat');
+    if(s.busy){if(!sTimer)sTimer=setInterval(sTick,500);}
+    else if(sTimer){clearInterval(sTimer);sTimer=null;pFill();gsAll();try{Android.earsApply()}catch(x){}}
   }catch(x){}}
-  function sPoll(){if(sTimer)clearInterval(sTimer);sTimer=setInterval(sTick,700);sTick();}
+  function sPoll(){if(sTimer)clearInterval(sTimer);sTimer=setInterval(sTick,500);setTimeout(sTick,120);}
   function pFill(){try{PV=JSON.parse(Android.piperVoices());}catch(x){PV=[];}
     var s=vg('pVoice'),cur=s.value||(VC.piper&&VC.piper.voice)||'en_US-amy-medium';s.innerHTML='';
-    PV.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=(v.installed?'\u2713 ':'')+v.label+' ('+v.mb+' MB)';s.appendChild(o);});s.value=cur;}
+    PV.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=v.label;o.dataset.sub=v.mb+' MB';o.dataset.ok=v.installed?'1':'';s.appendChild(o);});s.value=cur;gsAll();}
   function pInstall(){vSave();Android.speechInstall('voice',vg('pVoice').value);sPoll();}
-  function pRemove(){if(confirm('Delete this voice from the phone?')){Android.speechRemove('voice',vg('pVoice').value);pFill();sTick();}}
+  function pRemove(){askYes('Delete this voice from the phone?',function(){Android.speechRemove('voice',vg('pVoice').value);pFill();sTick();},'Delete');}
   function eGet(k){Android.speechInstall(k,'');sPoll();}
-  function eDel(k){if(confirm('Delete this model from the phone?')){Android.speechRemove(k,'');sTick();}}
+  function eDel(k){askYes('Delete this model from the phone?',function(){Android.speechRemove(k,'');sTick();},'Delete');}
   function eApply(){try{Android.earsApply()}catch(x){}}
-  function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';
+  /* glass picker: turns a <select> into a glass button + popup that springs out of it */
+  function gsLabel(sel){var b=sel._gb;if(!b)return;var o=sel.options[sel.selectedIndex];b.querySelector('.gt').textContent=o?o.textContent:'';b.querySelector('.gk').style.display=(o&&o.dataset.ok=='1')?'':'none';}
+  function gsAll(){document.querySelectorAll('#voice select').forEach(function(s){if(!s._gb)glassify(s);else gsLabel(s);});}
+  function glassify(sel){if(sel._gb)return;var b=document.createElement('button');b.type='button';b.className='gsb';
+    b.innerHTML='<span class="gk">&#10003;</span><span class="gt"></span><svg class="gc" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    sel.parentNode.insertBefore(b,sel);sel.style.display='none';sel._gb=b;b.onclick=function(){gsOpen(sel)};
+    try{new MutationObserver(function(){gsLabel(sel)}).observe(sel,{childList:true,subtree:true,characterData:true});}catch(x){}
+    sel.addEventListener('change',function(){gsLabel(sel)});gsLabel(sel);}
+  function gsClose(fast){var m=document.querySelector('.gmenu'),sc=document.querySelector('.gscrim');
+    if(sc){sc.classList.remove('open');setTimeout(function(){sc.remove()},260);}
+    if(m){if(fast){m.remove();}else{m.classList.remove('open');m.classList.add('out');setTimeout(function(){m.remove()},280);}}}
+  function gsOpen(sel){gsClose(true);document.querySelectorAll('.gscrim').forEach(function(x){x.remove()});
+    var b=sel._gb,r=b.getBoundingClientRect(),vh=window.innerHeight,vw=window.innerWidth;
+    var sc=document.createElement('div');sc.className='gscrim';sc.onclick=function(){gsClose()};
+    var m=document.createElement('div');m.className='gmenu';
+    var lab=b.previousElementSibling,tt=(lab&&lab.tagName=='LABEL')?lab.childNodes[0].textContent.trim():'';
+    var html='<div class="gin">'+(tt?'<div class="gtitle">'+esc(tt)+'</div>':'');
+    for(var i=0;i<sel.options.length;i++){var o=sel.options[i];
+      html+='<div class="gi'+(i==sel.selectedIndex?' on':'')+'" data-i="'+i+'">'+(o.dataset.ok=='1'?'<span class="gk">&#10003;</span>':'<span class="gk0"></span>')+'<span class="gn">'+esc(o.textContent)+'</span>'+(o.dataset.sub?'<span class="gs">'+esc(o.dataset.sub)+'</span>':'')+'</div>';}
+    m.innerHTML=html+'</div>';
+    var w=Math.min(vw-24,Math.max(r.width,260)),left=Math.max(12,Math.min(r.left,vw-w-12));
+    var spaceBelow=vh-r.bottom-12,spaceAbove=r.top-12,below=spaceBelow>=Math.min(300,spaceAbove)||spaceBelow>=spaceAbove;
+    var mh=Math.min(Math.max(below?spaceBelow:spaceAbove,160),Math.round(vh*.62));
+    m.style.width=w+'px';m.style.left=left+'px';m.style.maxHeight=mh+'px';
+    if(below)m.style.top=(r.bottom+6)+'px';else m.style.bottom=(vh-r.top+6)+'px';
+    m.style.transformOrigin=(r.left+r.width/2-left)+'px '+(below?'0':'100%');
+    m.onclick=function(e){var t=e.target;while(t&&t!==m&&!(t.className&&String(t.className).indexOf('gi')==0&&t.dataset&&t.dataset.i!==undefined))t=t.parentNode;
+      if(t&&t!==m){sel.selectedIndex=+t.dataset.i;sel.dispatchEvent(new Event('change',{bubbles:true}));gsLabel(sel);gsClose();}};
+    document.body.appendChild(sc);document.body.appendChild(m);
+    var sel0=m.querySelector('.gi.on');if(sel0)m.scrollTop=Math.max(0,sel0.offsetTop-60);
+    void m.offsetWidth;sc.classList.add('open');m.classList.add('open');}
+  window.addEventListener('scroll',function(){if(document.querySelector('.gmenu'))gsClose();},true);
+  setInterval(function(){try{gsAll()}catch(x){}},1200);
+  function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';gsAll();
     vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
   function vFill(){vg('vEng').value=VC.engine=='local'?'system':(VC.engine||'system');var o=VC.openai||{},e=VC.eleven||{},p=VC.piper||{},x=VC.ears||{};
     vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;

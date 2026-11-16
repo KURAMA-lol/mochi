@@ -60,6 +60,10 @@ object Speech {
     @Volatile private var busy = ""
     @Volatile private var msg = ""
     @Volatile private var pct = -1
+    @Volatile private var busyId = ""
+    @Volatile private var lastKind = ""
+    @Volatile private var lastId = ""
+    @Volatile private var cancelFlag = false
 
     private fun root(ctx: Context) = File(ctx.filesDir, "speech").apply { mkdirs() }
     private fun voiceDir(ctx: Context, id: String) = File(File(root(ctx), "voices"), id)
@@ -164,9 +168,11 @@ object Speech {
         val g = guard(ctx)
         val dis = JSONArray()
         for (k in listOf("tts", "kws", "asr")) if (g.getBoolean(k, false)) dis.put(k)
-        return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("msg", msg).put("pct", pct)
+        return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("busyId", busyId).put("lastKind", lastKind).put("lastId", lastId).put("msg", msg).put("pct", pct)
             .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("voices", installed).put("disabled", dis)
     }
+
+    fun cancel() { cancelFlag = true }
 
     private fun download(url: String, out: File, label: String) {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -183,13 +189,14 @@ object Speech {
                     while (true) {
                         val r = i.read(b)
                         if (r <= 0) break
+                        if (cancelFlag) throw RuntimeException("Cancelled")
                         o.write(b, 0, r)
                         n += r
                         val now = System.currentTimeMillis()
                         if (now - lastUi > 400) {
                             lastUi = now
                             pct = if (total > 0) (n * 100 / total).toInt() else -1
-                            msg = "Downloading $label: " + (n / 1000000) + (if (total > 0) " / " + (total / 1000000) else "") + " MB"
+                            msg = "Downloading: " + (n / 1000000) + (if (total > 0) " / " + (total / 1000000) else "") + " MB" + (if (pct >= 0) " (" + pct + "%)" else "")
                         }
                     }
                 }
@@ -215,7 +222,10 @@ object Speech {
             }
             else -> return
         }
-        busy = kind; msg = "Starting..."; pct = 0
+        val have = when (kind) { "kws" -> ready(app, "kws"); "asr" -> ready(app, "asr"); else -> voiceReady(app, id) }
+        if (have) { lastKind = kind; lastId = id; msg = "Already downloaded."; return }
+        cancelFlag = false
+        busy = kind; busyId = id; lastKind = kind; lastId = id; msg = "Starting..."; pct = 0
         Thread {
             val tar = File(app.cacheDir, "dl_" + System.nanoTime() + ".tar.bz2")
             try {
@@ -229,11 +239,12 @@ object Speech {
                 if (kind == "voice") synchronized(this) { releaseTts() }
                 msg = "Done."
             } catch (e: Throwable) {
-                msg = "Failed: " + (e.message ?: e.toString()).take(160)
+                msg = if (e.message == "Cancelled") "Cancelled." else "Failed: " + (e.message ?: e.toString()).take(160)
             } finally {
                 tar.delete()
                 pct = -1
                 busy = ""
+                busyId = ""
             }
         }.start()
     }
