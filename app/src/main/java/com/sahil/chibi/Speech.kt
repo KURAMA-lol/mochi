@@ -10,7 +10,9 @@ import com.k2fsa.sherpa.onnx.EndpointConfig
 import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.KeywordSpotter
 import com.k2fsa.sherpa.onnx.KeywordSpotterConfig
+import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
+import com.k2fsa.sherpa.onnx.OfflineTtsPocketModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
@@ -34,6 +36,8 @@ import java.nio.ByteOrder
 object Speech {
     private const val BASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
     private const val KWS_URL = BASE + "kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2"
+    private const val POCKET_URL = BASE + "tts-models/sherpa-onnx-pocket-tts-int8-2026-01-26.tar.bz2"
+    private val POCKET_FILES = listOf("lm_flow.int8.onnx", "lm_main.int8.onnx", "encoder.onnx", "decoder.int8.onnx", "text_conditioner.onnx", "vocab.json", "token_scores.json")
     private const val ASR_URL = BASE + "asr-models/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06.tar.bz2"
 
     class PV(val id: String, val label: String, val mb: Int)
@@ -86,6 +90,7 @@ object Speech {
     fun ready(ctx: Context, kind: String): Boolean = when (kind) {
         "kws" -> File(modelDir(ctx, "kws"), "tokens.txt").exists() && File(modelDir(ctx, "kws"), "encoder-epoch-12-avg-2-chunk-16-left-64.onnx").exists()
         "asr" -> File(modelDir(ctx, "asr"), "tokens.txt").exists() && File(modelDir(ctx, "asr"), "encoder.onnx").exists()
+        "pocket" -> POCKET_FILES.all { File(modelDir(ctx, "pocket"), it).exists() }
         else -> false
     }
 
@@ -167,9 +172,9 @@ object Speech {
         for (v in VOICES) if (voiceReady(ctx, v.id)) installed.put(v.id)
         val g = guard(ctx)
         val dis = JSONArray()
-        for (k in listOf("tts", "kws", "asr")) if (g.getBoolean(k, false)) dis.put(k)
+        for (k in listOf("tts", "kws", "asr", "pocket")) if (g.getBoolean(k, false)) dis.put(k)
         return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("busyId", busyId).put("lastKind", lastKind).put("lastId", lastId).put("msg", msg).put("pct", pct)
-            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("voices", installed).put("disabled", dis)
+            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("voices", installed).put("disabled", dis)
     }
 
     fun cancel() { cancelFlag = true }
@@ -215,6 +220,7 @@ object Speech {
         when (kind) {
             "kws" -> { url = KWS_URL; dest = modelDir(app, "kws"); label = "wake word model" }
             "asr" -> { url = ASR_URL; dest = modelDir(app, "asr"); label = "speech recognition model" }
+            "pocket" -> { url = POCKET_URL; dest = modelDir(app, "pocket"); label = "Pocket-TTS voice" }
             "voice" -> {
                 val v = VOICES.firstOrNull { it.id == id } ?: return
                 url = BASE + "tts-models/vits-piper-" + v.id + "-int8.tar.bz2"
@@ -222,7 +228,7 @@ object Speech {
             }
             else -> return
         }
-        val have = when (kind) { "kws" -> ready(app, "kws"); "asr" -> ready(app, "asr"); else -> voiceReady(app, id) }
+        val have = when (kind) { "kws", "asr", "pocket" -> ready(app, kind); else -> voiceReady(app, id) }
         if (have) { lastKind = kind; lastId = id; msg = "Already downloaded."; return }
         cancelFlag = false
         busy = kind; busyId = id; lastKind = kind; lastId = id; msg = "Starting..."; pct = 0
@@ -233,7 +239,7 @@ object Speech {
                 msg = "Unpacking $label..."; pct = -1
                 val r = PyRuntime.unpack(app, tar.absolutePath, dest.absolutePath)
                 if (r != "ok") throw RuntimeException(r)
-                val good = when (kind) { "kws" -> ready(app, "kws"); "asr" -> ready(app, "asr"); else -> voiceReady(app, id) }
+                val good = when (kind) { "kws", "asr", "pocket" -> ready(app, kind); else -> voiceReady(app, id) }
                 if (!good) throw RuntimeException("The download did not contain the expected files.")
                 guard(app).edit().putBoolean(if (kind == "voice") "tts" else kind, false).commit()
                 if (kind == "voice") synchronized(this) { releaseTts() }
@@ -253,6 +259,7 @@ object Speech {
         when (kind) {
             "kws" -> modelDir(ctx, "kws").deleteRecursively()
             "asr" -> modelDir(ctx, "asr").deleteRecursively()
+            "pocket" -> { synchronized(this) { releasePocket() }; modelDir(ctx, "pocket").deleteRecursively() }
             "voice" -> { if (VOICES.any { it.id == id }) voiceDir(ctx, id).deleteRecursively(); synchronized(this) { releaseTts() } }
         }
         guard(ctx).edit().putBoolean(if (kind == "voice") "tts" else kind, false).commit()
@@ -268,8 +275,86 @@ object Speech {
         tts = null; ttsId = ""
     }
 
+    fun synth(ctx: Context, text: String): ByteArray =
+        if (Voice.engine(ctx) == "pocket") synthPocket(ctx, text) else synthPiper(ctx, text)
+
+    // ------------------------------------------------------------ Pocket-TTS (Kyutai, 100M, runs on sherpa-onnx)
+
+    private var pTts: OfflineTts? = null
+    private var pRef: FloatArray? = null
+    private var pRefSr = 0
+
+    private fun releasePocket() {
+        try { pTts?.release() } catch (e: Throwable) {}
+        pTts = null; pRef = null
+    }
+
+    /** Reads a 16-bit PCM wav into mono floats. */
+    private fun readWav(f: File): Pair<FloatArray, Int> {
+        val b = f.readBytes()
+        val bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN)
+        var pos = 12
+        var ch = 1
+        var sr = 16000
+        var bits = 16
+        while (pos + 8 <= b.size) {
+            val id = String(b, pos, 4)
+            val len = bb.getInt(pos + 4)
+            if (id == "fmt ") { ch = bb.getShort(pos + 10).toInt(); sr = bb.getInt(pos + 12); bits = bb.getShort(pos + 22).toInt() }
+            if (id == "data") {
+                if (bits != 16) throw RuntimeException("Reference voice must be 16-bit wav")
+                val end = minOf(pos + 8 + len, b.size)
+                val frames = (end - pos - 8) / (2 * ch)
+                val out = FloatArray(frames)
+                for (i in 0 until frames) {
+                    var s = 0f
+                    for (c in 0 until ch) s += bb.getShort(pos + 8 + (i * ch + c) * 2) / 32768f
+                    out[i] = s / ch
+                }
+                return Pair(out, sr)
+            }
+            pos += 8 + len + (len and 1)
+        }
+        throw RuntimeException("Reference voice wav has no audio")
+    }
+
     @Synchronized
-    fun synth(ctx: Context, text: String): ByteArray {
+    fun synthPocket(ctx: Context, text: String): ByteArray {
+        if (!ready(ctx, "pocket")) throw RuntimeException("Pocket-TTS is not downloaded yet (Settings > Voice)")
+        val d = modelDir(ctx, "pocket")
+        if (pTts == null) {
+            pTts = guarded(ctx, "pocket") {
+                OfflineTts(
+                    config = OfflineTtsConfig(
+                        model = OfflineTtsModelConfig(
+                            pocket = OfflineTtsPocketModelConfig(
+                                lmFlow = File(d, "lm_flow.int8.onnx").absolutePath,
+                                lmMain = File(d, "lm_main.int8.onnx").absolutePath,
+                                encoder = File(d, "encoder.onnx").absolutePath,
+                                decoder = File(d, "decoder.int8.onnx").absolutePath,
+                                textConditioner = File(d, "text_conditioner.onnx").absolutePath,
+                                vocabJson = File(d, "vocab.json").absolutePath,
+                                tokenScoresJson = File(d, "token_scores.json").absolutePath,
+                            ),
+                            numThreads = 3,
+                            provider = "cpu",
+                        )
+                    )
+                )
+            }
+            val ref = File(d, "test_wavs").listFiles { x -> x.name.endsWith(".wav") }?.sortedBy { it.name }?.firstOrNull()
+                ?: throw RuntimeException("Pocket-TTS download has no reference voice")
+            val (s, sr) = readWav(ref)
+            pRef = s; pRefSr = sr
+        }
+        val p = Voice.cfg(ctx).optJSONObject("pocket") ?: JSONObject()
+        val sp = p.optDouble("speed", 1.0).toFloat().coerceIn(0.6f, 1.6f)
+        val a = pTts!!.generateWithConfig(text, GenerationConfig(speed = sp, referenceAudio = pRef, referenceSampleRate = pRefSr))
+        return wav(a.samples, a.sampleRate)
+    }
+
+    @Synchronized
+    fun synthPiper(ctx: Context, text: String): ByteArray {
         val p = Voice.cfg(ctx).optJSONObject("piper") ?: JSONObject()
         val id = p.optString("voice", "en_US-amy-medium")
         val d = voiceDir(ctx, id)

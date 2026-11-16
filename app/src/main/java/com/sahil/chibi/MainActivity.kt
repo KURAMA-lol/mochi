@@ -210,25 +210,6 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 78) {
-            if (resultCode != RESULT_OK) return
-            val u = data?.data ?: return
-            val nm = pendingCloneName
-            Thread {
-                try {
-                    val id = Voice.clone(this, nm, u)
-                    val c = Voice.cfg(this)
-                    val e = c.optJSONObject("eleven") ?: JSONObject()
-                    e.put("voiceId", id)
-                    c.put("eleven", e).put("engine", "eleven")
-                    Voice.save(this, c.toString())
-                    js("window.onVoiceClone && onVoiceClone(true, " + JSONObject.quote(id) + ")")
-                } catch (ex: Throwable) {
-                    js("window.onVoiceClone && onVoiceClone(false, " + JSONObject.quote(ex.message ?: ex.toString()) + ")")
-                }
-            }.start()
-            return
-        }
     }
 
     private fun askRuntimePerms() {
@@ -373,24 +354,11 @@ class MainActivity : Activity() {
             }
         }
 
-        @JavascriptInterface fun listVoices() {
-            Thread {
-                try {
-                    val a = Voice.listVoices(this@MainActivity)
-                    js("window.onVoiceList && onVoiceList(true, " + a.toString() + ")")
-                } catch (e: Throwable) {
-                    js("window.onVoiceList && onVoiceList(false, " + JSONObject.quote(e.message ?: e.toString()) + ")")
-                }
-            }.start()
-        }
+        @JavascriptInterface fun callStart() { CompanionService.send(this@MainActivity, CompanionService.ACT_CALL) }
 
-        @JavascriptInterface fun cloneVoice(name: String) {
-            pendingCloneName = name
-            runOnUiThread {
-                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*" }
-                startActivityForResult(i, 78)
-            }
-        }
+        @JavascriptInterface fun callStop() { CompanionService.send(this@MainActivity, CompanionService.ACT_HANGUP) }
+
+        @JavascriptInterface fun callState(): String = JSONObject().put("active", Call.active).put("state", Call.state).put("running", CompanionService.running).toString()
 
         @JavascriptInterface fun pickMascotImage() {
             val i = Intent(Intent.ACTION_GET_CONTENT)

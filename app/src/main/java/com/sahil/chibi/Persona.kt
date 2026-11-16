@@ -9,7 +9,6 @@ object Persona {
         cfg.persona.prompt
             .replace("{name}", cfg.persona.name)
             .replace("{user}", cfg.persona.userName)
-            .let { if (Voice.cuesOn) it + "\n\nYour replies are spoken aloud. Now and then (not in every message) you may include a natural reaction such as haha, hehe, *giggles*, *sighs* or *coughs*; the app plays these as real sounds." else it }
 
     private val IDLE = listOf(
         "neutral" to "Hmm... what are you up to?",

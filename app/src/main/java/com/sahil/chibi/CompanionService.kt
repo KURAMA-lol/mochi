@@ -63,6 +63,8 @@ class CompanionService : Service() {
         const val ACT_STOP = "chibi.stop"
         const val ACT_RELOAD = "chibi.reload"
         const val ACT_WAKE = "chibi.wake"
+        const val ACT_CALL = "chibi.call"
+        const val ACT_HANGUP = "chibi.hangup"
         @Volatile var wakeState = "off"
         @Volatile var wakeHeard = ""
         const val ACT_SAY = "chibi.say"
@@ -199,9 +201,6 @@ class CompanionService : Service() {
         cfg = ConfigStore.load(this)
         createChannel()
         loadChat()
-        tts = TextToSpeech(this) { st ->
-            if (st == TextToSpeech.SUCCESS) { ttsReady = true; applyTts() }
-        }
         running = true
         try {
             val f = android.content.IntentFilter().apply {
@@ -223,6 +222,8 @@ class CompanionService : Service() {
             ACT_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACT_RELOAD -> { rebuildChibi() }
             ACT_WAKE -> { endWake(); scheduleWake(300) }
+            ACT_CALL -> { ensureChibi(); if (hidden) showChibi(); startCall() }
+            ACT_HANGUP -> endCall()
             ACT_TALK -> {
                 ensureChibi()
                 if (hidden) showChibi()
@@ -264,6 +265,7 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         running = false
+        Call.stop()
         Ears.stopAll()
         endWake()
         AgentBrowser.onUse = null
@@ -497,10 +499,10 @@ class CompanionService : Service() {
         return Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_tile)
             .setContentTitle("${cfg.persona.name} is on your phone")
-            .setContentText(if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
+            .setContentText(if (Call.active) "On a call - " + Call.state else if (hidden) "Hidden - tap Show to bring her back" else "Tap her to chat")
             .setContentIntent(open)
             .setOngoing(true)
-            .addAction(act("Call", actionPi(1, ACT_SUMMON)))
+            .addAction(if (Call.active) act("Hang up", actionPi(4, ACT_HANGUP)) else act("Call", actionPi(1, ACT_CALL)))
             .addAction(act(if (hidden) "Show" else "Hide", actionPi(2, ACT_TOGGLE)))
             .addAction(act("Stop", actionPi(3, ACT_STOP)))
             .build()
@@ -1477,7 +1479,7 @@ class CompanionService : Service() {
         saveChat()
         addMsg(clean, false, "via ${res.provider.name} · ${res.ms}ms")
         val mode = cfg.persona.ttsMode
-        say(clean, mood, spoken = mode == "always" || (mode == "voice" && voice))
+        say(clean, mood, spoken = Call.active || mode == "always" || (mode == "voice" && voice))
         Learner.after(this, cfg, history.takeLast(8).toList()) { _ -> main.post { if (typing == null) say("Noted, I'll remember that.", "happy") } }
     }
 
@@ -1551,14 +1553,54 @@ class CompanionService : Service() {
         } catch (ex: Exception) {}
     }
 
+    @Volatile private var lastSpokenText = ""
+
     private fun speak(text: String) {
-        if (Voice.engine(this) != "system") {
-            try { tts?.stop() } catch (ex: Exception) {}
-            Voice.speak(this, text) { err -> if (err != null) main.post { speakSystem(text) } }
-            return
+        lastSpokenText = text
+        Voice.speak(this, text) { err ->
+            if (err != null) main.post { addMsg("Voice problem: $err", false, null) }
         }
-        speakSystem(text)
     }
+
+    // ---- live voice call (mic stays open until hang up, works over other apps) ----
+    private val callHost = object : Call.Host {
+        override fun onUtterance(text: String) {
+            main.post {
+                val x = text.replace(WAKE_HEAD, "").trim()
+                if (x.isNotBlank()) sendUserText(x, true)
+            }
+        }
+        override fun speaking(): Boolean = Voice.playing()
+        override fun stopSpeaking() { Voice.stop() }
+        override fun lastSpoken(): String = lastSpokenText
+        override fun state(s: String) { main.post { refreshNotification() } }
+        override fun ended(why: String) {
+            main.post {
+                refreshNotification()
+                if (why.startsWith("error")) say("Call ended: " + why.removePrefix("error: "), "sad")
+                else if (why == "bye") say("Bye bye!", "happy", spoken = true)
+                scheduleWake(1200)
+            }
+        }
+    }
+
+    private fun startCall() {
+        if (Call.active) return
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            say("I need mic permission first. Open the Nana app and tap Grant mic.", "sad"); return
+        }
+        if (!Speech.ready(this, "asr")) {
+            say("Download the speech recognition model in Settings > Voice first.", "sad"); return
+        }
+        main.removeCallbacks(wakeDog)
+        endWake()
+        startFg()
+        Call.start(this, callHost)
+        refreshNotification()
+        say("I'm listening.", "happy", spoken = true)
+    }
+
+    private fun endCall() { Call.stop(); Voice.stop() }
 
     private fun speakSystem(text: String) {
         if (!ttsReady) return
@@ -1658,6 +1700,7 @@ class CompanionService : Service() {
 
     private fun startWake() {
         if (!running) return
+        if (Call.active) return
         if (!Agent.wake(this)) { Ears.stopWake(); wakeState = "off"; return }
         if (Speech.wakeLocal(this)) { endWake(); startLocalWake(); return }
         Ears.stopWake()
@@ -1708,6 +1751,7 @@ class CompanionService : Service() {
     }
 
     private fun startListening() {
+        if (Call.active) { addMsg("You're on a call. Just talk, or tap Hang up in the notification.", false, null); return }
         if (Speech.asrLocal(this) && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { startLocalListening(); return }
         Ears.pause(true)
         endWake()

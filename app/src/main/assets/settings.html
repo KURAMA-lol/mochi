@@ -185,6 +185,11 @@ nav button.on{background:var(--lens);box-shadow:inset 1px 1px 0 var(--rim),inset
 .dl-msg{color:var(--mut);font-size:13px}
 .dl-ok{color:var(--ac);font-weight:700;font-size:13px;white-space:nowrap}
 button.b:disabled{opacity:.45}
+
+  .card .btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .card .btns .b{min-height:46px;padding-left:18px;padding-right:18px}
+  .card label.sw{margin-top:18px}
+  .card p.mu{margin-top:14px}
 </style>
 </head>
 <body>
@@ -418,111 +423,56 @@ button.b:disabled{opacity:.45}
     <input type="range" min="0.8" max="2" step="0.05" id="pitch" oninput="document.getElementById('pitchv').textContent=this.value;Pz('pitch',+this.value)">
   </div>
   <div class="card">
-    <label>Voice engine <span class="mut">(natural voices instead of the robotic phone voice)</span></label>
+    <label style="margin-top:0">Voice</label>
     <select id="vEng" onchange="vSave()">
-      <option value="system">Phone default (robotic)</option>
-      <option value="piper">Piper: natural voices on your phone (free, offline)</option>
-      <option value="openai">Natural: Kokoro / OpenAI-style API (needs key)</option>
-      <option value="eleven">ElevenLabs (voice cloning, needs key)</option>
-      <option value="custom">Custom API / Prexzy free voices</option>
+      <option value="piper">Piper - small and fast</option>
+      <option value="pocket">Pocket-TTS - more natural, slower</option>
     </select>
-
-    <div id="vCustom" style="display:none">
-      <label>Source</label>
-      <select id="cPre" onchange="vSave()"><option value="prexzy">Prexzy free voices (no key)</option><option value="generic">My own API (any URL)</option></select>
-      <div id="cPrexzy">
-        <label>Voice <span class="mut">(styles work on the first group)</span></label>
-        <select id="cVoice" onchange="vSave()"><optgroup label="Expressive English"><option value="amy">Amy - US female, 11 styles</option><option value="arthur">Arthur - UK male</option><option value="beatrice">Beatrice - US female, 10 styles</option><option value="camila">Camila - US female</option><option value="casey">Casey - US neutral</option><option value="charlie">Charlie - UK male</option><option value="david">David - US male</option><option value="dylan">Dylan - US male</option><option value="ella">Ella - UK female</option><option value="emma">Emma - US female</option><option value="eric">Eric - US male</option><option value="ethan">Ethan - US male</option><option value="evie">Evie - UK female child</option><option value="freddie">Freddie - UK male</option><option value="freya">Freya - UK female</option><option value="grace">Grace - US female</option><option value="hannah">Hannah - US female</option><option value="henry">Henry - UK male</option><option value="isabella">Isabella - UK female</option><option value="isla">Isla - UK female</option><option value="ivy">Ivy - US female child</option><option value="jackson">Jackson - US male, 10 styles</option><option value="jacob">Jacob - US male</option><option value="james">James - US male</option><option value="jennifer">Jennifer - US female</option><option value="joey">Joey - US male</option><option value="john">John - US male</option><option value="julie">Julie - US female</option><option value="justin">Justin - US male</option><option value="katrina">Katrina - US female</option><option value="kevin">Kevin - US male</option><option value="layla">Layla - US female</option><option value="leo">Leo - US male</option><option value="lily">Lily - UK female</option><option value="marcus">Marcus - US male</option><option value="matthew">Matthew - US male</option><option value="max">Max - UK male</option><option value="mia">Mia - US female, 10 styles</option><option value="michael">Michael - US male, 11 styles</option><option value="noah">Noah - UK male</option><option value="olivia">Olivia - US female, 16 styles</option><option value="owen">Owen - US male, 11 styles</option><option value="paul">Paul - US male</option><option value="phoebe">Phoebe - UK female</option><option value="quincy">Quincy - US female</option><option value="sally">Sally - US female, 7 styles</option><option value="sam">Sam - US male</option><option value="scott">Scott - US male, 10 styles</option><option value="sophia">Sophia - US female, 13 styles</option><option value="sophie">Sophie - UK female</option><option value="theo">Theo - UK male</option><option value="thomas">Thomas - US male</option><option value="victor">Victor - US male</option><option value="william">William - UK male</option><option value="xena">Xena - US female</option></optgroup><optgroup label="Other languages"><option value="tts-hi">Hindi (plain, no styles)</option><option value="tts-en">English (plain, no styles)</option><option value="tts-fr">French (plain, no styles)</option><option value="tts-es">Spanish (plain, no styles)</option><option value="tts-de">German (plain, no styles)</option><option value="tts-ja">Japanese (plain, no styles)</option><option value="tts-ko">Korean (plain, no styles)</option><option value="tts-ar">Arabic (plain, no styles)</option><option value="tts-ru">Russian (plain, no styles)</option><option value="tts-pt">Portuguese (plain, no styles)</option><option value="tts-it">Italian (plain, no styles)</option><option value="tts-tr">Turkish (plain, no styles)</option><option value="tts-id">Indonesian (plain, no styles)</option></optgroup><optgroup label="Retro"><option value="tts-mary">Mary (retro robot)</option><option value="tts-mike">Mike (retro robot)</option><option value="tts-female-whisper">Female whisper (retro)</option></optgroup></select>
-        <label>Mood style <span class="mut">(auto picks from the sentence)</span></label>
-        <select id="cStyle" onchange="vSave()"><option value="auto">Auto</option><option value="none">None</option><option value="cheerful">Cheerful</option><option value="friendly">Friendly</option><option value="excited">Excited</option><option value="hopeful">Hopeful</option><option value="sad">Sad</option><option value="angry">Angry</option><option value="whispering">Whispering</option><option value="shouting">Shouting</option><option value="terrified">Terrified</option></select>
-        <label>Speed / Pitch <span class="mut">(optional, leave empty for default)</span></label>
-        <div class="btns"><input id="cSpeed" placeholder="speed" oninput="vSave()"><input id="cPitch" placeholder="pitch" oninput="vSave()"></div>
-        <p class="mut">Free public service, may be slow (5-30 s) or go down. Needs internet. If a voice rejects a style, it retries without it.</p>
-      </div>
-      <div id="cGeneric" style="display:none">
-        <label>URL <span class="mut">(use {text} where the sentence goes)</span></label>
-        <input id="cUrl" placeholder="https://example.com/tts?text={text}" oninput="vSave()">
-        <label>Method</label>
-        <select id="cMethod" onchange="vSave()"><option>GET</option><option>POST</option></select>
-        <label>POST body <span class="mut">(JSON with {text}; empty = text only)</span></label>
-        <input id="cBody" placeholder='{"input":"{text}","voice":"x"}' oninput="vSave()">
-        <label>Headers <span class="mut">(one per line, Name: value)</span></label>
-        <textarea id="cHead" rows="2" oninput="vSave()"></textarea>
-        <label>JSON field with audio <span class="mut">(optional, e.g. data.url; auto-detects if empty)</span></label>
-        <input id="cField" oninput="vSave()">
-        <p class="mut">Reply can be audio directly, or JSON with an audio link / base64.</p>
-      </div>
-    </div>
-    <label style="display:flex;align-items:center;gap:10px;margin-top:12px"><input type="checkbox" id="vSfx" onchange="vSave()" style="width:auto"> <span>Real laugh / giggle / cough sounds <span class="mut">(for haha, hehe, *giggles*, *coughs*, *sighs*, *gasps*. Works with Piper, Custom, Kokoro and ElevenLabs. Needs internet once per sound.)</span></span></label>
-    <div id="vPiper" style="display:none">
-      <label>Piper voice <span class="mut">(natural, runs on your phone)</span></label>
+    <div id="vPiper">
+      <label>Piper voice</label>
       <select id="pVoice" onchange="vSave();sTick()"></select>
       <div class="dl-top"><span id="pStat" class="dl-msg">...</span><span id="pTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
       <div class="pbar" id="pBar" style="display:none"><i id="pBarI"></i></div>
       <div class="btns"><button class="b" id="pGet" onclick="pInstall()">Download this voice</button><button class="b ghost" id="pCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="pDel" style="display:none" onclick="pRemove()">Delete</button></div>
       <label>Speed</label><input id="pSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
-      <p class="mu">Free and offline after the one-time download (about 21 MB each). English voices read English; Hinglish typed in English letters will sound odd. Hindi voices need Devanagari text.</p>
+      <p class="mu">About 21 MB per voice, works offline. Hindi voices need Devanagari text.</p>
     </div>
-    <div id="vOpenai" style="display:none">
-      <label>Preset</label>
-      <select id="vPreset" onchange="vPreset()">
-        <option value="">Choose a preset...</option>
-        <option value="di">Kokoro on DeepInfra (cheap, many voices)</option>
-        <option value="self">Kokoro on my own server</option>
-        <option value="oa">OpenAI voices</option>
-      </select>
-      <label>API URL</label><input id="oUrl" oninput="vSave()" placeholder="https://.../v1/audio/speech">
-      <label>API key</label><input id="oKey" type="password" oninput="vSave()">
-      <label>Model</label><input id="oModel" oninput="vSave()">
-      <label>Voice</label>
-      <input id="oVoice" list="vList" oninput="vSave()">
-      <datalist id="vList">
-        <option value="af_bella"><option value="af_heart"><option value="af_nicole"><option value="af_sarah"><option value="af_sky">
-        <option value="am_adam"><option value="am_michael"><option value="bf_emma"><option value="bf_isabella"><option value="bm_george"><option value="bm_lewis">
-        <option value="hf_alpha"><option value="hf_beta"><option value="hm_omega"><option value="hm_psi">
-        <option value="alloy"><option value="ash"><option value="coral"><option value="echo"><option value="fable"><option value="nova"><option value="onyx"><option value="sage"><option value="shimmer">
-      </datalist>
-      <label>Speed</label><input id="oSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
+    <div id="vPocket" style="display:none">
+      <div class="dl-top"><span class="mut">Pocket-TTS voice</span><span id="pkTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+      <div class="dl-msg" id="pkStat" style="margin-top:4px">...</div>
+      <div class="pbar" id="pkBar" style="display:none"><i id="pkBarI"></i></div>
+      <div class="btns"><button class="b" id="pkGet" onclick="eGet('pocket')">Download</button><button class="b ghost" id="pkCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="pkDel" style="display:none" onclick="eDel('pocket')">Delete</button></div>
+      <label>Speed</label><input id="pkSpeed" type="number" step="0.05" min="0.6" max="1.6" oninput="vSave()">
+      <p class="mu">Kyutai Pocket-TTS, English only, runs fully on your phone. Big download, and each sentence takes a moment to make.</p>
     </div>
-    <div id="vEleven" style="display:none">
-      <label>ElevenLabs API key</label><input id="eKey" type="password" oninput="vSave()">
-      <label>Voice ID</label><input id="eId" oninput="vSave()">
-      <select id="eList" onchange="vg('eId').value=this.value;vSave()" style="margin-top:6px"><option value="">(tap "Load my voices")</option></select>
-      <div class="btns"><button class="b ghost" onclick="vLoadList()">Load my voices</button></div>
-      <label>Model</label><input id="eModel" oninput="vSave()">
-      <label>Clone a voice <span class="mut">(clean 30s+ audio of one speaker; needs a paid ElevenLabs plan)</span></label>
-      <input id="eName" placeholder="Name for the new voice">
-      <div class="btns"><button class="b" onclick="vClone()">Pick audio sample &amp; clone</button></div>
-    </div>
-    <div class="btns"><button class="b" onclick="vTest()">Test voice</button></div>
-    <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:6px"></div>
+    <div class="btns" style="margin-top:14px"><button class="b" onclick="vTest()">Test voice</button></div>
+    <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:8px"></div>
   </div>
   <div class="card">
-    <label style="margin-top:0">Offline ears <span class="mut">(wake word and speech recognition that run on your phone)</span></label>
+    <label style="margin-top:0">Voice call <span class="mut">(like ChatGPT voice: stays on until you hang up, even in other apps)</span></label>
+    <div class="dl-msg" id="callStat">Not on a call</div>
+    <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
+    <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off; headphones work best</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
+    <p class="mu">Needs the speech recognition model below and a downloaded voice. You can also start it from the notification. Say "bye Nana" or tap Hang up to end it.</p>
+  </div>
+  <div class="card">
+    <label style="margin-top:0">Hey Nana &amp; speech recognition <span class="mut">(run on your phone)</span></label>
     <div class="dl-top"><span class="mut">Wake word model</span><span id="kwTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
     <div class="dl-msg" id="wkStat" style="margin-top:4px">...</div>
     <div class="pbar" id="kwBar" style="display:none"><i id="kwBarI"></i></div>
     <div class="btns"><button class="b" id="kwGet" onclick="eGet('kws')">Download (17 MB)</button><button class="b ghost" id="kwCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="kwDel" style="display:none" onclick="eDel('kws')">Delete</button></div>
-    <div class="dl-top"><span class="mut">Speech recognition model</span><span id="asTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+    <div class="dl-top" style="margin-top:14px"><span class="mut">Speech recognition model</span><span id="asTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
     <div class="dl-msg" id="asStat" style="margin-top:4px">...</div>
     <div class="pbar" id="asBar" style="display:none"><i id="asBarI"></i></div>
     <div class="btns"><button class="b" id="asGet" onclick="eGet('asr')">Download (57 MB)</button><button class="b ghost" id="asCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="asDel" style="display:none" onclick="eDel('asr')">Delete</button></div>
-    <label>Wake word engine</label>
-    <select id="wkEng" onchange="vSave();eApply()"><option value="local">Offline (fast, no internet)</option><option value="system">Google speech (old way)</option></select>
-    <label>Speech recognition</label>
-    <select id="asEng" onchange="vSave()"><option value="local">Offline (fast, English)</option><option value="system">Google speech (needs internet)</option></select>
     <label>Wake sensitivity</label>
     <select id="wkSens" onchange="vSave();eApply()"><option value="low">Low (fewer false wakes)</option><option value="normal">Normal</option><option value="high">High (hears you easier)</option></select>
     <label class="sw"><span>Listen when the screen is off<small>uses more battery</small></span><input type="checkbox" id="wkScr" onchange="vSave();eApply()"></label>
-    <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. Turn on Hey Nana in the Hey Nana card first. Offline recognition understands English only.</p>
+    <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. Turn on Hey Nana in its card first. English only.</p>
   </div>
-    <script>
-  var VC={engine:'system',piper:{voice:'en_US-amy-medium',speed:1},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false},openai:{},eleven:{}};
+  <script>
+  var VC={engine:'piper',piper:{voice:'en_US-amy-medium',speed:1},pocket:{speed:1},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false,barge:true}};
   function vg(i){return document.getElementById(i)}
-  var VP={di:['https://api.deepinfra.com/v1/openai/audio/speech','hexgrad/Kokoro-82M','af_bella'],
-          self:['http://192.168.1.10:8880/v1/audio/speech','kokoro','af_bella'],
-          oa:['https://api.openai.com/v1/audio/speech','gpt-4o-mini-tts','nova']};
-
   var PV=[],sTimer=null;
   function setDl(p,st,dis){var g=function(i){return vg(p+i)};
     g('Get').style.display=(st=='none')?'':'none';g('Cancel').style.display=(st=='busy')?'':'none';g('Del').style.display=(st=='ready')?'':'none';
@@ -541,6 +491,7 @@ button.b:disabled{opacity:.45}
     sRow(s,'p','voice',inst,'tts','Not downloaded yet',cur,'pStat');
     sRow(s,'kw','kws',s.kws,'kws','Not downloaded yet',cur,'wkStat');
     sRow(s,'as','asr',s.asr,'asr','Not downloaded yet',cur,'asStat');
+    sRow(s,'pk','pocket',s.pocket,'pocket','Not downloaded yet',cur,'pkStat');
     if(s.busy){if(!sTimer)sTimer=setInterval(sTick,500);}
     else if(sTimer){clearInterval(sTimer);sTimer=null;pFill();gsAll();try{Android.earsApply()}catch(x){}}
   }catch(x){}}
@@ -586,33 +537,25 @@ button.b:disabled{opacity:.45}
     void m.offsetWidth;sc.classList.add('open');m.classList.add('open');}
   window.addEventListener('scroll',function(e){var m=document.querySelector('.gmenu');if(m&&!(e.target&&e.target.nodeType===1&&m.contains(e.target)))gsClose();},true);
   setInterval(function(){try{gsAll()}catch(x){}},1200);
-  function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';gsAll();
-    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';
-    vg('vCustom').style.display=VC.engine=='custom'?'block':'none';vg('cPrexzy').style.display=(vg('cPre').value=='generic')?'none':'block';vg('cGeneric').style.display=(vg('cPre').value=='generic')?'block':'none';}
-  function vFill(){vg('vEng').value=VC.engine=='local'?'system':(VC.engine||'system');var o=VC.openai||{},e=VC.eleven||{},p=VC.piper||{},x=VC.ears||{},cu=VC.custom||{};
-    vg('cPre').value=cu.preset||'prexzy';vg('cVoice').value=cu.voice||'amy';vg('cStyle').value=cu.style||'auto';vg('cSpeed').value=cu.speed||'';vg('cPitch').value=cu.pitch||'';vg('cUrl').value=cu.url||'';vg('cMethod').value=cu.method||'GET';vg('cBody').value=cu.body||'';vg('cHead').value=cu.headers||'';vg('cField').value=cu.field||'';vg('vSfx').checked=VC.sfx!==false;
-    vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;
-    vg('wkEng').value=x.wake||'local';vg('asEng').value=x.asr||'local';vg('wkSens').value=x.sens||'normal';vg('wkScr').checked=!!x.screenOff;
-    vg('oUrl').value=o.url||'';vg('oKey').value=o.key||'';vg('oModel').value=o.model||'';vg('oVoice').value=o.voice||'';vg('oSpeed').value=o.speed||1;
-    vg('eKey').value=e.key||'';vg('eId').value=e.voiceId||'';vg('eModel').value=e.model||'eleven_multilingual_v2';vShow();sTick();}
-  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&j.engine)VC=j;}catch(x){}VC.openai=VC.openai||{};VC.eleven=VC.eleven||{};VC.piper=VC.piper||{voice:'en_US-amy-medium',speed:1};VC.ears=VC.ears||{wake:'local',asr:'local',sens:'normal',screenOff:false};vFill();}
+  function vShow(){vg('vPiper').style.display=VC.engine=='pocket'?'none':'block';vg('vPocket').style.display=VC.engine=='pocket'?'block':'none';gsAll();}
+  function vFill(){vg('vEng').value=VC.engine=='pocket'?'pocket':'piper';var p=VC.piper||{},x=VC.ears||{},k=VC.pocket||{};
+    vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;vg('pkSpeed').value=k.speed||1;
+    vg('wkSens').value=x.sens||'normal';vg('wkScr').checked=!!x.screenOff;vg('wkBarge').checked=x.barge!==false;vShow();sTick();}
+  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&typeof j=='object')VC=j;}catch(x){}VC.piper=VC.piper||{voice:'en_US-amy-medium',speed:1};VC.pocket=VC.pocket||{speed:1};VC.ears=VC.ears||{};vFill();}
   function vSave(){VC.engine=vg('vEng').value;
     VC.piper={voice:vg('pVoice').value,speed:+vg('pSpeed').value||1};
-    VC.ears={wake:vg('wkEng').value,asr:vg('asEng').value,sens:vg('wkSens').value,screenOff:vg('wkScr').checked};
-    VC.openai={url:vg('oUrl').value,key:vg('oKey').value,model:vg('oModel').value,voice:vg('oVoice').value,speed:+vg('oSpeed').value||1};
-    VC.eleven={key:vg('eKey').value,voiceId:vg('eId').value,model:vg('eModel').value||'eleven_multilingual_v2'};
-    VC.custom={preset:vg('cPre').value,voice:vg('cVoice').value,style:vg('cStyle').value,speed:vg('cSpeed').value,pitch:vg('cPitch').value,url:vg('cUrl').value,method:vg('cMethod').value,body:vg('cBody').value,headers:vg('cHead').value,field:vg('cField').value};VC.sfx=vg('vSfx').checked;
+    VC.pocket={speed:+vg('pkSpeed').value||1};
+    VC.ears={wake:'local',asr:'local',sens:vg('wkSens').value,screenOff:vg('wkScr').checked,barge:vg('wkBarge').checked};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
-  function vPreset(){var p=VP[vg('vPreset').value];if(!p)return;vg('oUrl').value=p[0];vg('oModel').value=p[1];vg('oVoice').value=p[2];vSave();}
-  function vTest(){vSave();vg('vStat').textContent='Generating...';Android.testVoice('Hi! This is my new voice. Haha, how do I sound? *giggles* Okay okay, I am ready!');}
-  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Done. If you heard it, it works!':'Error: '+m;};
-  function vLoadList(){vSave();vg('vStat').textContent='Loading voices...';Android.listVoices();}
-  window.onVoiceList=function(ok,a){if(!ok){vg('vStat').textContent='Error: '+a;return;}
-    var s=vg('eList');s.innerHTML='<option value="">Pick a voice...</option>';
-    a.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=v.name;s.appendChild(o);});vg('vStat').textContent=a.length+' voices loaded.';};
-  function vClone(){vSave();var n=vg('eName').value.trim();if(!n){vg('vStat').textContent='Give the new voice a name first.';return;}
-    vg('vStat').textContent='Pick an audio file...';Android.cloneVoice(n);}
-  window.onVoiceClone=function(ok,m){if(ok){vg('eId').value=m;vg('vStat').textContent='Voice cloned and selected! Tap Test voice.';VC.engine='eleven';vFill();}else vg('vStat').textContent='Clone failed: '+m;};
+  function vTest(){vSave();vg('vStat').textContent='Making the voice...';Android.testVoice('Hi! This is my voice. How do I sound?');}
+  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works!':'Error: '+m;};
+  var callOn=false;
+  function callToggle(){try{if(callOn)Android.callStop();else{vSave();Android.callStart();}}catch(x){}setTimeout(callPoll,600);}
+  function callPoll(){try{var s=JSON.parse(Android.callState());callOn=!!s.active;
+    var names={loading:'Getting ready...',listening:'Listening...',hearing:'Hearing you...',speaking:'Nana is talking (speak to interrupt)',muted:'Muted','mic-blocked':'Android is blocking the mic. Open Nana once, then start again.',off:'Not on a call'};
+    vg('callStat').textContent=callOn?(names[s.state]||s.state):'Not on a call';
+    vg('callBtn').textContent=callOn?'Hang up':'Start voice call';}catch(x){}}
+  setInterval(callPoll,1000);
   setTimeout(vLoad,300);
   </script>
 </section>
