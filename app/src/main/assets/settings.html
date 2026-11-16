@@ -555,7 +555,7 @@ button.b:disabled{opacity:.45}
     document.body.appendChild(sc);document.body.appendChild(m);
     var sel0=m.querySelector('.gi.on');if(sel0)m.scrollTop=Math.max(0,sel0.offsetTop-60);
     void m.offsetWidth;sc.classList.add('open');m.classList.add('open');}
-  window.addEventListener('scroll',function(){if(document.querySelector('.gmenu'))gsClose();},true);
+  window.addEventListener('scroll',function(e){var m=document.querySelector('.gmenu');if(m&&!(e.target&&e.target.nodeType===1&&m.contains(e.target)))gsClose();},true);
   setInterval(function(){try{gsAll()}catch(x){}},1200);
   function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';gsAll();
     vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
