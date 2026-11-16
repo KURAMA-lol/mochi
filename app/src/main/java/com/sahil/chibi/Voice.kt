@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.UUID
 
 /** Natural-voice TTS over HTTP (OpenAI-style APIs incl. Kokoro, and ElevenLabs incl. voice cloning). */
@@ -31,7 +32,14 @@ object Voice {
 
     fun cfg(ctx: Context): JSONObject = try { JSONObject(raw(ctx)) } catch (e: Exception) { JSONObject() }
 
-    fun engine(ctx: Context): String = cfg(ctx).optString("engine", "system").let { if (it == "local") "system" else it }
+    @Volatile var cuesOn = false
+
+    fun engine(ctx: Context): String {
+        val c = cfg(ctx)
+        val e = c.optString("engine", "system").let { if (it == "local") "system" else it }
+        cuesOn = e != "system" && c.optBoolean("sfx", true)
+        return e
+    }
 
     private fun http(method: String, url: String, headers: Map<String, String>, body: ByteArray?, contentType: String?): ByteArray {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -39,6 +47,7 @@ object Voice {
             c.requestMethod = method
             c.connectTimeout = 15000
             c.readTimeout = 60000
+            if (!headers.containsKey("User-Agent")) c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) Nana")
             for ((k, v) in headers) c.setRequestProperty(k, v)
             if (body != null) {
                 c.doOutput = true
@@ -80,8 +89,183 @@ object Voice {
                     mapOf("xi-api-key" to e.optString("key").trim()), body.toString().toByteArray(), "application/json")
             }
             "piper" -> return Speech.synth(ctx, text)
+            "custom" -> return customSynth(c.optJSONObject("custom") ?: JSONObject(), text)
             else -> throw RuntimeException("no cloud voice engine selected")
         }
+    }
+
+
+    // ---- custom HTTP voice (prexzyapis presets or any URL) ----
+
+    private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+
+    private fun autoStyle(t: String): String {
+        val l = t.lowercase()
+        return when {
+            Regex("sorry|\\bsad\\b|miss you|unfortunately|cry").containsMatchIn(l) -> "sad"
+            Regex("whisper|secret|shh").containsMatchIn(l) -> "whispering"
+            t.contains('!') -> "cheerful"
+            else -> "friendly"
+        }
+    }
+
+    /** Turns an API reply into audio bytes: raw audio, or JSON holding an audio URL / base64. */
+    private fun resolveAudio(bytes: ByteArray, field: String): ByteArray {
+        if (bytes.isEmpty() || bytes[0] != 0x7B.toByte()) return bytes
+        val j = JSONObject(String(bytes))
+        var v: Any? = null
+        if (field.isNotBlank()) {
+            var cur: Any? = j
+            for (k in field.split('.')) cur = (cur as? JSONObject)?.opt(k)
+            v = cur
+        } else {
+            for (k in listOf("audio_url", "audioUrl", "url", "audio", "data", "result", "file")) {
+                val x = j.opt(k)
+                if (x is String && x.isNotBlank()) { v = x; break }
+                if (x is JSONObject) {
+                    for (k2 in listOf("audio_url", "url", "audio")) { val y = x.optString(k2); if (y.isNotBlank()) { v = y; break } }
+                    if (v != null) break
+                }
+            }
+        }
+        val s = (v as? String)?.trim()
+        if (s.isNullOrBlank()) throw RuntimeException("no audio in reply: " + String(bytes).take(160))
+        if (s.startsWith("http")) return http("GET", s, emptyMap(), null, null)
+        val b64 = if (s.contains("base64,")) s.substringAfter("base64,") else s
+        return android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+    }
+
+    private fun customSynth(o: JSONObject, text: String): ByteArray {
+        if (o.optString("preset", "prexzy") == "prexzy") {
+            val voice = o.optString("voice", "amy").ifBlank { "amy" }
+            val named = !voice.startsWith("tts-")
+            val want = o.optString("style", "auto")
+            val style: String? = if (!named || want == "none" || want.isBlank()) null else if (want == "auto") autoStyle(text) else want
+            fun build(st: String?): String {
+                val sb = StringBuilder("https://prexzyapis.com/tts/").append(voice).append("?text=").append(enc(text))
+                if (o.optString("speed").isNotBlank()) sb.append("&speed=").append(enc(o.optString("speed").trim()))
+                if (o.optString("pitch").isNotBlank()) sb.append("&pitch=").append(enc(o.optString("pitch").trim()))
+                if (st != null) sb.append("&style=").append(enc(st))
+                return sb.toString()
+            }
+            val first = try { resolveAudio(http("GET", build(style), emptyMap(), null, null), "") }
+            catch (e: Exception) { if (style != null) null else throw e }
+            return first ?: resolveAudio(http("GET", build(null), emptyMap(), null, null), "")
+        }
+        val tpl = o.optString("url").trim()
+        if (tpl.isBlank()) throw RuntimeException("API URL is empty")
+        val method = o.optString("method", "GET").uppercase()
+        val hd = HashMap<String, String>()
+        for (line in o.optString("headers").lines()) {
+            val i = line.indexOf(':')
+            if (i > 0) hd[line.substring(0, i).trim()] = line.substring(i + 1).trim()
+        }
+        val url = tpl.replace("{text}", enc(text))
+        var body: ByteArray? = null
+        var ct: String? = null
+        if (method == "POST") {
+            val b = o.optString("body")
+            val q = JSONObject.quote(text)
+            body = (if (b.isBlank()) "{\"text\":" + q + "}" else b.replace("\"{text}\"", q).replace("{text}", q.substring(1, q.length - 1))).toByteArray()
+            ct = hd.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value ?: "application/json"
+        }
+        return resolveAudio(http(method, url, hd, body, ct), o.optString("field").trim())
+    }
+
+    // ---- sound cues: haha, *giggles*, *coughs* ... become real clips ----
+
+    private class Seg(val text: String?, val sfx: String?)
+
+    private val CUES = Regex("(?i)\\*\\s*(laughs?|laughing|giggles?|giggling|chuckles?|chuckling|coughs?|coughing|sighs?|sighing|gasps?|clears throat)\\s*\\*|\\(\\s*(laughs?|giggles?|chuckles?|coughs?|sighs?|gasps?)\\s*\\)|\\b(?:ha(?:ha)+h?|he(?:he)+h?|hihi+)\\b|😂|🤣|😆")
+    private val SFXQ = mapOf("laugh" to "female laugh", "giggle" to "girl giggle", "chuckle" to "girl chuckle",
+        "cough" to "cough", "sigh" to "female sigh", "gasp" to "gasp")
+
+    private fun cueKey(s: String): String {
+        val l = s.lowercase()
+        return when {
+            l.contains("giggl") || l.contains("hehe") || l.contains("hihi") || l.contains("😆") -> "giggle"
+            l.contains("chuckl") -> "chuckle"
+            l.contains("cough") || l.contains("throat") -> "cough"
+            l.contains("sigh") -> "sigh"
+            l.contains("gasp") -> "gasp"
+            else -> "laugh"
+        }
+    }
+
+    private fun segments(ctx: Context, raw: String): List<Seg> {
+        val out = ArrayList<Seg>()
+        if (!cfg(ctx).optBoolean("sfx", true)) {
+            val c = clean(raw); if (c.isNotBlank()) out.add(Seg(c, null)); return out
+        }
+        var last = 0
+        var n = 0
+        for (m in CUES.findAll(raw)) {
+            val before = clean(raw.substring(last, m.range.first))
+            if (before.isNotBlank()) out.add(Seg(before, null))
+            if (n < 3) { out.add(Seg(null, cueKey(m.value))); n++ }
+            last = m.range.last + 1
+        }
+        val tail = clean(raw.substring(last))
+        if (tail.isNotBlank()) out.add(Seg(tail, null))
+        return out
+    }
+
+    /** Returns a cached clip for the cue, fetching up to 3 short human recordings the first time. */
+    private fun sfxClip(ctx: Context, key: String): ByteArray? {
+        val dir = File(ctx.filesDir, "sfx")
+        dir.mkdirs()
+        fun have(): List<File> = (dir.listFiles { f -> f.name.startsWith(key + "_") } ?: emptyArray()).toList()
+        if (have().size < 3) {
+            try {
+                val q = SFXQ[key] ?: key
+                val j = JSONObject(String(http("GET", "https://prexzyapis.com/sound/search?query=" + enc(q), emptyMap(), null, null)))
+                val arr = j.getJSONArray("results")
+                var n = have().size
+                for (i in 0 until arr.length()) {
+                    if (n >= 3) break
+                    val o = arr.getJSONObject(i)
+                    val d = o.optString("duration").toDoubleOrNull() ?: continue
+                    if (d < 0.5 || d > 3.6) continue
+                    val mp3 = o.optString("mp3")
+                    if (!mp3.startsWith("http")) continue
+                    val f = File(dir, key + "_" + o.optLong("soundId") + ".mp3")
+                    if (f.exists()) continue
+                    try { f.writeBytes(http("GET", mp3, emptyMap(), null, null)); n++ } catch (e: Exception) { f.delete() }
+                }
+            } catch (e: Exception) { }
+        }
+        val l = have()
+        return if (l.isEmpty()) null else l[(Math.random() * l.size).toInt()].readBytes()
+    }
+
+    /** Speaks text pieces and sound cues in order; the next piece is prepared while the current one plays. */
+    private fun speakSegs(ctx: Context, segs: List<Seg>, my: Int, onDone: (String?) -> Unit) {
+        Thread {
+            val ex = java.util.concurrent.Executors.newSingleThreadExecutor()
+            var started = false
+            piperBusy = true
+            val piper = engine(ctx) == "piper"
+            try {
+                val units = ArrayList<Seg>()
+                for (s in segs) {
+                    if (s.text != null && piper) for (x in sentences(s.text)) units.add(Seg(x, null)) else units.add(s)
+                }
+                val futs = units.map { u -> ex.submit<ByteArray?> { if (u.sfx != null) sfxClip(ctx, u.sfx) else synth(ctx, u.text ?: "") } }
+                for (f in futs) {
+                    if (my != gen) break
+                    val a = try { f.get() } catch (e: Exception) { if (!started) throw e; null }
+                    if (my != gen) break
+                    if (!started) { started = true; onDone(null) }
+                    if (a != null) playAndWait(ctx, a, my)
+                }
+            } catch (e: Throwable) {
+                if (!started) { started = true; onDone((e.cause?.message ?: e.message ?: e.toString()).take(240)) }
+            } finally {
+                ex.shutdownNow()
+                piperBusy = false
+                if (!started) onDone(null)
+            }
+        }.start()
     }
 
     private fun clean(t: String): String {
@@ -99,9 +283,10 @@ object Voice {
     /** Synthesises and plays. onDone(null) = playback started, otherwise an error message. */
     fun speak(ctx: Context, text: String, onDone: (String?) -> Unit) {
         val clean = clean(text)
-        if (clean.isBlank()) { onDone(null); return }
+        val segs = segments(ctx, text)
+        if (segs.isEmpty()) { onDone(null); return }
         val my = ++gen
-        if (engine(ctx) == "piper") { speakPiper(ctx, clean, my, onDone); return }
+        if (engine(ctx) == "piper" || segs.any { it.sfx != null }) { speakSegs(ctx, segs, my, onDone); return }
         Thread {
             try {
                 val audio = synth(ctx, clean)
@@ -125,33 +310,9 @@ object Voice {
         return out
     }
 
-    /** Piper voices: synthesise sentence by sentence in the background while the previous one is playing. */
-    private fun speakPiper(ctx: Context, text: String, my: Int, onDone: (String?) -> Unit) {
-        Thread {
-            val ex = java.util.concurrent.Executors.newSingleThreadExecutor()
-            var started = false
-            piperBusy = true
-            try {
-                val futs = sentences(text).map { s -> ex.submit<ByteArray> { Speech.synth(ctx, s) } }
-                for (f in futs) {
-                    if (my != gen) break
-                    val a = f.get()
-                    if (my != gen) break
-                    if (!started) { started = true; onDone(null) }
-                    playAndWait(ctx, a, my)
-                }
-            } catch (e: Throwable) {
-                if (!started) { started = true; onDone((e.cause?.message ?: e.message ?: e.toString()).take(240)) }
-            } finally {
-                ex.shutdownNow()
-                piperBusy = false
-                if (!started) onDone(null)
-            }
-        }.start()
-    }
-
     private fun playAndWait(ctx: Context, audio: ByteArray, myGen: Int) {
-        val f = File(ctx.cacheDir, "tts_" + System.nanoTime() + ".wav")
+        val isWav = audio.size > 4 && audio[0] == 0x52.toByte() && audio[1] == 0x49.toByte()
+        val f = File(ctx.cacheDir, "tts_" + System.nanoTime() + (if (isWav) ".wav" else ".mp3"))
         f.writeBytes(audio)
         val latch = java.util.concurrent.CountDownLatch(1)
         main.post {

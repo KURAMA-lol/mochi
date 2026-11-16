@@ -424,7 +424,36 @@ button.b:disabled{opacity:.45}
       <option value="piper">Piper: natural voices on your phone (free, offline)</option>
       <option value="openai">Natural: Kokoro / OpenAI-style API (needs key)</option>
       <option value="eleven">ElevenLabs (voice cloning, needs key)</option>
+      <option value="custom">Custom API / Prexzy free voices</option>
     </select>
+
+    <div id="vCustom" style="display:none">
+      <label>Source</label>
+      <select id="cPre" onchange="vSave()"><option value="prexzy">Prexzy free voices (no key)</option><option value="generic">My own API (any URL)</option></select>
+      <div id="cPrexzy">
+        <label>Voice <span class="mut">(styles work on the first group)</span></label>
+        <select id="cVoice" onchange="vSave()"><optgroup label="Expressive English"><option value="amy">Amy - US female, 11 styles</option><option value="arthur">Arthur - UK male</option><option value="beatrice">Beatrice - US female, 10 styles</option><option value="camila">Camila - US female</option><option value="casey">Casey - US neutral</option><option value="charlie">Charlie - UK male</option><option value="david">David - US male</option><option value="dylan">Dylan - US male</option><option value="ella">Ella - UK female</option><option value="emma">Emma - US female</option><option value="eric">Eric - US male</option><option value="ethan">Ethan - US male</option><option value="evie">Evie - UK female child</option><option value="freddie">Freddie - UK male</option><option value="freya">Freya - UK female</option><option value="grace">Grace - US female</option><option value="hannah">Hannah - US female</option><option value="henry">Henry - UK male</option><option value="isabella">Isabella - UK female</option><option value="isla">Isla - UK female</option><option value="ivy">Ivy - US female child</option><option value="jackson">Jackson - US male, 10 styles</option><option value="jacob">Jacob - US male</option><option value="james">James - US male</option><option value="jennifer">Jennifer - US female</option><option value="joey">Joey - US male</option><option value="john">John - US male</option><option value="julie">Julie - US female</option><option value="justin">Justin - US male</option><option value="katrina">Katrina - US female</option><option value="kevin">Kevin - US male</option><option value="layla">Layla - US female</option><option value="leo">Leo - US male</option><option value="lily">Lily - UK female</option><option value="marcus">Marcus - US male</option><option value="matthew">Matthew - US male</option><option value="max">Max - UK male</option><option value="mia">Mia - US female, 10 styles</option><option value="michael">Michael - US male, 11 styles</option><option value="noah">Noah - UK male</option><option value="olivia">Olivia - US female, 16 styles</option><option value="owen">Owen - US male, 11 styles</option><option value="paul">Paul - US male</option><option value="phoebe">Phoebe - UK female</option><option value="quincy">Quincy - US female</option><option value="sally">Sally - US female, 7 styles</option><option value="sam">Sam - US male</option><option value="scott">Scott - US male, 10 styles</option><option value="sophia">Sophia - US female, 13 styles</option><option value="sophie">Sophie - UK female</option><option value="theo">Theo - UK male</option><option value="thomas">Thomas - US male</option><option value="victor">Victor - US male</option><option value="william">William - UK male</option><option value="xena">Xena - US female</option></optgroup><optgroup label="Other languages"><option value="tts-hi">Hindi (plain, no styles)</option><option value="tts-en">English (plain, no styles)</option><option value="tts-fr">French (plain, no styles)</option><option value="tts-es">Spanish (plain, no styles)</option><option value="tts-de">German (plain, no styles)</option><option value="tts-ja">Japanese (plain, no styles)</option><option value="tts-ko">Korean (plain, no styles)</option><option value="tts-ar">Arabic (plain, no styles)</option><option value="tts-ru">Russian (plain, no styles)</option><option value="tts-pt">Portuguese (plain, no styles)</option><option value="tts-it">Italian (plain, no styles)</option><option value="tts-tr">Turkish (plain, no styles)</option><option value="tts-id">Indonesian (plain, no styles)</option></optgroup><optgroup label="Retro"><option value="tts-mary">Mary (retro robot)</option><option value="tts-mike">Mike (retro robot)</option><option value="tts-female-whisper">Female whisper (retro)</option></optgroup></select>
+        <label>Mood style <span class="mut">(auto picks from the sentence)</span></label>
+        <select id="cStyle" onchange="vSave()"><option value="auto">Auto</option><option value="none">None</option><option value="cheerful">Cheerful</option><option value="friendly">Friendly</option><option value="excited">Excited</option><option value="hopeful">Hopeful</option><option value="sad">Sad</option><option value="angry">Angry</option><option value="whispering">Whispering</option><option value="shouting">Shouting</option><option value="terrified">Terrified</option></select>
+        <label>Speed / Pitch <span class="mut">(optional, leave empty for default)</span></label>
+        <div class="btns"><input id="cSpeed" placeholder="speed" oninput="vSave()"><input id="cPitch" placeholder="pitch" oninput="vSave()"></div>
+        <p class="mut">Free public service, may be slow (5-30 s) or go down. Needs internet. If a voice rejects a style, it retries without it.</p>
+      </div>
+      <div id="cGeneric" style="display:none">
+        <label>URL <span class="mut">(use {text} where the sentence goes)</span></label>
+        <input id="cUrl" placeholder="https://example.com/tts?text={text}" oninput="vSave()">
+        <label>Method</label>
+        <select id="cMethod" onchange="vSave()"><option>GET</option><option>POST</option></select>
+        <label>POST body <span class="mut">(JSON with {text}; empty = text only)</span></label>
+        <input id="cBody" placeholder='{"input":"{text}","voice":"x"}' oninput="vSave()">
+        <label>Headers <span class="mut">(one per line, Name: value)</span></label>
+        <textarea id="cHead" rows="2" oninput="vSave()"></textarea>
+        <label>JSON field with audio <span class="mut">(optional, e.g. data.url; auto-detects if empty)</span></label>
+        <input id="cField" oninput="vSave()">
+        <p class="mut">Reply can be audio directly, or JSON with an audio link / base64.</p>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:10px;margin-top:12px"><input type="checkbox" id="vSfx" onchange="vSave()" style="width:auto"> <span>Real laugh / giggle / cough sounds <span class="mut">(for haha, hehe, *giggles*, *coughs*, *sighs*, *gasps*. Works with Piper, Custom, Kokoro and ElevenLabs. Needs internet once per sound.)</span></span></label>
     <div id="vPiper" style="display:none">
       <label>Piper voice <span class="mut">(natural, runs on your phone)</span></label>
       <select id="pVoice" onchange="vSave();sTick()"></select>
@@ -558,8 +587,10 @@ button.b:disabled{opacity:.45}
   window.addEventListener('scroll',function(e){var m=document.querySelector('.gmenu');if(m&&!(e.target&&e.target.nodeType===1&&m.contains(e.target)))gsClose();},true);
   setInterval(function(){try{gsAll()}catch(x){}},1200);
   function vShow(){vg('vPiper').style.display=VC.engine=='piper'?'block':'none';gsAll();
-    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';}
-  function vFill(){vg('vEng').value=VC.engine=='local'?'system':(VC.engine||'system');var o=VC.openai||{},e=VC.eleven||{},p=VC.piper||{},x=VC.ears||{};
+    vg('vOpenai').style.display=VC.engine=='openai'?'block':'none';vg('vEleven').style.display=VC.engine=='eleven'?'block':'none';
+    vg('vCustom').style.display=VC.engine=='custom'?'block':'none';vg('cPrexzy').style.display=(vg('cPre').value=='generic')?'none':'block';vg('cGeneric').style.display=(vg('cPre').value=='generic')?'block':'none';}
+  function vFill(){vg('vEng').value=VC.engine=='local'?'system':(VC.engine||'system');var o=VC.openai||{},e=VC.eleven||{},p=VC.piper||{},x=VC.ears||{},cu=VC.custom||{};
+    vg('cPre').value=cu.preset||'prexzy';vg('cVoice').value=cu.voice||'amy';vg('cStyle').value=cu.style||'auto';vg('cSpeed').value=cu.speed||'';vg('cPitch').value=cu.pitch||'';vg('cUrl').value=cu.url||'';vg('cMethod').value=cu.method||'GET';vg('cBody').value=cu.body||'';vg('cHead').value=cu.headers||'';vg('cField').value=cu.field||'';vg('vSfx').checked=VC.sfx!==false;
     vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;
     vg('wkEng').value=x.wake||'local';vg('asEng').value=x.asr||'local';vg('wkSens').value=x.sens||'normal';vg('wkScr').checked=!!x.screenOff;
     vg('oUrl').value=o.url||'';vg('oKey').value=o.key||'';vg('oModel').value=o.model||'';vg('oVoice').value=o.voice||'';vg('oSpeed').value=o.speed||1;
@@ -570,9 +601,10 @@ button.b:disabled{opacity:.45}
     VC.ears={wake:vg('wkEng').value,asr:vg('asEng').value,sens:vg('wkSens').value,screenOff:vg('wkScr').checked};
     VC.openai={url:vg('oUrl').value,key:vg('oKey').value,model:vg('oModel').value,voice:vg('oVoice').value,speed:+vg('oSpeed').value||1};
     VC.eleven={key:vg('eKey').value,voiceId:vg('eId').value,model:vg('eModel').value||'eleven_multilingual_v2'};
+    VC.custom={preset:vg('cPre').value,voice:vg('cVoice').value,style:vg('cStyle').value,speed:vg('cSpeed').value,pitch:vg('cPitch').value,url:vg('cUrl').value,method:vg('cMethod').value,body:vg('cBody').value,headers:vg('cHead').value,field:vg('cField').value};VC.sfx=vg('vSfx').checked;
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
   function vPreset(){var p=VP[vg('vPreset').value];if(!p)return;vg('oUrl').value=p[0];vg('oModel').value=p[1];vg('oVoice').value=p[2];vSave();}
-  function vTest(){vSave();vg('vStat').textContent='Generating...';Android.testVoice('Hi! This is my new voice. How do I sound?');}
+  function vTest(){vSave();vg('vStat').textContent='Generating...';Android.testVoice('Hi! This is my new voice. Haha, how do I sound? *giggles* Okay okay, I am ready!');}
   window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Done. If you heard it, it works!':'Error: '+m;};
   function vLoadList(){vSave();vg('vStat').textContent='Loading voices...';Android.listVoices();}
   window.onVoiceList=function(ok,a){if(!ok){vg('vStat').textContent='Error: '+a;return;}
