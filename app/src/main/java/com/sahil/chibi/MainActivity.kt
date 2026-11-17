@@ -383,6 +383,8 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun teamStop() { Team.stopAll("Stopped by you.") }
 
+        @JavascriptInterface fun teamEmp(json: String) { try { Team.setEmp(this@MainActivity, json) } catch (e: Exception) {} }
+
         @JavascriptInterface fun teamClear() { Team.clear(this@MainActivity) }
 
         @JavascriptInterface fun teamConfig(json: String) { try { Team.setConfig(this@MainActivity, json) } catch (e: Exception) {} }

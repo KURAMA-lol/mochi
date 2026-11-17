@@ -201,7 +201,14 @@ button.b:disabled{opacity:.45}
   .tm-m b{display:block;font-size:11.5px;margin-bottom:3px;font-weight:600}
   .tm-m.me{align-self:flex-end;background:var(--ac);color:var(--onac,#1a0d05)}
   .tm-m.sys{align-self:center;background:transparent;color:var(--mut);font-size:12px;text-align:center}
-  .tm-m.err{align-self:center;background:transparent;color:#ff6b7a;font-size:12px}
+  .tm-chips{scroll-behavior:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;min-height:48px}
+.tm-chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tm-m.tool{align-self:flex-start;background:transparent;border:1px solid var(--line);color:var(--mut);font-size:12px}
+.tm-emp{padding:12px 0;border-top:1px solid var(--line)}
+.tm-eh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}
+.tm-eh b{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.tm-ea{font-size:12px;color:var(--mut);text-align:right;flex:0 0 40%;overflow-wrap:anywhere}
+.tm-m.err{align-self:center;background:transparent;color:#ff6b7a;font-size:12px}
   .tm-m.fin{border:1px solid var(--ac)}
   .tm-m.job{background:transparent;border:1px dashed var(--line);font-size:13px}
   .tm-info{font-size:12px;color:var(--mut);margin:8px 0}
@@ -639,6 +646,11 @@ button.b:disabled{opacity:.45}
     <p class="mu" id="tmTo"></p>
   </div>
   <div class="card">
+    <label style="margin-top:0">Employees</label>
+    <p class="mu">Each provider is an employee. Give it a role and choose what it may do on its own. Turn one off to take it out of the team.</p>
+    <div id="tmEmps"></div>
+  </div>
+  <div class="card">
     <label style="margin-top:0">Team settings</label>
     <label>Lead <span class="mut">(splits the job and gives the final answer)</span></label>
     <select id="tmLead" onchange="tmCfg()"><option value="">Auto</option></select>
@@ -661,26 +673,52 @@ function tmPoll(){
   if(!vg('team').classList.contains('on')){clearInterval(TM.timer);TM.timer=null;return;}
   var s;try{s=JSON.parse(Android.teamState(TM.last));}catch(x){return;}
   TM.agents=s.agents||[];
-  var nm=TM.agents.map(function(a){return a.name}).join('|');
-  if(nm!=TM.names){TM.names=nm;var l=vg('tmLead');l.innerHTML='<option value="">Auto</option>';TM.agents.forEach(function(a){var o=document.createElement('option');o.value=a.name;o.textContent=a.name+' ('+a.model+')';l.appendChild(o);});l.value=s.leadPref||'';}
+  var nm=TM.agents.map(function(a){return a.name+(a.on===false?'-':'')}).join('|');
+  if(nm!=TM.names){TM.names=nm;var l=vg('tmLead');l.innerHTML='<option value="">Auto</option>';TM.agents.forEach(function(a){if(a.on===false)return;var o=document.createElement('option');o.value=a.name;o.textContent=a.name+' ('+a.model+')';l.appendChild(o);});l.value=s.leadPref||'';}
   if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
   s.events.forEach(function(e){TM.ev.push(e);if(e.id>TM.last)TM.last=e.id;});
-  tmChips();
+  TM.running=s.running;tmChips();tmEmps();
   vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns used: '+s.turns+' / '+s.max+(s.lead?'  Lead: '+s.lead:'');
   if(s.events.length||TM.redo){tmRender(!!TM.redo,s.events);TM.redo=false;}
 }
-function tmChips(){var c=vg('tmChips'),h='';
-  var all=[{name:'room',label:'Room',status:'idle'}].concat(TM.agents.map(function(a){return {name:a.name,label:a.name,status:a.status}}));
-  all.forEach(function(a){var d=a.status=='thinking'||a.status=='waiting for Nana'?'t':(a.status.indexOf('error')==0?'e':'');
-    h+='<button class="tm-chip'+(TM.sel==a.name?' on':'')+'" data-n="'+a.name.replace(/"/g,'&quot;')+'"><span class="tm-dot '+d+'"></span>'+a.label.replace(/</g,'&lt;')+'</button>';});
-  if(c._h!==h){c._h=h;c.innerHTML=h;c.querySelectorAll('.tm-chip').forEach(function(b){b.onclick=function(){TM.sel=b.dataset.n;TM.redo=true;tmChips();tmPoll();tmTo();};});}
+function tmChips(){var c=vg('tmChips');
+  var on=TM.agents.filter(function(a){return a.on!==false;});
+  var names=['room'].concat(on.map(function(a){return a.name}));var key=names.join('|');
+  if(c._k!==key){var keep=c.scrollLeft;c._k=key;c.innerHTML='';
+    names.forEach(function(n){var b=document.createElement('button');b.className='tm-chip';b.dataset.n=n;
+      var d=document.createElement('span');d.className='tm-dot';var l=document.createElement('span');l.textContent=n=='room'?'Room':n;
+      b.appendChild(d);b.appendChild(l);b.onclick=function(){TM.sel=n;TM.redo=true;tmChips();tmPoll();};c.appendChild(b);});
+    c.scrollLeft=keep;}
+  var st={};on.forEach(function(a){st[a.name]=a.status;});
+  Array.prototype.forEach.call(c.children,function(b){var n=b.dataset.n;
+    var s=n=='room'?(TM.running?'thinking':'idle'):(st[n]||'idle');
+    var cls='tm-dot'+(s=='idle'?'':(s.indexOf('error')==0?' e':' t'));
+    if(b.firstChild.className!=cls)b.firstChild.className=cls;
+    var want=TM.sel==n;if(b.classList.contains('on')!=want)b.classList.toggle('on',want);});
+  if(TM.sel!='room'&&!st.hasOwnProperty(TM.sel)){TM.sel='room';TM.redo=true;}
   tmTo();}
+function tmEmps(){var c=vg('tmEmps'),key=TM.agents.map(function(a){return a.name}).join('|');
+  if(c._k!==key){c._k=key;c.innerHTML='';
+    TM.agents.forEach(function(a){var d=document.createElement('div');d.className='tm-emp';
+      d.innerHTML='<div class="tm-eh"><b></b><span class="tm-ea"></span></div>'
+       +'<label class="sw"><span>On the team</span><input type="checkbox" data-k="on"></label>'
+       +'<input type="text" data-k="role" maxlength="160" placeholder="Role, e.g. researcher, writer, checker">'
+       +'<label class="sw"><span>Web research<small>search, read pages, Scrapy, Agent-Reach, video captions</small></span><input type="checkbox" data-k="research"></label>'
+       +'<label class="sw"><span>Downloads<small>save files to Downloads/Nana</small></span><input type="checkbox" data-k="download"></label>'
+       +'<label class="sw"><span>Skills<small>can open your skills</small></span><input type="checkbox" data-k="skills"></label>';
+      d.querySelector('b').textContent=a.name+'  '+a.model;
+      d.querySelectorAll('[data-k]').forEach(function(el){var k=el.dataset.k;if(el.type=='checkbox')el.checked=a[k]!==false&&(k!='download'||!!a[k]);else el.value=a[k]||'';
+        el.onchange=function(){var o={name:a.name};d.querySelectorAll('[data-k]').forEach(function(x){o[x.dataset.k]=x.type=='checkbox'?x.checked:x.value.trim();});try{Android.teamEmp(JSON.stringify(o));}catch(x){}setTimeout(tmPoll,200);};});
+      c.appendChild(d);});}
+  TM.agents.forEach(function(a,i){var el=c.children[i];if(!el)return;var t=el.querySelector('.tm-ea');
+    var s=a.on===false?'off':(a.act?('using '+a.act):(a.status||'idle'));if(t.textContent!=s)t.textContent=s;});}
 function tmTo(){vg('tmTo').textContent=TM.sel=='room'?'Sending to the Room: the lead splits the job. Use @name to call someone directly.':'Private chat with '+TM.sel+'. Only they hear this.';}
 function tmRender(full,fresh){var log=vg('tmLog');var near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
   var list=full?TM.ev:(fresh||[]);if(full)log.innerHTML='';
   list.forEach(function(e){if(!tmOk(e))return;var d=document.createElement('div');d.className='tm-m';var t=document.createElement('span');t.textContent=e.text;
     if(e.kind=='user'||e.from=='You'){d.className+=' me';d.appendChild(t);}
     else if(e.kind=='system'){d.className+=' sys';d.appendChild(t);}
+    else if(e.kind=='tool'){d.className+=' tool';t.textContent=e.from+' used '+e.text;d.appendChild(t);}
     else if(e.kind=='error'){d.className+=' err';t.textContent=e.from+': '+e.text;d.appendChild(t);}
     else{if(e.kind=='final')d.className+=' fin';if(e.kind=='task')d.className+=' job';
       var b=document.createElement('b');b.style.color=tmCol(e.from);b.textContent=e.from+' to '+tmName(e.to)+(e.kind=='final'?' (final answer)':(e.kind=='task'?' (phone job)':''));d.appendChild(b);d.appendChild(t);}
