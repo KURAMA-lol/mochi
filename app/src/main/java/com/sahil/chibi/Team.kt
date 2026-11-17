@@ -30,7 +30,15 @@ object Team {
     @Volatile private var app: Context? = null
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("team", Context.MODE_PRIVATE)
-    private fun maxTurns(ctx: Context) = prefs(ctx).getInt("max", 30).coerceIn(2, 60)
+    private fun maxTurns(ctx: Context) = prefs(ctx).getInt("max", 0).coerceIn(0, 500)
+    private fun maxMins(ctx: Context) = prefs(ctx).getInt("mins", 20).coerceIn(0, 240)
+    @Volatile private var jobStart = 0L
+    private val down = ConcurrentHashMap<String, Long>()
+    private val keyOf = ConcurrentHashMap<String, String>()
+    private val renamed = ConcurrentHashMap<String, String>()
+    private val recent = ArrayList<String>()
+    private fun isDown(n: String) = (down[n]?.let { System.currentTimeMillis() - it < 180000L } ?: false)
+    private fun canon(n: String): String { var x = n; var i = 0; while (i < 6) { val y = renamed[x] ?: break; if (y == x) break; x = y; i++ }; return x }
     private fun toolsOn(ctx: Context) = prefs(ctx).getBoolean("tools", false)
 
     private val act = ConcurrentHashMap<String, String>()
@@ -39,8 +47,10 @@ object Team {
 
     private fun emps(ctx: Context): JSONObject = try { JSONObject(prefs(ctx).getString("emp", "{}")) } catch (e: Exception) { JSONObject() }
 
-    private fun emp(ctx: Context, name: String): Emp {
-        val o = emps(ctx).optJSONObject(name)
+    private fun emp(ctx: Context, display: String): Emp = empK(ctx, keyOf[display] ?: display)
+
+    private fun empK(ctx: Context, key: String): Emp {
+        val o = emps(ctx).optJSONObject(key)
         return Emp(o?.optBoolean("on", true) ?: true, (o?.optString("role", "") ?: "").take(200), o?.optBoolean("research", true) ?: true,
             o?.optBoolean("download", false) ?: false, o?.optBoolean("skills", true) ?: true)
     }
@@ -51,9 +61,13 @@ object Team {
         val name = o.optString("name")
         if (name.isEmpty()) return
         val all = emps(ctx)
-        all.put(name, o)
+        val cur = all.optJSONObject(name) ?: JSONObject()
+        for (k in o.keys()) cur.put(k, o.get(k))
+        all.put(name, cur)
         prefs(ctx).edit().putString("emp", all.toString()).apply()
     }
+
+    private fun aliasOf(ctx: Context, key: String): String = (emps(ctx).optJSONObject(key)?.optString("alias", "") ?: "").trim()
 
     private fun allowed(e: Emp): Set<String> {
         val s = HashSet<String>()
@@ -72,19 +86,25 @@ object Team {
         val out = ArrayList<Pair<String, Provider>>()
         val seen = HashSet<String>()
         for (p in ConfigStore.load(ctx).providers.filter { it.usable() }) {
-            var n = p.name.trim().ifEmpty { "Agent" }
+            var key = p.name.trim().ifEmpty { "Agent" }
             var k = 2
-            while (!seen.add(n.lowercase())) { n = p.name.trim() + " " + k; k++ }
-            if (all || emp(ctx, n).on) out.add(Pair(n, p))
+            while (!seen.add(key.lowercase())) { key = p.name.trim() + " " + k; k++ }
+            val al = aliasOf(ctx, key)
+            var n = if (al.isNotEmpty()) al else key
+            var j = 2
+            while (keyOf[n] != null && keyOf[n] != key || out.any { it.first == n }) { n = (if (al.isNotEmpty()) al else key) + " " + j; j++ }
+            keyOf[n] = key
+            if (all || empK(ctx, key).on) out.add(Pair(n, p))
         }
         return out
     }
 
     private fun leadOf(ctx: Context, ro: List<Pair<String, Provider>>): String {
+        val up = ro.filter { !isDown(it.first) }.ifEmpty { ro }
         val want = prefs(ctx).getString("lead", "") ?: ""
-        ro.firstOrNull { it.first == want }?.let { return it.first }
-        ro.firstOrNull { e -> e.second.tagList().any { it == "lead" || it == "smart" } }?.let { return it.first }
-        return ro.minByOrNull { it.second.priority }?.first ?: ""
+        up.firstOrNull { it.first == want }?.let { return it.first }
+        up.firstOrNull { e -> e.second.tagList().any { it == "lead" || it == "smart" } }?.let { return it.first }
+        return up.minByOrNull { it.second.priority }?.first ?: ""
     }
 
     private fun ensureLoaded(ctx: Context) {
@@ -123,7 +143,7 @@ object Team {
 
     fun setConfig(ctx: Context, json: String) {
         val o = JSONObject(json)
-        prefs(ctx).edit().putInt("max", o.optInt("max", 20)).putString("lead", o.optString("lead", "")).putBoolean("tools", o.optBoolean("tools", false)).apply()
+        prefs(ctx).edit().putInt("max", o.optInt("max", 0)).putInt("mins", o.optInt("mins", 20)).putString("lead", o.optString("lead", "")).putBoolean("tools", o.optBoolean("tools", false)).apply()
     }
 
     fun state(ctx: Context, since: Int): String {
@@ -131,9 +151,11 @@ object Team {
         ensureLoaded(ctx)
         val ro = roster(ctx)
         val ag = JSONArray()
+        val boss = leadOf(ctx, ro)
         for ((n, p) in roster(ctx, true)) {
             val e = emp(ctx, n)
-            ag.put(JSONObject().put("name", n).put("model", p.model).put("status", if (e.on) (status[n] ?: "idle") else "idle").put("act", act[n] ?: "")
+            val st = if (!e.on) "idle" else if (isDown(n)) (status[n]?.takeIf { it.startsWith("error") } ?: "error: offline") else (status[n]?.takeIf { !it.startsWith("error") } ?: "idle")
+            ag.put(JSONObject().put("name", n).put("key", keyOf[n] ?: n).put("alias", aliasOf(ctx, keyOf[n] ?: n)).put("boss", n == boss).put("model", p.model).put("status", st).put("act", act[n] ?: "")
                 .put("on", e.on).put("role", e.role).put("research", e.research).put("download", e.download).put("skills", e.skills))
         }
         val ev = JSONArray()
@@ -141,7 +163,7 @@ object Team {
             for (e in events) if (e.id > since) ev.put(JSONObject().put("id", e.id).put("from", e.from).put("to", e.to).put("text", e.text).put("kind", e.kind).put("t", e.t))
         }
         val pr = prefs(ctx)
-        return JSONObject().put("running", inflight.get() > 0).put("turns", turns).put("max", maxTurns(ctx))
+        return JSONObject().put("running", inflight.get() > 0).put("turns", turns).put("max", maxTurns(ctx)).put("mins", maxMins(ctx))
             .put("lead", leadOf(ctx, ro)).put("leadPref", pr.getString("lead", "")).put("tools", toolsOn(ctx))
             .put("agents", ag).put("events", ev).toString()
     }
@@ -152,6 +174,7 @@ object Team {
         try { if (app != null && toolsOn(app!!)) Agent.stop() } catch (e: Exception) {}
         for (k in status.keys) status[k] = "idle"
         act.clear()
+        synchronized(recent) { recent.clear() }
         if (msg != null) add("system", "room", msg, "system")
     }
 
@@ -168,6 +191,8 @@ object Team {
         if (ro.isEmpty()) { add("system", "room", "No providers are set up yet. Add some in AI > Providers.", "error"); return }
         val names = ro.map { it.first }
         val busy = inflight.get() > 0
+        jobStart = System.currentTimeMillis()
+        synchronized(recent) { recent.clear() }
         if (!busy) { turns = 0; gen++ }
         turns = 0
         val direct = names.firstOrNull { it == target }
@@ -190,7 +215,8 @@ object Team {
         }
     }
 
-    private fun deliver(name: String, item: String) {
+    private fun deliver(raw: String, item: String) {
+        val name = canon(raw)
         inbox.getOrPut(name) { ConcurrentLinkedQueue() }.add(item)
         schedule(name)
     }
@@ -204,7 +230,7 @@ object Team {
             try { runTurn(name, g) } catch (e: Throwable) { add(name, "room", "crashed: " + (e.message ?: e.javaClass.simpleName), "error") }
             finally {
                 flag.set(false)
-                status[name] = status[name]?.takeIf { it.startsWith("error") } ?: "idle"
+                status[name] = if (isDown(name)) (status[name] ?: "idle") else "idle"
                 inflight.decrementAndGet()
                 if (gen == g && inbox[name]?.isNotEmpty() == true) schedule(name)
             }
@@ -226,7 +252,7 @@ object Team {
         val team = ro.joinToString("\n") {
             val e = emp(ctx, it.first)
             "- " + it.first + " (model " + it.second.model + (if (it.second.tagList().isNotEmpty()) ", strengths: " + it.second.tagList().joinToString("/") else "") +
-                (if (e.role.isNotBlank()) ", role: " + e.role else "") + (if (e.research) ", can research the web" else "") + (if (e.download) ", can download files" else "") + ")" + (if (it.first == lead) " [LEAD]" else "")
+                (if (e.role.isNotBlank()) ", role: " + e.role else "") + (if (e.research) ", can research the web" else "") + (if (e.download) ", can download files" else "") + ")" + (if (it.first == lead) " [BOSS]" else "") + (if (isDown(it.first)) " [OFFLINE]" else "")
         }
         val me = emp(ctx, name)
         val role = if (me.role.isNotBlank()) "Your role: " + me.role + "\n" else ""
@@ -238,13 +264,14 @@ object Team {
         val tools = if (toolsOn(ctx)) "Nana is a phone assistant with real tools (read the screen, open apps, web, files). Give her a concrete job with a DO line." else "Nana's phone tools are turned OFF. Do not use DO."
         return "You are $name, one AI agent in a small team inside Sahil's phone app. Your model: ${p.model}.\n" + role +
             "Team:\n$team\n$tools\n" + toolDoc +
-            "Work as a team. " + (if (name == lead) "You are the LEAD: read the task, decide who does what based on strengths, assign parts with TO lines (you may keep a part yourself), collect results, then finish with DONE. " else "Do the parts the lead or teammates give you, report back with TO or SAY, and ask a teammate when you need help. ") +
+            "Work as a team. " + (if (name == lead) "You are the BOSS of this team: read the task, decide who does what based on strengths, assign parts with TO lines (you may keep a part yourself), collect results, then finish with DONE. " else "Do the parts the lead or teammates give you, report back with TO or SAY, and ask a teammate when you need help. ") +
             "Decide yourselves, do not ask Sahil unless you are truly blocked. Match Sahil's language (he writes Hinglish). Be short.\n" +
             "Reply with one or more lines, each starting with exactly one of:\n" +
             "TO <Name>: a message to one teammate (assign work, ask, answer, review)\n" +
             "SAY: a short progress note or answer for Sahil\n" +
             "DO: a concrete phone job for Nana (she reports back to you)\n" +
             "DONE: the final answer for Sahil, only when the whole job is finished\n" +
+            "NAME <Agent>: <NewName> gives a short nickname (use NAME: <NewName> for yourself). Do it when Sahil asks the team to pick or change names: each agent can name itself, and the boss may name others so that all names are different. Then tell Sahil with SAY.\n" +
             "A message may continue on the following lines. Never invent the result of a DO job; wait for Nana's report. Never type passwords, card numbers or OTPs. Do not repeat what others already said."
     }
 
@@ -257,8 +284,9 @@ object Team {
         if (items.isEmpty()) return
         val ro = roster(ctx)
         val p = ro.firstOrNull { it.first == name }?.second ?: return
-        if (turns >= maxTurns(ctx)) {
-            add("system", "room", "Turn limit (" + maxTurns(ctx) + ") reached, so I paused. Send a message to continue.", "system")
+        val mx = maxTurns(ctx); val mm = maxMins(ctx)
+        if ((mx > 0 && turns >= mx) || (mm > 0 && jobStart > 0 && System.currentTimeMillis() - jobStart > mm * 60000L)) {
+            add("system", "room", "Paused after " + (if (mx > 0 && turns >= mx) "$mx turns" else "$mm minutes") + ". Send a message to carry on (limits are in Team settings, 0 = no limit).", "system")
             stopAll(null)
             return
         }
@@ -267,24 +295,36 @@ object Team {
         act.remove(name)
         val lead = leadOf(ctx, ro)
         val user = "Team room so far:\n" + transcript() + "\nNew for you:\n" + items.joinToString("\n")
-        val reply = try {
-            Adapters.call(p.copy(maxTokens = maxOf(p.maxTokens, 900)), systemFor(ctx, name, p, ro, lead), listOf(Msg("user", user)))
-        } catch (e: Exception) {
-            val m = (e.message ?: e.toString()).take(200)
+        var reply = ""
+        var failure: String? = null
+        for (attempt in 0..1) {
+            try {
+                reply = Adapters.call(p.copy(maxTokens = maxOf(p.maxTokens, 900)), systemFor(ctx, name, p, ro, lead), listOf(Msg("user", user)))
+                failure = null
+                break
+            } catch (e: Exception) {
+                failure = (e.message ?: e.toString()).take(200)
+                if (attempt == 0) try { Thread.sleep(2500) } catch (x: InterruptedException) {}
+                if (gen != g) return
+            }
+        }
+        if (failure != null) {
+            var m: String = failure
+            if (m.contains("resolve host", true)) m = "can't reach " + (Regex("\"([^\"]+)\"").find(m)?.groupValues?.get(1) ?: "its server") + ". The address may be wrong or that server is gone. Check the URL in AI > Providers."
+            down[name] = System.currentTimeMillis()
             status[name] = "error: $m"
-            add(name, "room", "could not answer: $m", "error")
-            if (name == lead) {
-                val other = ro.firstOrNull { it.first != name }?.first
-                if (other != null) {
-                    prefs(ctx).edit().putString("lead", other).apply()
-                    add("system", "room", "$name failed, $other is the lead now.", "system")
-                    for (x in items) deliver(other, x)
-                }
-            } else {
-                deliver(lead, "$name could not answer (" + m.take(80) + "). Please redistribute their part.")
+            add(name, "room", "offline: $m", "error")
+            val other = leadOf(ctx, roster(ctx))
+            if (name == lead && other.isNotEmpty() && other != name) {
+                add("system", "room", "$name is offline, so $other is the boss for now.", "system")
+                for (x in items) deliver(other, x)
+                deliver(other, "$name (the boss) went offline. You are the boss now.")
+            } else if (name != lead) {
+                deliver(lead, "$name is offline (" + m.take(80) + "). Give their part to someone else or do it yourself.")
             }
             return
         }
+        down.remove(name)
         if (gen != g) return
         handle(ctx, name, reply, g, ro)
     }
@@ -319,8 +359,8 @@ object Team {
         val names = ro.map { it.first }
         val dirs = ArrayList<Pair<String, String>>()
         for (line in reply.trim().split("\n")) {
-            val m = Regex("^\\s*(TO|SAY|DO|DONE)\\b\\s*(?:<([^>]*)>)?\\s*:?\\s*(.*)$").find(line)
-            if (m != null && line.trimStart().let { it.startsWith("TO") || it.startsWith("SAY") || it.startsWith("DO") }) {
+            val m = Regex("^\\s*(TO|SAY|DO|DONE|NAME)\\b\\s*(?:<([^>]*)>)?\\s*:?\\s*(.*)$").find(line)
+            if (m != null && line.trimStart().let { it.startsWith("TO") || it.startsWith("SAY") || it.startsWith("DO") || it.startsWith("NAME") }) {
                 val k = m.groupValues[1]
                 var rest = m.groupValues[3]
                 val tgt = m.groupValues[2]
@@ -333,13 +373,41 @@ object Team {
             if (gen != g) return
             val text = raw.trim()
             if (text.isEmpty()) continue
+            if (k == "TO" || k == "SAY" || k == "DONE") {
+                val sig = name + ":" + text.lowercase().replace(Regex("\\W+"), " ").take(160)
+                val rep = synchronized(recent) { val c = recent.count { it == sig }; recent.add(sig); while (recent.size > 14) recent.removeAt(0); c }
+                if (rep >= 2) { stopAll("The agents started repeating themselves, so I paused. Send a message to carry on."); return }
+            }
             when (k) {
+                "NAME" -> {
+                    val i = text.indexOf(':')
+                    val tgtRaw = if (i > 0) text.substring(0, i).trim().trim('<', '>') else name
+                    val nn = (if (i > 0) text.substring(i + 1) else text).trim().trim('"', '\'', '<', '>').replace(Regex("[^\\p{L}\\p{N} ._-]"), "").trim().take(24)
+                    val target = names.firstOrNull { compact(it) == compact(tgtRaw) } ?: name
+                    val boss = leadOf(ctx, ro)
+                    if (nn.isEmpty()) deliver(name, "That name was empty. Use NAME <Agent>: <NewName>.")
+                    else if (target != name && name != boss) deliver(name, "Only the boss can rename others. You can rename yourself with NAME: <NewName>.")
+                    else if (names.any { it.equals(nn, true) && it != target }) deliver(name, "The name $nn is already taken. Pick another.")
+                    else if (nn != target) {
+                        val key = keyOf[target] ?: target
+                        setEmp(ctx, JSONObject().put("name", key).put("alias", nn).toString())
+                        renamed[target] = nn
+                        keyOf[nn] = key
+                        inbox.remove(target)?.let { q -> val nq = inbox.getOrPut(nn) { ConcurrentLinkedQueue() }; for (x in q) nq.add(x) }
+                        status.remove(target)?.let { status[nn] = it }
+                        if ((prefs(ctx).getString("lead", "") ?: "") == target) prefs(ctx).edit().putString("lead", nn).apply()
+                        add("system", "room", "$target is now called $nn.", "system")
+                    }
+                }
                 "TO" -> {
                     val i = text.indexOf(':')
                     val tn = if (i > 0) text.substring(0, i).trim().trim('<', '>') else ""
                     val target = names.firstOrNull { compact(it) == compact(tn) }
                     if (target == null || target == name) add(name, "you", text, "agent")
-                    else {
+                    else if (isDown(target)) {
+                        add("system", name, "$target is offline right now.", "system")
+                        deliver(name, "$target is offline (could not answer). Do not wait for them: ask someone else or do it yourself.")
+                    } else {
                         val body = text.substring(i + 1).trim()
                         add(name, target, body, "agent")
                         deliver(target, "From $name: $body")

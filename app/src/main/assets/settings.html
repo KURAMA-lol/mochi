@@ -203,6 +203,18 @@ button.b:disabled{opacity:.45}
   .tm-m.sys{align-self:center;background:transparent;color:var(--mut);font-size:12px;text-align:center}
   .tm-chips{scroll-behavior:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;min-height:48px}
 .tm-chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tm-chips .tm-chip{height:40px;box-sizing:border-box;white-space:nowrap;max-width:210px;padding:0 14px;min-height:40px}
+.tm-chips .tm-chip span:last-child{overflow:hidden;text-overflow:ellipsis}
+.tm-chips .tm-dot{flex:none;width:8px;height:8px;margin:0;animation:none;transform:none}
+.tm-chips .tm-dot.t{background:#2fbf71;animation:tmpulse 1s ease-in-out infinite}
+.tm-chips .tm-dot.e{background:#ff6b7a;animation:none}
+@keyframes tmpulse{0%,100%{opacity:.3}50%{opacity:1}}
+.tm-info{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tm-stop{flex:none;padding:6px 14px;min-height:34px}
+.tm-compose{display:flex;gap:8px;align-items:flex-end}
+.tm-compose textarea{flex:1;min-height:46px;max-height:120px;resize:none;margin:0}
+.tm-compose .b{flex:none;min-height:46px}
+#team{padding-bottom:130px}
 .tm-m.tool{align-self:flex-start;background:transparent;border:1px solid var(--line);color:var(--mut);font-size:12px}
 .tm-emp{padding:12px 0;border-top:1px solid var(--line)}
 .tm-eh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}
@@ -640,9 +652,8 @@ button.b:disabled{opacity:.45}
   <div class="card">
     <div id="tmChips" class="tm-chips"></div>
     <div id="tmLog" class="tm-log"></div>
-    <div id="tmInfo" class="tm-info">...</div>
-    <textarea id="tmText" rows="2" placeholder="Give the team a job, or talk to them..."></textarea>
-    <div class="btns"><button class="b" onclick="tmSend()">Send</button><button class="b ghost" onclick="Android.teamStop()">Stop everyone</button></div>
+    <div class="tm-info"><span id="tmInfo">...</span><button class="b ghost tm-stop" onclick="Android.teamStop()">Stop</button></div>
+    <div class="tm-compose"><textarea id="tmText" rows="1" placeholder="Give the team a job, or talk to them..."></textarea><button class="b" onclick="tmSend()">Send</button></div>
     <p class="mu" id="tmTo"></p>
   </div>
   <div class="card">
@@ -652,10 +663,12 @@ button.b:disabled{opacity:.45}
   </div>
   <div class="card">
     <label style="margin-top:0">Team settings</label>
-    <label>Lead <span class="mut">(splits the job and gives the final answer)</span></label>
+    <label>Boss <span class="mut">(splits the job, checks the work, gives the final answer. If the boss goes offline, the next one takes over)</span></label>
     <select id="tmLead" onchange="tmCfg()"><option value="">Auto</option></select>
-    <label>Max turns per job <span class="mut">(stops runaway chats, each turn uses your API)</span></label>
-    <input id="tmMax" type="number" min="2" max="60" value="20" onchange="tmCfg()">
+    <label>Max turns per job <span class="mut">(0 = no limit)</span></label>
+    <input id="tmMax" type="number" min="0" max="500" value="0" onchange="tmCfg()">
+    <label>Max minutes per job <span class="mut">(0 = no limit. The team also stops by itself if they start repeating)</span></label>
+    <input id="tmMins" type="number" min="0" max="240" value="20" onchange="tmCfg()">
     <label class="sw"><span>Let the team use Nana's phone tools<small>they can ask Nana to open apps, read the screen, search. Off by default.</small></span><input type="checkbox" id="tmTools" onchange="tmCfg()"></label>
     <div class="btns"><button class="b ghost" onclick="tmClear()">Clear team chat</button></div>
     <p class="mu">Every provider you added in AI &gt; Providers is a team member with its own chat. Tap a name above to talk to just that one, or stay in Room. Write @name to call someone in the Room. Say "stop" any time.</p>
@@ -675,19 +688,20 @@ function tmPoll(){
   TM.agents=s.agents||[];
   var nm=TM.agents.map(function(a){return a.name+(a.on===false?'-':'')}).join('|');
   if(nm!=TM.names){TM.names=nm;var l=vg('tmLead');l.innerHTML='<option value="">Auto</option>';TM.agents.forEach(function(a){if(a.on===false)return;var o=document.createElement('option');o.value=a.name;o.textContent=a.name+' ('+a.model+')';l.appendChild(o);});l.value=s.leadPref||'';}
-  if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
+  if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmMins').value=s.mins;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
   s.events.forEach(function(e){TM.ev.push(e);if(e.id>TM.last)TM.last=e.id;});
   TM.running=s.running;tmChips();tmEmps();
-  vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns used: '+s.turns+' / '+s.max+(s.lead?'  Lead: '+s.lead:'');
+  vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns: '+s.turns+(s.max?' / '+s.max:'')+(s.lead?'  Boss: '+s.lead:'');
   if(s.events.length||TM.redo){tmRender(!!TM.redo,s.events);TM.redo=false;}
 }
 function tmChips(){var c=vg('tmChips');
   var on=TM.agents.filter(function(a){return a.on!==false;});
-  var names=['room'].concat(on.map(function(a){return a.name}));var key=names.join('|');
+  var items=[{n:'room',l:'Room'}].concat(on.map(function(a){return {n:a.name,l:(a.boss?'\u2605 ':'')+a.name};}));
+  var key=items.map(function(x){return x.l}).join('|');
   if(c._k!==key){var keep=c.scrollLeft;c._k=key;c.innerHTML='';
-    names.forEach(function(n){var b=document.createElement('button');b.className='tm-chip';b.dataset.n=n;
-      var d=document.createElement('span');d.className='tm-dot';var l=document.createElement('span');l.textContent=n=='room'?'Room':n;
-      b.appendChild(d);b.appendChild(l);b.onclick=function(){TM.sel=n;TM.redo=true;tmChips();tmPoll();};c.appendChild(b);});
+    items.forEach(function(x){var b=document.createElement('button');b.className='tm-chip';b.dataset.n=x.n;
+      var d=document.createElement('span');d.className='tm-dot';var l=document.createElement('span');l.textContent=x.l;
+      b.appendChild(d);b.appendChild(l);b.onclick=function(){TM.sel=x.n;TM.redo=true;tmChips();tmPoll();};c.appendChild(b);});
     c.scrollLeft=keep;}
   var st={};on.forEach(function(a){st[a.name]=a.status;});
   Array.prototype.forEach.call(c.children,function(b){var n=b.dataset.n;
@@ -697,18 +711,19 @@ function tmChips(){var c=vg('tmChips');
     var want=TM.sel==n;if(b.classList.contains('on')!=want)b.classList.toggle('on',want);});
   if(TM.sel!='room'&&!st.hasOwnProperty(TM.sel)){TM.sel='room';TM.redo=true;}
   tmTo();}
-function tmEmps(){var c=vg('tmEmps'),key=TM.agents.map(function(a){return a.name}).join('|');
+function tmEmps(){var c=vg('tmEmps'),key=TM.agents.map(function(a){return a.key+'|'+a.name}).join(',');
   if(c._k!==key){c._k=key;c.innerHTML='';
     TM.agents.forEach(function(a){var d=document.createElement('div');d.className='tm-emp';
       d.innerHTML='<div class="tm-eh"><b></b><span class="tm-ea"></span></div>'
        +'<label class="sw"><span>On the team</span><input type="checkbox" data-k="on"></label>'
+       +'<input type="text" data-k="alias" maxlength="24" placeholder="Nickname (the team can also pick names themselves)">'
        +'<input type="text" data-k="role" maxlength="160" placeholder="Role, e.g. researcher, writer, checker">'
        +'<label class="sw"><span>Web research<small>search, read pages, Scrapy, Agent-Reach, video captions</small></span><input type="checkbox" data-k="research"></label>'
        +'<label class="sw"><span>Downloads<small>save files to Downloads/Nana</small></span><input type="checkbox" data-k="download"></label>'
        +'<label class="sw"><span>Skills<small>can open your skills</small></span><input type="checkbox" data-k="skills"></label>';
-      d.querySelector('b').textContent=a.name+'  '+a.model;
-      d.querySelectorAll('[data-k]').forEach(function(el){var k=el.dataset.k;if(el.type=='checkbox')el.checked=a[k]!==false&&(k!='download'||!!a[k]);else el.value=a[k]||'';
-        el.onchange=function(){var o={name:a.name};d.querySelectorAll('[data-k]').forEach(function(x){o[x.dataset.k]=x.type=='checkbox'?x.checked:x.value.trim();});try{Android.teamEmp(JSON.stringify(o));}catch(x){}setTimeout(tmPoll,200);};});
+      d.querySelector('b').textContent=(a.boss?'\u2605 ':'')+a.name+'  \u00b7  '+a.model;
+      d.querySelectorAll('[data-k]').forEach(function(el){var k=el.dataset.k;if(el.type=='checkbox')el.checked=!!a[k];else el.value=a[k]||'';
+        el.onchange=function(){var o={name:a.key};d.querySelectorAll('[data-k]').forEach(function(x){o[x.dataset.k]=x.type=='checkbox'?x.checked:x.value.trim();});try{Android.teamEmp(JSON.stringify(o));}catch(x){}setTimeout(tmPoll,250);};});
       c.appendChild(d);});}
   TM.agents.forEach(function(a,i){var el=c.children[i];if(!el)return;var t=el.querySelector('.tm-ea');
     var s=a.on===false?'off':(a.act?('using '+a.act):(a.status||'idle'));if(t.textContent!=s)t.textContent=s;});}
@@ -725,7 +740,7 @@ function tmRender(full,fresh){var log=vg('tmLog');var near=log.scrollHeight-log.
     log.appendChild(d);});
   if(full||near)log.scrollTop=log.scrollHeight;}
 function tmSend(){var t=vg('tmText').value.trim();if(!t)return;try{Android.teamPost(t,TM.sel);}catch(x){}vg('tmText').value='';setTimeout(tmPoll,250);}
-function tmCfg(){try{Android.teamConfig(JSON.stringify({max:+vg('tmMax').value||20,lead:vg('tmLead').value,tools:vg('tmTools').checked}));}catch(x){}}
+function tmCfg(){try{Android.teamConfig(JSON.stringify({max:parseInt(vg('tmMax').value)||0,mins:parseInt(vg('tmMins').value)||0,lead:vg('tmLead').value,tools:vg('tmTools').checked}));}catch(x){}}
 function tmClear(){askYes('Clear the whole team chat?',function(){try{Android.teamClear();}catch(x){}TM.ev=[];TM.last=0;TM.redo=true;tmPoll();},'Clear');}
 </script>
 
