@@ -3,7 +3,11 @@ package com.sahil.chibi
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaRecorder
+import android.net.Uri
 import android.os.PowerManager
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.EndpointConfig
@@ -94,7 +98,20 @@ object Speech {
         else -> false
     }
 
-    fun wakeLocal(ctx: Context): Boolean = ears(ctx).optString("wake", "local") == "local" && ready(ctx, "kws") && !guard(ctx).getBoolean("kws", false)
+    fun kwsOk(ctx: Context): Boolean = ready(ctx, "kws") && !guard(ctx).getBoolean("kws", false)
+    /** Wake by reading the live transcript for "Hey Nana" (works with any accent the recognizer understands). */
+    fun asrWake(ctx: Context): Boolean = ears(ctx).optBoolean("accurate", true) && ready(ctx, "asr") && !guard(ctx).getBoolean("asr", false)
+    fun wakeLocal(ctx: Context): Boolean = ears(ctx).optString("wake", "local") == "local" && (kwsOk(ctx) || asrWake(ctx))
+
+    private val WAKE_STRONG = Regex("\\b(?:n[aeu]+n+[aeu]+h?|na\\s+na|nan\\s+a|naan[aeu]?)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
+    private val WAKE_WEAK = Regex("\\b(?:hey|hi|hello|ok|okay)\\s+(?:anna|hanna|hannah|nina|nona|lana|nonna|mana)\\b[,.!?\\s]*", RegexOption.IGNORE_CASE)
+
+    /** The words after the wake word when the text starts a "Hey Nana" call, otherwise null. */
+    fun wakeMatch(t: String): String? {
+        val m = WAKE_STRONG.find(t) ?: WAKE_WEAK.find(t) ?: return null
+        if (m.range.first > 14) return null
+        return t.substring(m.range.last + 1).trim()
+    }
     fun asrLocal(ctx: Context): Boolean = ears(ctx).optString("asr", "local") == "local" && ready(ctx, "asr") && !guard(ctx).getBoolean("asr", false)
     fun screenOffOk(ctx: Context): Boolean = ears(ctx).optBoolean("screenOff", false)
 
@@ -318,6 +335,85 @@ object Speech {
         throw RuntimeException("Reference voice wav has no audio")
     }
 
+    private fun customRef(ctx: Context) = File(root(ctx), "pocket_custom.wav")
+
+    fun pocketVoicesJson(ctx: Context): String {
+        val a = JSONArray()
+        val ws = File(modelDir(ctx, "pocket"), "test_wavs").listFiles { x -> x.name.endsWith(".wav") }?.sortedBy { it.name } ?: emptyList()
+        for (f in ws) a.put(JSONObject().put("id", f.name).put("label", "Built-in: " + f.name.removeSuffix(".wav")))
+        if (customRef(ctx).exists()) a.put(JSONObject().put("id", "custom").put("label", "My voice (from your file)"))
+        return a.toString()
+    }
+
+    fun removeCustomPocket(ctx: Context) { customRef(ctx).delete(); synchronized(this) { pRef = null; pRefKey = "" } }
+
+    /** Decodes any audio file (mp3, m4a, wav, ogg...) into a short mono reference clip for Pocket-TTS. */
+    fun saveCustomPocket(ctx: Context, uri: Uri): String {
+        val ex = MediaExtractor()
+        ex.setDataSource(ctx, uri, null)
+        var idx = -1
+        var fmt: MediaFormat? = null
+        for (i in 0 until ex.trackCount) {
+            val f = ex.getTrackFormat(i)
+            if ((f.getString(MediaFormat.KEY_MIME) ?: "").startsWith("audio/")) { idx = i; fmt = f; break }
+        }
+        if (idx < 0 || fmt == null) throw RuntimeException("That file has no audio")
+        ex.selectTrack(idx)
+        val codec = MediaCodec.createDecoderByType(fmt.getString(MediaFormat.KEY_MIME)!!)
+        codec.configure(fmt, null, null, 0)
+        codec.start()
+        var sr = if (fmt.containsKey(MediaFormat.KEY_SAMPLE_RATE)) fmt.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 24000
+        var ch = if (fmt.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) fmt.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 1
+        val out = ArrayList<Float>()
+        val info = MediaCodec.BufferInfo()
+        var inDone = false
+        var outDone = false
+        try {
+            while (!outDone) {
+                if (!inDone) {
+                    val ii = codec.dequeueInputBuffer(10000)
+                    if (ii >= 0) {
+                        val b = codec.getInputBuffer(ii)!!
+                        val n = ex.readSampleData(b, 0)
+                        if (n < 0) { codec.queueInputBuffer(ii, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM); inDone = true }
+                        else { codec.queueInputBuffer(ii, 0, n, ex.sampleTime, 0); ex.advance() }
+                    }
+                }
+                val oi = codec.dequeueOutputBuffer(info, 10000)
+                if (oi >= 0) {
+                    val b = codec.getOutputBuffer(oi)!!
+                    b.position(info.offset); b.limit(info.offset + info.size)
+                    val sb = b.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                    val c = if (ch < 1) 1 else ch
+                    while (sb.remaining() >= c) {
+                        var s = 0f
+                        for (k in 0 until c) s += sb.get() / 32768f
+                        out.add(s / c)
+                    }
+                    codec.releaseOutputBuffer(oi, false)
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outDone = true
+                    if (out.size > sr * 20) outDone = true
+                } else if (oi == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    val nf = codec.outputFormat
+                    if (nf.containsKey(MediaFormat.KEY_SAMPLE_RATE)) sr = nf.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                    if (nf.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) ch = nf.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                }
+            }
+        } finally {
+            try { codec.stop() } catch (e: Throwable) {}
+            try { codec.release() } catch (e: Throwable) {}
+            ex.release()
+        }
+        if (out.size < sr * 2) throw RuntimeException("Clip is too short. Use 5 to 15 seconds of one clear voice.")
+        val keep = minOf(out.size, sr * 15)
+        val arr = FloatArray(keep) { out[it] }
+        customRef(ctx).writeBytes(wav(arr, sr))
+        synchronized(this) { pRef = null; pRefKey = "" }
+        return "ok"
+    }
+
+    private var pRefKey = ""
+
     @Synchronized
     fun synthPocket(ctx: Context, text: String): ByteArray {
         if (!ready(ctx, "pocket")) throw RuntimeException("Pocket-TTS is not downloaded yet (Settings > Voice)")
@@ -342,12 +438,18 @@ object Speech {
                     )
                 )
             }
-            val ref = File(d, "test_wavs").listFiles { x -> x.name.endsWith(".wav") }?.sortedBy { it.name }?.firstOrNull()
-                ?: throw RuntimeException("Pocket-TTS download has no reference voice")
-            val (s, sr) = readWav(ref)
-            pRef = s; pRefSr = sr
         }
         val p = Voice.cfg(ctx).optJSONObject("pocket") ?: JSONObject()
+        val want = p.optString("voice", "")
+        val key = if (want == "custom" && customRef(ctx).exists()) "custom" else want
+        if (pRef == null || pRefKey != key) {
+            val ref = if (key == "custom") customRef(ctx)
+                else (File(d, "test_wavs").listFiles { x -> x.name == want }?.firstOrNull()
+                    ?: File(d, "test_wavs").listFiles { x -> x.name.endsWith(".wav") }?.sortedBy { it.name }?.firstOrNull()
+                    ?: throw RuntimeException("Pocket-TTS download has no reference voice"))
+            val (s, sr) = readWav(ref)
+            pRef = s; pRefSr = sr; pRefKey = key
+        }
         val sp = p.optDouble("speed", 1.0).toFloat().coerceIn(0.6f, 1.6f)
         val a = pTts!!.generateWithConfig(text, GenerationConfig(speed = sp, referenceAudio = pRef, referenceSampleRate = pRefSr))
         return wav(a.samples, a.sampleRate)
@@ -401,9 +503,10 @@ object Speech {
  */
 object Ears {
     interface Host {
-        fun onWake(keyword: String)
+        fun onWake(keyword: String, rest: String)
         fun speaking(): Boolean
         fun state(s: String)
+        fun heard(text: String)
     }
 
     private class Req(val onPartial: (String) -> Unit, val onFinal: (String) -> Unit, val onFail: (String) -> Unit)
@@ -469,6 +572,9 @@ object Ears {
         var kws: KeywordSpotter? = null
         var ks: OnlineStream? = null
         var kKey = ""
+        var wst: OnlineStream? = null
+        var wText = ""
+        var wChange = 0L
         var asr: OnlineRecognizer? = null
         var ast: OnlineStream? = null
         var aText = ""
@@ -495,7 +601,7 @@ object Ears {
                 val now = System.currentTimeMillis()
                 if (now - lastScreen > 1000) { screenOn = pm.isInteractive; lastScreen = now }
 
-                if (asr != null && r == null && ast == null && now - asrIdle > 45000) { try { asr.release() } catch (e: Throwable) {}; asr = null }
+                if (asr != null && r == null && ast == null && wst == null && now - asrIdle > 45000) { try { asr.release() } catch (e: Throwable) {}; asr = null }
 
                 val allowWake = wake && !paused && (screenOn || Speech.screenOffOk(ctx))
                 if (paused || (r == null && !allowWake)) {
@@ -506,6 +612,7 @@ object Ears {
                 }
 
                 if (r != null) {
+                    if (wst != null) { try { wst.release() } catch (e: Throwable) {}; wst = null }
                     if (asr == null) {
                         h?.state("loading")
                         try { asr = Speech.guarded(ctx, "asr") { OnlineRecognizer(config = Speech.asrConfig(ctx)) } }
@@ -514,7 +621,14 @@ object Ears {
                     if (ast == null) { ast = asr!!.createStream(); aText = ""; aStart = now; aHeard = false }
                 } else {
                     if (ast != null) { try { ast.release() } catch (e: Throwable) {}; ast = null }
-                    if (kws == null || kKey != key) {
+                    val useKws = Speech.kwsOk(ctx)
+                    val useAsr = Speech.asrWake(ctx)
+                    if (!useKws && kws != null) {
+                        try { ks?.release() } catch (e: Throwable) {}
+                        try { kws.release() } catch (e: Throwable) {}
+                        kws = null; ks = null
+                    }
+                    if (useKws && (kws == null || kKey != key)) {
                         h?.state("loading")
                         try { ks?.release() } catch (e: Throwable) {}
                         try { kws?.release() } catch (e: Throwable) {}
@@ -523,9 +637,18 @@ object Ears {
                             val k = Speech.guarded(ctx, "kws") { KeywordSpotter(config = Speech.kwsConfig(ctx)) }
                             kws = k; ks = k.createStream(); kKey = key
                         } catch (e: Throwable) {
-                            h?.state("error:" + (e.message ?: "model").take(60)); Thread.sleep(5000); continue
+                            if (!useAsr) { h?.state("error:" + (e.message ?: "model").take(60)); Thread.sleep(5000); continue }
                         }
                     }
+                    if (useAsr) {
+                        if (asr == null) {
+                            h?.state("loading")
+                            try { asr = Speech.guarded(ctx, "asr") { OnlineRecognizer(config = Speech.asrConfig(ctx)) } }
+                            catch (e: Throwable) { if (kws == null) { h?.state("error:" + (e.message ?: "model").take(60)); Thread.sleep(5000); continue } }
+                        }
+                        if (asr != null && wst == null) { wst = asr.createStream(); wText = ""; wChange = now }
+                    } else if (wst != null) { try { wst.release() } catch (e: Throwable) {}; wst = null }
+                    if (kws == null && wst == null) { h?.state("error:no-wake-model"); Thread.sleep(2000); continue }
                 }
 
                 if (rec == null) {
@@ -577,15 +700,43 @@ object Ears {
                         if (k != null && s != null) k.reset(s)
                     }
                 } else {
-                    val k = kws!!
-                    val s = ks!!
-                    s.acceptWaveform(f, 16000)
-                    while (k.isReady(s)) {
-                        k.decode(s)
-                        val res = k.getResult(s)
-                        if (res.keyword.isNotEmpty()) {
-                            k.reset(s)
-                            if (now > cool) { cool = now + 2000; h?.onWake(res.keyword) }
+                    val k = kws
+                    val s = ks
+                    if (k != null && s != null) {
+                        s.acceptWaveform(f, 16000)
+                        while (k.isReady(s)) {
+                            k.decode(s)
+                            val res = k.getResult(s)
+                            if (res.keyword.isNotEmpty()) {
+                                k.reset(s)
+                                if (now > cool) {
+                                    cool = now + 2000
+                                    wst?.let { w -> asr?.reset(w) }; wText = ""
+                                    h?.onWake(res.keyword, "")
+                                }
+                            }
+                        }
+                    }
+                    val w = wst
+                    val m2 = asr
+                    if (w != null && m2 != null) {
+                        w.acceptWaveform(f, 16000)
+                        while (m2.isReady(w)) m2.decode(w)
+                        val t = m2.getResult(w).text.trim()
+                        if (t != wText) { wText = t; wChange = now }
+                        val end = m2.isEndpoint(w)
+                        val rest = if (t.isNotEmpty()) Speech.wakeMatch(t) else null
+                        if (rest != null && (end || now - wChange > 700) && now > cool) {
+                            cool = now + 2000
+                            m2.reset(w); wText = ""
+                            if (k != null && s != null) k.reset(s)
+                            h?.heard(t)
+                            h?.onWake("nana", rest)
+                        } else if (end) {
+                            if (t.isNotEmpty()) h?.heard(t)
+                            m2.reset(w); wText = ""
+                        } else if (t.length > 70 || (t.isNotEmpty() && now - wChange > 6000)) {
+                            m2.reset(w); wText = ""
                         }
                     }
                     if (zero == 0) h?.state("listening-local")
@@ -599,6 +750,7 @@ object Ears {
             synchronized(this) { th = null }
         } finally {
             closeRec(rec)
+            try { wst?.release() } catch (e: Throwable) {}
             try { ast?.release() } catch (e: Throwable) {}
             try { ks?.release() } catch (e: Throwable) {}
             try { kws?.release() } catch (e: Throwable) {}

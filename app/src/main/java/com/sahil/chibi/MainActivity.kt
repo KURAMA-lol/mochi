@@ -210,6 +210,18 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 80) {
+            if (resultCode != RESULT_OK) return
+            val u = data?.data ?: return
+            Thread {
+                try {
+                    Speech.saveCustomPocket(this, u)
+                    js("window.onPocketVoice && onPocketVoice(true, 'Voice saved. Tap Test voice.')")
+                } catch (ex: Throwable) {
+                    js("window.onPocketVoice && onPocketVoice(false, " + JSONObject.quote(ex.message ?: ex.toString()) + ")")
+                }
+            }.start()
+        }
     }
 
     private fun askRuntimePerms() {
@@ -353,6 +365,17 @@ class MainActivity : Activity() {
                 js("window.onVoiceTest && onVoiceTest(" + (err == null) + ", " + JSONObject.quote(err ?: "ok") + ")")
             }
         }
+
+        @JavascriptInterface fun pocketVoices(): String = Speech.pocketVoicesJson(this@MainActivity)
+
+        @JavascriptInterface fun pickPocketVoice() {
+            runOnUiThread {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*" }
+                startActivityForResult(i, 80)
+            }
+        }
+
+        @JavascriptInterface fun pocketRemoveCustom() { Speech.removeCustomPocket(this@MainActivity) }
 
         @JavascriptInterface fun callStart() { CompanionService.send(this@MainActivity, CompanionService.ACT_CALL) }
 

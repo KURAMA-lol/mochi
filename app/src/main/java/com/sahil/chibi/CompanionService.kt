@@ -1616,9 +1616,12 @@ class CompanionService : Service() {
     private var localListening = false
     private val wakeDog = Runnable { startWake() }
     private val earsHost = object : Ears.Host {
-        override fun onWake(keyword: String) {
-            wakeHeard = "\"" + keyword.replace('_', ' ') + "\" at " + java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
-            main.post { triggerWake("") }
+        override fun onWake(keyword: String, rest: String) {
+            wakeHeard = "woke on \"" + keyword.replace('_', ' ') + "\" at " + java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
+            main.post { triggerWake(rest) }
+        }
+        override fun heard(text: String) {
+            wakeHeard = "heard \"" + text.take(60) + "\" at " + java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
         }
         override fun speaking(): Boolean = Voice.playing() || (tts?.isSpeaking == true)
         override fun state(s: String) { wakeState = s }
