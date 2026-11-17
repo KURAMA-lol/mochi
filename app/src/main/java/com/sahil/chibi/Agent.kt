@@ -133,7 +133,7 @@ object Agent {
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
     private val TAG_OPEN = Regex("""<tool>\s*(\{[\s\S]*\})""")
 
-    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. Several independent calls may go in one reply; they run in order. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query}; web_read{url}; watch_video{url}; watch_along{on}; agent_reach{command}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact}."
+    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. Several independent calls may go in one reply; they run in order. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query}; web_read{url}; watch_video{url}; watch_along{on}; agent_reach{command}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact}; scrape{url,fields,follow,max_pages}; use_skill{name}."
 
     private const val DOC = """You can use tools. To use one, reply with ONLY a tool call and nothing else, exactly like:
 <tool>{"name":"TOOL_NAME","args":{...}}</tool>
@@ -153,6 +153,8 @@ Tools:
 - watch_video {"url":"..."} : "watch" a video or reel link. YouTube and Shorts give info plus a timestamped caption transcript; TikTok, Instagram, Facebook and X give the public caption only. Use it whenever the user shares or asks about a video or reel link, then react like you watched it together. You never see the picture or hear the sound: say so when you only saw a caption.
 - watch_along {"on":true|false} : turn on or off live watch-along (she comments on Reels and Shorts on screen). Only when the user asks.
 - agent_reach {"command":"youtube subtitle <link>"} : Agent-Reach, runs inside the app. Commands: youtube read|subtitle|search, github read|search, web read|search, v2ex hot|read, bilibili search|read, read <url>. Instagram, X, Reddit and Facebook do not work here (they need a desktop browser): say so instead of retrying.
+- scrape {"url":"...","fields":{"title":"h1::text","price":".price::text"},"follow":"regex of links to crawl next (optional)","max_pages":5} : Scrapy inside the app. Pulls fields (CSS selectors, or xpath:...) from a page and optionally from linked pages of the same site. Without fields you get title, headings and text. Static HTML only. Only scrape what the user asked for.
+- use_skill {"name":"..."} : open one of the SKILLS listed above and follow it.
 - browser_open {"url":"..."} : open a page in Nana's own browser (it floats on the user's screen). Returns page text and numbered elements [n].
 - browser_read {} : read the current browser page again.
 - browser_click_text {"text":"Sign up"} : clicks the first button/link/field on the page whose label contains the text (PREFERRED, no numbers needed).
@@ -200,7 +202,7 @@ How to work:
         if (!enabled(ctx)) return chatRetry(conf, base, history, voice)
         val acc = NanaAccess.inst != null
         val live = "\n\nLIVE STATUS (trust this): tools ON; phone/browser actions " + (if (actions(ctx)) "ON" else "OFF (user switched it off in settings)") + "; screen control (accessibility) " + (if (acc) "ON" else "OFF (screen_* tools and tapping will not work)") + ". If a needed switch is OFF, say so plainly and tell the user which one to turn on. Never claim you did something unless a tool result in this conversation shows it."
-        val system = base + live + "\n\n" + DOC
+        val system = base + live + "\n\n" + DOC + Skills.block(ctx)
         val hLast = history.indexOfLast { it.role == "user" }
         val request = if (hLast >= 0) history[hLast].content else ""
         val prevTask = lastTask(ctx)
@@ -507,6 +509,10 @@ How to work:
         reg("agent_reach", "Run an Agent-Reach command inside the app (embedded Python): youtube read|subtitle|search, github read|search, web read|search, v2ex hot|read, bilibili search|read, read <url>.", listOf(p("command", "string", true)), readOnly = true) { c, a ->
             try { PyRuntime.reach(c, a.optString("command")) } catch (e: Throwable) { "Agent-Reach failed: " + (e.message ?: e.toString()).take(300) }
         }
+        reg("scrape", "Scrapy inside the app: scrape{url, fields (name->CSS selector map), follow (regex), max_pages}. Static pages only.", listOf(p("url", "string", true), p("fields", "string"), p("follow", "string"), p("max_pages", "int")), readOnly = true) { c, a ->
+            try { PyRuntime.scrape(c, a.toString()) } catch (e: Throwable) { "Scrapy failed: " + (e.message ?: e.toString()).take(300) }
+        }
+        reg("use_skill", "Open one of the user's skills (instruction sheets) by name and follow it.", listOf(p("name", "string", true)), readOnly = true) { c, a -> Skills.text(c, a.optString("name")) }
         reg("launch_app", "Open an app by name.", listOf(p("name", "string", true))) { c, a -> launch(c, a.optString("name")) }
         reg("open_url", "Open a link in the user's apps.", listOf(p("url", "string", true))) { c, a -> openUrl(c, a.optString("url")) }
         reg("browser_open", "Open a page in Nana's browser.", listOf(p("url", "string", true))) { c, a -> AgentBrowser.open(c, a.optString("url")) }

@@ -387,6 +387,21 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun teamConfig(json: String) { try { Team.setConfig(this@MainActivity, json) } catch (e: Exception) {} }
 
+        @JavascriptInterface fun skillsList(): String = Skills.listJson(this@MainActivity)
+
+        @JavascriptInterface fun skillSave(name: String, desc: String, body: String): String = Skills.save(this@MainActivity, name, desc, body)
+
+        @JavascriptInterface fun skillDelete(name: String) { Skills.delete(this@MainActivity, name) }
+
+        @JavascriptInterface fun skillToggle(name: String, on: Boolean) { Skills.toggle(this@MainActivity, name, on) }
+
+        @JavascriptInterface fun skillImport(url: String) {
+            Thread {
+                val r = Skills.importUrl(this@MainActivity, url)
+                js("skImported(" + JSONObject.quote(r) + ")")
+            }.start()
+        }
+
         @JavascriptInterface fun callStart() { CompanionService.send(this@MainActivity, CompanionService.ACT_CALL) }
 
         @JavascriptInterface fun callStop() { CompanionService.send(this@MainActivity, CompanionService.ACT_HANGUP) }

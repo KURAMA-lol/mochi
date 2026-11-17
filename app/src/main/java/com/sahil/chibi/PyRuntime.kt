@@ -28,6 +28,14 @@ object PyRuntime {
         return compact(out).take(6000)
     }
 
+    /** Scrapy crawl (see nana_scrapy.py). args is the tool's JSON. Returns text for the model. */
+    fun scrape(ctx: Context, args: String): String {
+        val raw = py(ctx).getModule("nana_scrapy").callAttr("run", args).toString()
+        val o = JSONObject(raw)
+        val out = o.optString("out").trim()
+        return if (o.optBoolean("ok", false)) out.ifEmpty { "Scrapy returned nothing." } else "Scrapy error: " + out.take(500)
+    }
+
     /** Unpacks a downloaded model archive (tar.bz2) with Python's stdlib. Returns "ok" or an error text. */
     fun unpack(ctx: Context, tar: String, dest: String): String =
         py(ctx).getModule("nana_models").callAttr("unpack", tar, dest).toString()

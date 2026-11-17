@@ -55,6 +55,7 @@ chaquopy {
             install("loguru")
             install("pyyaml")
             install("yt-dlp[default]==2026.8.19")
+            install("scrapy")
         }
     }
 }

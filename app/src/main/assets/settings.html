@@ -585,6 +585,49 @@ button.b:disabled{opacity:.45}
   </script>
 </section>
 
+<!-- SKILLS -->
+<section id="skills">
+  <div class="card">
+    <label style="margin-top:0">Skills</label>
+    <p class="mu">A skill is a short instruction sheet. Nana sees only the name and one line of every skill that is ON, and opens the full text when your job matches. Needs Nana's tools to be on.</p>
+    <div id="skList"></div>
+  </div>
+  <div class="card">
+    <label style="margin-top:0" id="skFormT">Add a skill</label>
+    <input id="skName" placeholder="name, e.g. cbse-physics">
+    <input id="skDesc" placeholder="when to use it (one line)">
+    <textarea id="skBody" rows="6" placeholder="Step by step instructions..."></textarea>
+    <div class="btns"><button class="b" onclick="skSave()">Save skill</button><button class="b ghost" onclick="skClear()">Clear</button></div>
+    <p class="mu" id="skMsg"></p>
+  </div>
+  <div class="card">
+    <label style="margin-top:0">Import from a link</label>
+    <input id="skUrl" placeholder="https://github.com/.../SKILL.md">
+    <div class="btns"><button class="b" onclick="skImport()">Import</button></div>
+    <p class="mu">Works with a SKILL.md style file (name and description at the top). GitHub links are fine. Read a skill before turning it on: it tells Nana what to do.</p>
+  </div>
+  <script>
+  var SK=[];
+  function skEsc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
+  function skLoad(){try{SK=JSON.parse(Android.skillsList());}catch(x){SK=[];}skRender();}
+  function skRender(){
+    var h='';
+    SK.forEach(function(s,i){
+      h+='<div style="padding:10px 0;border-top:1px solid var(--line)"><label class="sw"><span>'+skEsc(s.name)+'<small>'+skEsc(s.desc||'')+'</small></span><input type="checkbox" '+(s.on!==false?'checked':'')+' onchange="skTog('+i+',this.checked)"></label>'
+        +'<div class="btns"><button class="b ghost" onclick="skEdit('+i+')">Edit</button><button class="b ghost" onclick="skDel('+i+')">Delete</button></div></div>';
+    });
+    vg('skList').innerHTML=h||'<p class="mu">No skills yet.</p>';
+  }
+  function skTog(i,on){Android.skillToggle(SK[i].name,on);SK[i].on=on;}
+  function skEdit(i){vg('skName').value=SK[i].name;vg('skDesc').value=SK[i].desc||'';vg('skBody').value=SK[i].body||'';vg('skFormT').textContent='Edit skill';vg('skMsg').textContent='';}
+  function skDel(i){if(!confirm('Delete skill '+SK[i].name+'?'))return;Android.skillDelete(SK[i].name);skLoad();}
+  function skClear(){vg('skName').value='';vg('skDesc').value='';vg('skBody').value='';vg('skFormT').textContent='Add a skill';}
+  function skSave(){var r=Android.skillSave(vg('skName').value,vg('skDesc').value,vg('skBody').value);vg('skMsg').textContent=r=='ok'?'Saved.':r;if(r=='ok'){skClear();skLoad();}}
+  function skImport(){var u=vg('skUrl').value.trim();if(!u)return;vg('skMsg').textContent='Downloading...';Android.skillImport(u);}
+  function skImported(m){vg('skMsg').textContent=m;vg('skUrl').value='';skLoad();}
+  </script>
+</section>
+
 <!-- TEAM -->
 <section id="team">
   <div class="card">
@@ -681,7 +724,7 @@ const GROUPS = {
   home:{t:'Home',h:'Home',i:ICONS.home,s:[['home','Home']]},
   ai:{t:'AI',h:'AI models',i:ICONS.ai,s:[['prov','Providers'],['route','Routing'],['stats','Stats']]},
   team:{t:'Team',h:'AI Team',i:ICONS.ai,s:[['team','Team']]},
-  nana:{t:'Nana',h:'Nana',i:ICONS.pers,s:[['pers','Personality'],['beh','Behaviour'],['voice','Voice']]},
+  nana:{t:'Nana',h:'Nana',i:ICONS.pers,s:[['pers','Personality'],['beh','Behaviour'],['voice','Voice'],['skills','Skills']]},
   mem:{t:'Memory',h:'Memory',i:ICONS.mem,s:[['mem','Memory']]},
   set:{t:'Settings',h:'Settings',i:ICONS.gear,s:[['cfg','Setup'],['look','Appearance'],['data','Data']],hide:true,single:true}
 };
@@ -702,6 +745,7 @@ function tab(id){
   if (sec === 'mem') memLoad();
   if (sec === 'route') renderRoute();
   if (sec === 'team') teamOpen();
+  if (sec === 'skills') skLoad();
   toggleMenu(false); buildDrawerNav();
   window.scrollTo(0,0);
 }
