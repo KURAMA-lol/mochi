@@ -190,6 +190,22 @@ button.b:disabled{opacity:.45}
   .card .btns .b{min-height:46px;padding-left:18px;padding-right:18px}
   .card label.sw{margin-top:18px}
   .card p.mu{margin-top:14px}
+
+  .tm-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px}
+  .tm-chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--tx);font-size:13.5px;min-height:40px}
+  .tm-chip.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}
+  .tm-dot{width:8px;height:8px;border-radius:50%;background:#7b8794}
+  .tm-dot.t{background:var(--ac);animation:pind 1s ease-in-out infinite}.tm-dot.e{background:#ff6b7a}
+  .tm-log{height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px}
+  .tm-m{max-width:88%;padding:9px 12px;border-radius:14px;background:rgba(255,255,255,.06);font-size:14px;line-height:1.35;white-space:pre-wrap;word-break:break-word}
+  .tm-m b{display:block;font-size:11.5px;margin-bottom:3px;font-weight:600}
+  .tm-m.me{align-self:flex-end;background:var(--ac);color:var(--onac,#1a0d05)}
+  .tm-m.sys{align-self:center;background:transparent;color:var(--mut);font-size:12px;text-align:center}
+  .tm-m.err{align-self:center;background:transparent;color:#ff6b7a;font-size:12px}
+  .tm-m.fin{border:1px solid var(--ac)}
+  .tm-m.job{background:transparent;border:1px dashed var(--line);font-size:13px}
+  .tm-info{font-size:12px;color:var(--mut);margin:8px 0}
+  #tmText{width:100%;box-sizing:border-box;margin-top:4px}
 </style>
 </head>
 <body>
@@ -569,7 +585,69 @@ button.b:disabled{opacity:.45}
   </script>
 </section>
 
+<!-- TEAM -->
+<section id="team">
+  <div class="card">
+    <div id="tmChips" class="tm-chips"></div>
+    <div id="tmLog" class="tm-log"></div>
+    <div id="tmInfo" class="tm-info">...</div>
+    <textarea id="tmText" rows="2" placeholder="Give the team a job, or talk to them..."></textarea>
+    <div class="btns"><button class="b" onclick="tmSend()">Send</button><button class="b ghost" onclick="Android.teamStop()">Stop everyone</button></div>
+    <p class="mu" id="tmTo"></p>
+  </div>
+  <div class="card">
+    <label style="margin-top:0">Team settings</label>
+    <label>Lead <span class="mut">(splits the job and gives the final answer)</span></label>
+    <select id="tmLead" onchange="tmCfg()"><option value="">Auto</option></select>
+    <label>Max turns per job <span class="mut">(stops runaway chats, each turn uses your API)</span></label>
+    <input id="tmMax" type="number" min="2" max="60" value="20" onchange="tmCfg()">
+    <label class="sw"><span>Let the team use Nana's phone tools<small>they can ask Nana to open apps, read the screen, search. Off by default.</small></span><input type="checkbox" id="tmTools" onchange="tmCfg()"></label>
+    <div class="btns"><button class="b ghost" onclick="tmClear()">Clear team chat</button></div>
+    <p class="mu">Every provider you added in AI &gt; Providers is a team member with its own chat. Tap a name above to talk to just that one, or stay in Room. Write @name to call someone in the Room. Say "stop" any time.</p>
+  </div>
+</section>
+
 <nav id="nav"></nav>
+<script>
+var TM={ev:[],last:0,sel:'room',agents:[],timer:null,cfg:false,names:''};
+function tmCol(n){var x=0;for(var i=0;i<n.length;i++)x=(x*31+n.charCodeAt(i))%360;return 'hsl('+x+',70%,66%)';}
+function teamOpen(){if(TM.timer)return;tmPoll();TM.timer=setInterval(tmPoll,900);}
+function tmName(n){return n=='room'?'everyone':(n=='you'?'Sahil':n);}
+function tmOk(e){return TM.sel=='room'||e.from==TM.sel||e.to==TM.sel;}
+function tmPoll(){
+  if(!vg('team').classList.contains('on')){clearInterval(TM.timer);TM.timer=null;return;}
+  var s;try{s=JSON.parse(Android.teamState(TM.last));}catch(x){return;}
+  TM.agents=s.agents||[];
+  var nm=TM.agents.map(function(a){return a.name}).join('|');
+  if(nm!=TM.names){TM.names=nm;var l=vg('tmLead');l.innerHTML='<option value="">Auto</option>';TM.agents.forEach(function(a){var o=document.createElement('option');o.value=a.name;o.textContent=a.name+' ('+a.model+')';l.appendChild(o);});l.value=s.leadPref||'';}
+  if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
+  s.events.forEach(function(e){TM.ev.push(e);if(e.id>TM.last)TM.last=e.id;});
+  tmChips();
+  vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns used: '+s.turns+' / '+s.max+(s.lead?'  Lead: '+s.lead:'');
+  if(s.events.length||TM.redo){tmRender(!!TM.redo,s.events);TM.redo=false;}
+}
+function tmChips(){var c=vg('tmChips'),h='';
+  var all=[{name:'room',label:'Room',status:'idle'}].concat(TM.agents.map(function(a){return {name:a.name,label:a.name,status:a.status}}));
+  all.forEach(function(a){var d=a.status=='thinking'||a.status=='waiting for Nana'?'t':(a.status.indexOf('error')==0?'e':'');
+    h+='<button class="tm-chip'+(TM.sel==a.name?' on':'')+'" data-n="'+a.name.replace(/"/g,'&quot;')+'"><span class="tm-dot '+d+'"></span>'+a.label.replace(/</g,'&lt;')+'</button>';});
+  if(c._h!==h){c._h=h;c.innerHTML=h;c.querySelectorAll('.tm-chip').forEach(function(b){b.onclick=function(){TM.sel=b.dataset.n;TM.redo=true;tmChips();tmPoll();tmTo();};});}
+  tmTo();}
+function tmTo(){vg('tmTo').textContent=TM.sel=='room'?'Sending to the Room: the lead splits the job. Use @name to call someone directly.':'Private chat with '+TM.sel+'. Only they hear this.';}
+function tmRender(full,fresh){var log=vg('tmLog');var near=log.scrollHeight-log.scrollTop-log.clientHeight<80;
+  var list=full?TM.ev:(fresh||[]);if(full)log.innerHTML='';
+  list.forEach(function(e){if(!tmOk(e))return;var d=document.createElement('div');d.className='tm-m';var t=document.createElement('span');t.textContent=e.text;
+    if(e.kind=='user'||e.from=='You'){d.className+=' me';d.appendChild(t);}
+    else if(e.kind=='system'){d.className+=' sys';d.appendChild(t);}
+    else if(e.kind=='error'){d.className+=' err';t.textContent=e.from+': '+e.text;d.appendChild(t);}
+    else{if(e.kind=='final')d.className+=' fin';if(e.kind=='task')d.className+=' job';
+      var b=document.createElement('b');b.style.color=tmCol(e.from);b.textContent=e.from+' to '+tmName(e.to)+(e.kind=='final'?' (final answer)':(e.kind=='task'?' (phone job)':''));d.appendChild(b);d.appendChild(t);}
+    log.appendChild(d);});
+  if(full||near)log.scrollTop=log.scrollHeight;}
+function tmSend(){var t=vg('tmText').value.trim();if(!t)return;try{Android.teamPost(t,TM.sel);}catch(x){}vg('tmText').value='';setTimeout(tmPoll,250);}
+function tmCfg(){try{Android.teamConfig(JSON.stringify({max:+vg('tmMax').value||20,lead:vg('tmLead').value,tools:vg('tmTools').checked}));}catch(x){}}
+function tmClear(){askYes('Clear the whole team chat?',function(){try{Android.teamClear();}catch(x){}TM.ev=[];TM.last=0;TM.redo=true;tmPoll();},'Clear');}
+</script>
+
 <script>
 // ---------- tiny mock so the page also opens in a normal browser ----------
 if (!window.Android) {
@@ -602,6 +680,7 @@ const IC_NO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const GROUPS = {
   home:{t:'Home',h:'Home',i:ICONS.home,s:[['home','Home']]},
   ai:{t:'AI',h:'AI models',i:ICONS.ai,s:[['prov','Providers'],['route','Routing'],['stats','Stats']]},
+  team:{t:'Team',h:'AI Team',i:ICONS.ai,s:[['team','Team']]},
   nana:{t:'Nana',h:'Nana',i:ICONS.pers,s:[['pers','Personality'],['beh','Behaviour'],['voice','Voice']]},
   mem:{t:'Memory',h:'Memory',i:ICONS.mem,s:[['mem','Memory']]},
   set:{t:'Settings',h:'Settings',i:ICONS.gear,s:[['cfg','Setup'],['look','Appearance'],['data','Data']],hide:true,single:true}
@@ -622,6 +701,7 @@ function tab(id){
   if (sec === 'stats') loadStats();
   if (sec === 'mem') memLoad();
   if (sec === 'route') renderRoute();
+  if (sec === 'team') teamOpen();
   toggleMenu(false); buildDrawerNav();
   window.scrollTo(0,0);
 }

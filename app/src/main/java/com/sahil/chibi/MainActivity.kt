@@ -377,6 +377,16 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun pocketRemoveCustom() { Speech.removeCustomPocket(this@MainActivity) }
 
+        @JavascriptInterface fun teamState(since: Int): String = Team.state(this@MainActivity, since)
+
+        @JavascriptInterface fun teamPost(text: String, target: String) { Thread { Team.post(this@MainActivity, text, target) }.start() }
+
+        @JavascriptInterface fun teamStop() { Team.stopAll("Stopped by you.") }
+
+        @JavascriptInterface fun teamClear() { Team.clear(this@MainActivity) }
+
+        @JavascriptInterface fun teamConfig(json: String) { try { Team.setConfig(this@MainActivity, json) } catch (e: Exception) {} }
+
         @JavascriptInterface fun callStart() { CompanionService.send(this@MainActivity, CompanionService.ACT_CALL) }
 
         @JavascriptInterface fun callStop() { CompanionService.send(this@MainActivity, CompanionService.ACT_HANGUP) }
