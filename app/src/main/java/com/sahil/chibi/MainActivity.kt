@@ -358,7 +358,7 @@ class MainActivity : Activity() {
             Thread {
                 val c = this@MainActivity
                 if (Updater.token(c).isEmpty()) { if (force) js("updErr('Paste a GitHub token first.')"); return@Thread }
-                val p = c.getSharedPreferences("updater", Context.MODE_PRIVATE)
+                val p = c.getSharedPreferences("updater", android.content.Context.MODE_PRIVATE)
                 if (!force && System.currentTimeMillis() - p.getLong("last", 0L) < 1_800_000L) return@Thread
                 p.edit().putLong("last", System.currentTimeMillis()).apply()
                 try {
