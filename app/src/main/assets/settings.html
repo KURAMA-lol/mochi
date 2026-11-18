@@ -303,32 +303,45 @@ button.b:disabled{opacity:.45}
 
   <h2>App connections</h2>
   <div class="card">
+    <p class="mut" style="margin-top:0">Teach Nana to do things in other apps for you. Tap Add on what you want. Nana only uses it when you ask, and only if "Allow actions" is on.</p>
     <div id="cnList"></div>
-    <label>Name</label>
-    <input id="cnName" placeholder="e.g. tasker-task">
-    <div class="setrow"><span>Type</span><select id="cnKind" style="width:auto;padding:8px 10px"><option value="broadcast">Background signal</option><option value="activity">Open a link / app</option><option value="service">Start a service</option></select></div>
-    <input id="cnAction" placeholder="Action, e.g. net.dinglisch.android.tasker.ACTION_TASK">
-    <input id="cnPkg" placeholder="App package (optional)">
-    <input id="cnCls" placeholder="Class (optional)">
-    <input id="cnData" placeholder="Link (optional), e.g. https://wa.me/{number}?text={text}">
-    <textarea id="cnExtra" rows="3" placeholder="Extras, one per line: key=value. Put {text} where Nana should fill something in"></textarea>
-    <input id="cnNote" placeholder="What it does (Nana reads this)">
-    <div class="btns"><button class="b" onclick="cnSave()">Save</button><button class="b ghost" onclick="cnPreset('tasker')">Tasker</button><button class="b ghost" onclick="cnPreset('macrodroid')">MacroDroid</button><button class="b ghost" onclick="cnPreset('whatsapp')">WhatsApp link</button></div>
+    <label>Add one</label>
+    <div id="cnPresets"></div>
+    <details style="margin-top:10px"><summary class="mut">Advanced: make your own (for Tasker, MacroDroid and other apps)</summary>
+      <label>Name</label>
+      <input id="cnName" placeholder="e.g. tasker-task">
+      <div class="setrow"><span>Type</span><select id="cnKind" style="width:auto;padding:8px 10px"><option value="broadcast">Background signal</option><option value="activity">Open a link / app</option><option value="service">Start a service</option></select></div>
+      <input id="cnAction" placeholder="Action">
+      <input id="cnPkg" placeholder="App package (optional)">
+      <input id="cnCls" placeholder="Class (optional)">
+      <input id="cnData" placeholder="Link (optional), e.g. https://wa.me/{number}?text={text}">
+      <textarea id="cnExtra" rows="3" placeholder="Extras, one per line: key=value. {text} is filled in by Nana"></textarea>
+      <input id="cnNote" placeholder="What it does (Nana reads this)">
+      <div class="btns"><button class="b" onclick="cnSave()">Save</button></div>
+      <p class="mut">Tasker needs Preferences > Misc > Allow External Access. MacroDroid needs a trigger "Intent Received" with the same action.</p>
+    </details>
     <p class="mut" id="cnMsg"></p>
-    <p class="mut">Lets Nana trigger things in your other apps without tapping through them: a Tasker task, a MacroDroid macro, a deep link. She only fires one when you ask, and only if "Allow actions" is on. Tasker: turn on Preferences > Misc > Allow External Access. MacroDroid: add the trigger "Intent Received" with the same action. A WhatsApp link only opens the chat with the text ready, you press send.</p>
     <script>
     var CN=[];
+    var CNP=[
+      {t:'WhatsApp message',d:'Opens a chat with your text ready. You press send. Nana needs the number with country code.',c:{name:'whatsapp-message',kind:'activity',action:'android.intent.action.VIEW',data:'https://wa.me/{number}?text={text}',note:'Opens a WhatsApp chat with the text ready (number with country code, user presses send)'}},
+      {t:'Call someone',d:'Opens the dialer with the number. You press call.',c:{name:'call-number',kind:'activity',action:'android.intent.action.VIEW',data:'tel:{number}',note:'Opens the dialer with a number (user presses call)'}},
+      {t:'Text message (SMS)',d:'Opens a text message with your words ready. You press send.',c:{name:'sms-message',kind:'activity',action:'android.intent.action.VIEW',data:'sms:{number}?body={text}',note:'Opens an SMS with the text ready (user presses send)'}},
+      {t:'Google Maps search',d:'Shows a place on the map.',c:{name:'maps-search',kind:'activity',action:'android.intent.action.VIEW',data:'https://www.google.com/maps/search/?api=1&query={place}',note:'Shows a place in Google Maps'}},
+      {t:'YouTube search',d:'Opens YouTube results for something.',c:{name:'youtube-search',kind:'activity',action:'android.intent.action.VIEW',data:'https://www.youtube.com/results?search_query={query}',note:'Opens YouTube search results'}},
+      {t:'Open a website',d:'Opens any link in your browser.',c:{name:'open-link',kind:'activity',action:'android.intent.action.VIEW',data:'{url}',note:'Opens a web link'}},
+      {t:'Tasker task',d:'Only if you have Tasker. Runs one of your tasks by name.',c:{name:'tasker-task',kind:'broadcast',action:'net.dinglisch.android.tasker.ACTION_TASK',pkg:'net.dinglisch.android.tasker',extras:'version_number=1.0\ntask_name={task}',note:'Runs a Tasker task by name'}},
+      {t:'MacroDroid macro',d:'Only if you have MacroDroid. Triggers a macro (trigger: Intent Received).',c:{name:'macrodroid-macro',kind:'broadcast',action:'com.sahil.chibi.RUN_MACRO',extras:'name={task}',note:'Triggers a MacroDroid macro by name'}}];
     function cnEsc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
-    function cnLoad(){try{CN=JSON.parse(Android.connList());}catch(x){CN=[];}var h='';
-      CN.forEach(function(c,i){h+='<div style="padding:10px 0;border-top:1px solid var(--line)"><b>'+cnEsc(c.name)+'</b><div class="mut" style="font-size:12px">'+cnEsc(c.note||c.kind)+'</div><div class="btns" style="margin-top:6px"><button class="b ghost" onclick="cnTest('+i+')">Test</button><button class="b ghost" onclick="cnEdit('+i+')">Edit</button><button class="b ghost" onclick="cnDel('+i+')">Delete</button></div></div>';});
-      document.getElementById('cnList').innerHTML=h||'<p class="mut">No connections yet. Tap a preset below or fill the form.</p>';}
+    function cnLoad(){try{CN=JSON.parse(Android.connList());}catch(x){CN=[];}
+      var h='';CN.forEach(function(c,i){h+='<div class="setrow"><span>'+cnEsc(c.name)+'<div class="mut">'+cnEsc(c.note||c.kind)+'</div></span><span style="display:flex;gap:6px"><button class="b ghost" onclick="cnTest('+i+')">Test</button><button class="b ghost" onclick="cnDel('+i+')">Delete</button></span></div>';});
+      document.getElementById('cnList').innerHTML=h;
+      var have={};CN.forEach(function(c){have[c.name]=1;});
+      document.getElementById('cnPresets').innerHTML=CNP.map(function(p,i){return '<div class="setrow"><span>'+cnEsc(p.t)+'<div class="mut">'+cnEsc(p.d)+'</div></span><button class="b ghost" onclick="cnAdd('+i+')">'+(have[p.c.name]?'Added':'Add')+'</button></div>';}).join('');}
+    function cnAdd(i){var r=Android.connSave(JSON.stringify(CNP[i].c));document.getElementById('cnMsg').textContent=r=='ok'?'Added. Now just ask Nana, for example "WhatsApp Mummy: ghar aa raha hu".':r;cnLoad();}
     function cnSet(c){['Name:name','Kind:kind','Action:action','Pkg:pkg','Cls:cls','Data:data','Extra:extras','Note:note'].forEach(function(p){var a=p.split(':');document.getElementById('cn'+a[0]).value=c[a[1]]||(a[1]=='kind'?'broadcast':'');});}
-    function cnPreset(k){var P={tasker:{name:'tasker-task',kind:'broadcast',action:'net.dinglisch.android.tasker.ACTION_TASK',pkg:'net.dinglisch.android.tasker',extras:'version_number=1.0\ntask_name={task}',note:'Runs a Tasker task by name'},
-      macrodroid:{name:'macrodroid-macro',kind:'broadcast',action:'com.sahil.chibi.RUN_MACRO',extras:'name={task}',note:'Triggers a MacroDroid macro (trigger: Intent Received, same action)'},
-      whatsapp:{name:'whatsapp-chat',kind:'activity',action:'android.intent.action.VIEW',data:'https://wa.me/{number}?text={text}',note:'Opens a WhatsApp chat with the text ready (you press send)'}};cnSet(P[k]);}
-    function cnSave(){var o={name:cnV('Name'),kind:cnV('Kind'),action:cnV('Action'),pkg:cnV('Pkg'),cls:cnV('Cls'),data:cnV('Data'),extras:document.getElementById('cnExtra').value,note:cnV('Note')};var r=Android.connSave(JSON.stringify(o));document.getElementById('cnMsg').textContent=r=='ok'?'Saved.':r;if(r=='ok'){cnSet({});cnLoad();}}
     function cnV(n){return document.getElementById('cn'+n).value.trim();}
-    function cnEdit(i){cnSet(CN[i]);}
+    function cnSave(){var o={name:cnV('Name'),kind:cnV('Kind'),action:cnV('Action'),pkg:cnV('Pkg'),cls:cnV('Cls'),data:cnV('Data'),extras:document.getElementById('cnExtra').value,note:cnV('Note')};var r=Android.connSave(JSON.stringify(o));document.getElementById('cnMsg').textContent=r=='ok'?'Saved.':r;if(r=='ok'){cnSet({});cnLoad();}}
     function cnDel(i){Android.connDelete(CN[i].name);cnLoad();}
     function cnTest(i){document.getElementById('cnMsg').textContent=Android.connTest(CN[i].name);}
     window.addEventListener('load',cnLoad);
