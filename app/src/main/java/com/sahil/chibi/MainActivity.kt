@@ -446,6 +446,14 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun teamStop() { Team.stopAll("Stopped by you.") }
 
+        @JavascriptInterface fun connList(): String = Connect.json(this@MainActivity)
+
+        @JavascriptInterface fun connSave(json: String): String = Connect.save(this@MainActivity, json)
+
+        @JavascriptInterface fun connDelete(name: String) { Connect.delete(this@MainActivity, name) }
+
+        @JavascriptInterface fun connTest(name: String): String = Connect.fire(this@MainActivity, name, "")
+
         @JavascriptInterface fun teamEmp(json: String) { try { Team.setEmp(this@MainActivity, json) } catch (e: Exception) {} }
 
         @JavascriptInterface fun teamClear() { Team.clear(this@MainActivity) }

@@ -109,7 +109,7 @@ object Agent {
 
     private val ACTIONS = setOf(
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press", "set_reminder", "cancel_reminder", "set_alarm", "set_timer", "flashlight", "set_volume", "dial", "copy_text",
-        "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type"
+        "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type", "app_connect"
     )
     /** Other names a model may use for a parameter. They are copied to the real name before checking. */
     private val ARG_ALIASES = mapOf(
@@ -133,7 +133,7 @@ object Agent {
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
     private val TAG_OPEN = Regex("""<tool>\s*(\{[\s\S]*\})""")
 
-    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. Several independent calls may go in one reply; they run in order. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query,category}; web_read{url}; watch_video{url}; watch_along{on}; agent_reach{command}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact,pin}; memory_search{query}; scrape{url,fields,follow,max_pages}; download_file{url,name}; use_skill{name}."
+    const val DOC_LITE = "You can use tools. To use one reply with ONLY: <tool>{\"name\":\"TOOL\",\"args\":{...}}</tool> . The result comes back as TOOL_RESULT. Several independent calls may go in one reply; they run in order. When done, answer normally with no tag. Act with tools, never just announce. Never claim something is done unless a TOOL_RESULT shows it. Do only what the user asked.\nTools: device_status; web_search{query,category}; web_read{url}; watch_video{url}; watch_along{on}; agent_reach{command}; browser_open{url}; browser_read; browser_click_text{text}; browser_type{id,text,submit}; browser_scroll{direction}; launch_app{name}; open_url{url}; screen_read; screen_tap_text{text}; screen_tap_xy{x,y}; screen_type{text,submit}; screen_scroll{direction}; screen_back; screen_home; screen_press{key}; set_reminder{text,minutes OR at:\"HH:mm\"}; set_alarm{hour,minute}; set_timer{seconds}; read_notifications{app}; flashlight{on}; set_volume{level}; dial{number}; remember{fact,pin}; memory_search{query}; scrape{url,fields,follow,max_pages}; download_file{url,name}; use_skill{name}; team_roster; assign_to_team{task,to}; app_connect{name,params}."
 
     private const val DOC = """You can use tools. To use one, reply with ONLY a tool call and nothing else, exactly like:
 <tool>{"name":"TOOL_NAME","args":{...}}</tool>
@@ -156,6 +156,8 @@ Tools:
 - agent_reach {"command":"youtube subtitle <link>"} : Agent-Reach, runs inside the app. Commands: youtube read|subtitle|search, github read|search, web read|search, v2ex hot|read, bilibili search|read, read <url>. Instagram, X, Reddit and Facebook do not work here (they need a desktop browser): say so instead of retrying.
 - scrape {"url":"...","fields":{"title":"h1::text","price":".price::text"},"follow":"regex of links to crawl next (optional)","max_pages":5} : Scrapy inside the app. Pulls fields (CSS selectors, or xpath:...) from a page and optionally from linked pages of the same site. Without fields you get title, headings and text. Static HTML only. Only scrape what the user asked for.
 - download_file {"url":"...","name":"file.pdf"} : save a file from a link into Downloads/Nana. Only when the user asked for the file.
+- team_roster {} : list the user's AI team employees, their roles and tools. assign_to_team {"task":"...","to":"employee name (optional)"} : hand a job to the team and wait for their report (research, long writing, checking). Use it for big jobs, not for quick answers.
+- connections_list {} : the user's saved app connections. app_connect {"name":"...","params":{"text":"..."}} : trigger one in the background (a Tasker task, a macro, a deep link). Only when the user asks, and never for payments.
 - use_skill {"name":"..."} : open one of the SKILLS listed above and follow it.
 - browser_open {"url":"..."} : open a page in Nana's own browser (it floats on the user's screen). Returns page text and numbered elements [n].
 - browser_read {} : read the current browser page again.
@@ -204,7 +206,7 @@ How to work:
         if (!enabled(ctx)) return chatRetry(conf, base, history, voice)
         val acc = NanaAccess.inst != null
         val live = "\n\nLIVE STATUS (trust this): tools ON; phone/browser actions " + (if (actions(ctx)) "ON" else "OFF (user switched it off in settings)") + "; screen control (accessibility) " + (if (acc) "ON" else "OFF (screen_* tools and tapping will not work)") + ". If a needed switch is OFF, say so plainly and tell the user which one to turn on. Never claim you did something unless a tool result in this conversation shows it."
-        val system = base + live + "\n\n" + DOC + Skills.block(ctx)
+        val system = base + live + "\n\n" + DOC + Skills.block(ctx) + Connect.block(ctx)
         val hLast = history.indexOfLast { it.role == "user" }
         val request = if (hLast >= 0) history[hLast].content else ""
         val prevTask = lastTask(ctx)
@@ -520,6 +522,15 @@ How to work:
         }
         reg("download_file", "Download a file from a link into the phone's Downloads/Nana folder. Only when the user asked for the file. download_file{url, name}.", listOf(p("url", "string", true), p("name", "string")), readOnly = false) { c, a ->
             try { Downloader.fetch(c, a.optString("url"), a.optString("name")) } catch (e: Throwable) { "Download failed: " + (e.message ?: e.toString()).take(200) }
+        }
+        reg("team_roster", "List the employees of the user's AI team you can hand work to: names, roles and what each can do.", emptyList(), readOnly = true) { c, _ -> Team.rosterText(c) }
+        reg("assign_to_team", "Hand a task to the user's AI team and wait for their report. to = one employee (optional); without it the boss splits the work. Good for research, long writing or checking that needs several models. Employees can search the web, read pages, scrape and, if allowed, download.", listOf(p("task", "string", true), p("to", "string")), readOnly = true) { c, a ->
+            try { Team.delegate(c, a.optString("task"), a.optString("to")) } catch (e: Throwable) { "Team failed: " + (e.message ?: e.toString()).take(200) }
+        }
+        reg("connections_list", "List the user's saved app connections (Tasker tasks, macros, deep links) and the params each needs.", emptyList(), readOnly = true) { c, _ -> Connect.describe(c) }
+        reg("app_connect", "Fire one of the user's saved app connections in the background (no tapping). app_connect{name, params}. Only when the user asks.", listOf(p("name", "string", true), p("params", "string"))) { c, a ->
+            val pr = a.opt("params")
+            Connect.fire(c, a.optString("name"), if (pr == null || pr == org.json.JSONObject.NULL) "" else pr.toString())
         }
         reg("use_skill", "Open one of the user's skills (instruction sheets) by name and follow it.", listOf(p("name", "string", true)), readOnly = true) { c, a -> Skills.text(c, a.optString("name")) }
         reg("launch_app", "Open an app by name.", listOf(p("name", "string", true))) { c, a -> launch(c, a.optString("name")) }

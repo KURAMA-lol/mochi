@@ -33,6 +33,10 @@ object Team {
     private fun maxTurns(ctx: Context) = prefs(ctx).getInt("max", 0).coerceIn(0, 500)
     private fun maxMins(ctx: Context) = prefs(ctx).getInt("mins", 20).coerceIn(0, 240)
     @Volatile private var jobStart = 0L
+    @Volatile private var waiter: java.util.concurrent.CompletableFuture<String>? = null
+    @Volatile private var waiterTo: String? = null
+    @Volatile private var jobFrom = ""
+    @Volatile private var jobTask = ""
     private val down = ConcurrentHashMap<String, Long>()
     private val keyOf = ConcurrentHashMap<String, String>()
     private val renamed = ConcurrentHashMap<String, String>()
@@ -165,11 +169,12 @@ object Team {
         val pr = prefs(ctx)
         return JSONObject().put("running", inflight.get() > 0).put("turns", turns).put("max", maxTurns(ctx)).put("mins", maxMins(ctx))
             .put("lead", leadOf(ctx, ro)).put("leadPref", pr.getString("lead", "")).put("tools", toolsOn(ctx))
-            .put("agents", ag).put("events", ev).toString()
+            .put("job", JSONObject().put("from", jobFrom).put("task", jobTask)).put("agents", ag).put("events", ev).toString()
     }
 
     fun stopAll(msg: String?) {
         gen++
+        waiter?.complete(msg ?: "(stopped)")
         for (q in inbox.values) q.clear()
         try { if (app != null && toolsOn(app!!)) Agent.stop() } catch (e: Exception) {}
         for (k in status.keys) status[k] = "idle"
@@ -179,6 +184,54 @@ object Team {
     }
 
     private fun compact(s: String) = s.replace(" ", "").lowercase()
+
+    /** What Nana sees when she asks who is on the team. */
+    fun rosterText(ctx: Context): String {
+        app = ctx.applicationContext
+        val ro = roster(ctx)
+        if (ro.isEmpty()) return "The team is empty. The user can add providers in AI > Providers."
+        val boss = leadOf(ctx, ro)
+        return ro.joinToString("\n") {
+            val e = emp(ctx, it.first)
+            "- " + it.first + (if (it.first == boss) " (boss)" else "") + ": " + (e.role.ifBlank { "general" }) + "; tools: " + (allowed(e).sorted().joinToString(", ").ifEmpty { "none" }) +
+                (if (isDown(it.first)) "; OFFLINE" else "")
+        }
+    }
+
+    private fun lastNotes(): String {
+        val l = synchronized(events) { events.takeLast(8).filter { it.kind != "error" && it.kind != "tool" } }
+        return l.joinToString("\n") { it.from + ": " + it.text.take(400) }
+    }
+
+    /**
+     * Nana hands a job to the team and waits for the report.
+     * to = one employee, or blank to let the boss split it up. Employees only get the tools allowed for them,
+     * and cannot hand work on, hire anyone or schedule anything.
+     */
+    fun delegate(ctx: Context, task: String, to: String): String {
+        app = ctx.applicationContext
+        ensureLoaded(ctx)
+        val ro = roster(ctx)
+        if (task.isBlank()) return "No task given."
+        if (ro.isEmpty()) return "The team has no employees yet (providers are added in AI > Providers)."
+        if (inflight.get() > 0 || waiter != null) return "The team is busy with another job. Try again in a moment."
+        val target = if (to.isBlank()) null else (ro.firstOrNull { compact(it.first) == compact(to) } ?: return "No employee called \"$to\". Employees: " + ro.joinToString { it.first })
+        val w = java.util.concurrent.CompletableFuture<String>()
+        waiter = w; waiterTo = target?.first
+        jobFrom = "Nana"; jobTask = task.take(200)
+        jobStart = System.currentTimeMillis(); turns = 0; gen++
+        synchronized(recent) { recent.clear() }
+        add("Nana", target?.first ?: "room", task.take(1500), "agent")
+        if (target != null) deliver(target.first, "TASK from Nana (the user's phone assistant). Do it with your own tools, then answer with DONE: <short report, with sources>. Task: " + task)
+        else deliver(leadOf(ctx, ro), "NEW TASK from Nana (the user's phone assistant, passing on the user's request): " + task + "\nSplit it, collect the results, then finish with DONE: <the answer for Nana>.")
+        val secs = (if (maxMins(ctx) > 0) maxMins(ctx) else 10) * 60L
+        return try {
+            w.get(secs, java.util.concurrent.TimeUnit.SECONDS).take(3500)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            stopAll("Delegated job timed out.")
+            "The team ran out of time. Their latest notes:\n" + lastNotes()
+        } catch (e: Exception) { "(stopped)" } finally { waiter = null; waiterTo = null; jobFrom = "" }
+    }
 
     /** Called when you send something. target = "room" or an agent name. */
     fun post(ctx: Context, text: String, target: String) {
@@ -193,6 +246,7 @@ object Team {
         val busy = inflight.get() > 0
         jobStart = System.currentTimeMillis()
         synchronized(recent) { recent.clear() }
+        if (!busy) { jobFrom = "You"; jobTask = t.take(200) }
         if (!busy) { turns = 0; gen++ }
         turns = 0
         val direct = names.firstOrNull { it == target }
@@ -413,9 +467,10 @@ object Team {
                         deliver(target, "From $name: $body")
                     }
                 }
-                "SAY" -> add(name, "you", text, "agent")
+                "SAY" -> { add(name, "you", text, "agent"); if (waiterTo == name && calls.isEmpty()) waiter?.complete(text) }
                 "DONE" -> {
                     add(name, "you", text, "final")
+                    waiter?.complete(text)
                     gen++
                     for (q in inbox.values) q.clear()
                 }

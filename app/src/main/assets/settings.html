@@ -195,7 +195,7 @@ button.b:disabled{opacity:.45}
   .tm-chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--tx);font-size:13.5px;min-height:40px}
   .tm-chip.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}
   .tm-dot{width:8px;height:8px;border-radius:50%;background:#7b8794}
-  .tm-dot.t{background:var(--ac);animation:pind 1s ease-in-out infinite}.tm-dot.e{background:#ff6b7a}
+  .tm-dot.t{background:#2fbf71;animation:tmpulse 1s ease-in-out infinite}.tm-dot.e{background:#ff6b7a}
   .tm-log{height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px}
   .tm-m{max-width:88%;padding:9px 12px;border-radius:14px;background:rgba(255,255,255,.06);font-size:14px;line-height:1.35;white-space:pre-wrap;word-break:break-word}
   .tm-m b{display:block;font-size:11.5px;margin-bottom:3px;font-weight:600}
@@ -215,6 +215,11 @@ button.b:disabled{opacity:.45}
 .tm-compose textarea{flex:1;min-height:46px;max-height:120px;resize:none;margin:0}
 .tm-compose .b{flex:none;min-height:46px}
 #team{padding-bottom:130px}
+.tm-tree{margin:4px 0 8px;font-size:12.5px}
+.tm-t0{color:var(--mut);margin-bottom:4px;overflow-wrap:anywhere}
+.tm-tr{display:flex;align-items:center;gap:8px;padding:3px 0}
+.tm-tr b{font-weight:600}
+.tm-ts{color:var(--mut);margin-left:auto;text-align:right;overflow-wrap:anywhere;max-width:55%}
 .tm-m.tool{align-self:flex-start;background:transparent;border:1px solid var(--line);color:var(--mut);font-size:12px}
 .tm-emp{padding:12px 0;border-top:1px solid var(--line)}
 .tm-eh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}
@@ -293,6 +298,40 @@ button.b:disabled{opacity:.45}
     function srTest(){srSave();document.getElementById('srMsg').textContent='Testing...';try{Android.testSearch();}catch(x){document.getElementById('srMsg').textContent='Not available in this build.';}}
     function srTested(m){document.getElementById('srMsg').textContent=m;}
     window.addEventListener('load',srLoad);
+    </script>
+  </div>
+
+  <h2>App connections</h2>
+  <div class="card">
+    <div id="cnList"></div>
+    <label>Name</label>
+    <input id="cnName" placeholder="e.g. tasker-task">
+    <div class="setrow"><span>Type</span><select id="cnKind" style="width:auto;padding:8px 10px"><option value="broadcast">Background signal</option><option value="activity">Open a link / app</option><option value="service">Start a service</option></select></div>
+    <input id="cnAction" placeholder="Action, e.g. net.dinglisch.android.tasker.ACTION_TASK">
+    <input id="cnPkg" placeholder="App package (optional)">
+    <input id="cnCls" placeholder="Class (optional)">
+    <input id="cnData" placeholder="Link (optional), e.g. https://wa.me/{number}?text={text}">
+    <textarea id="cnExtra" rows="3" placeholder="Extras, one per line: key=value. Put {text} where Nana should fill something in"></textarea>
+    <input id="cnNote" placeholder="What it does (Nana reads this)">
+    <div class="btns"><button class="b" onclick="cnSave()">Save</button><button class="b ghost" onclick="cnPreset('tasker')">Tasker</button><button class="b ghost" onclick="cnPreset('macrodroid')">MacroDroid</button><button class="b ghost" onclick="cnPreset('whatsapp')">WhatsApp link</button></div>
+    <p class="mut" id="cnMsg"></p>
+    <p class="mut">Lets Nana trigger things in your other apps without tapping through them: a Tasker task, a MacroDroid macro, a deep link. She only fires one when you ask, and only if "Allow actions" is on. Tasker: turn on Preferences > Misc > Allow External Access. MacroDroid: add the trigger "Intent Received" with the same action. A WhatsApp link only opens the chat with the text ready, you press send.</p>
+    <script>
+    var CN=[];
+    function cnEsc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
+    function cnLoad(){try{CN=JSON.parse(Android.connList());}catch(x){CN=[];}var h='';
+      CN.forEach(function(c,i){h+='<div style="padding:10px 0;border-top:1px solid var(--line)"><b>'+cnEsc(c.name)+'</b><div class="mut" style="font-size:12px">'+cnEsc(c.note||c.kind)+'</div><div class="btns" style="margin-top:6px"><button class="b ghost" onclick="cnTest('+i+')">Test</button><button class="b ghost" onclick="cnEdit('+i+')">Edit</button><button class="b ghost" onclick="cnDel('+i+')">Delete</button></div></div>';});
+      document.getElementById('cnList').innerHTML=h||'<p class="mut">No connections yet. Tap a preset below or fill the form.</p>';}
+    function cnSet(c){['Name:name','Kind:kind','Action:action','Pkg:pkg','Cls:cls','Data:data','Extra:extras','Note:note'].forEach(function(p){var a=p.split(':');document.getElementById('cn'+a[0]).value=c[a[1]]||(a[1]=='kind'?'broadcast':'');});}
+    function cnPreset(k){var P={tasker:{name:'tasker-task',kind:'broadcast',action:'net.dinglisch.android.tasker.ACTION_TASK',pkg:'net.dinglisch.android.tasker',extras:'version_number=1.0\ntask_name={task}',note:'Runs a Tasker task by name'},
+      macrodroid:{name:'macrodroid-macro',kind:'broadcast',action:'com.sahil.chibi.RUN_MACRO',extras:'name={task}',note:'Triggers a MacroDroid macro (trigger: Intent Received, same action)'},
+      whatsapp:{name:'whatsapp-chat',kind:'activity',action:'android.intent.action.VIEW',data:'https://wa.me/{number}?text={text}',note:'Opens a WhatsApp chat with the text ready (you press send)'}};cnSet(P[k]);}
+    function cnSave(){var o={name:cnV('Name'),kind:cnV('Kind'),action:cnV('Action'),pkg:cnV('Pkg'),cls:cnV('Cls'),data:cnV('Data'),extras:document.getElementById('cnExtra').value,note:cnV('Note')};var r=Android.connSave(JSON.stringify(o));document.getElementById('cnMsg').textContent=r=='ok'?'Saved.':r;if(r=='ok'){cnSet({});cnLoad();}}
+    function cnV(n){return document.getElementById('cn'+n).value.trim();}
+    function cnEdit(i){cnSet(CN[i]);}
+    function cnDel(i){Android.connDelete(CN[i].name);cnLoad();}
+    function cnTest(i){document.getElementById('cnMsg').textContent=Android.connTest(CN[i].name);}
+    window.addEventListener('load',cnLoad);
     </script>
   </div>
 
@@ -685,6 +724,7 @@ button.b:disabled{opacity:.45}
   <div class="card">
     <div id="tmChips" class="tm-chips"></div>
     <div id="tmLog" class="tm-log"></div>
+    <div id="tmTree" class="tm-tree"></div>
     <div class="tm-info"><span id="tmInfo">...</span><button class="b ghost tm-stop" onclick="Android.teamStop()">Stop</button></div>
     <div class="tm-compose"><textarea id="tmText" rows="1" placeholder="Give the team a job, or talk to them..."></textarea><button class="b" onclick="tmSend()">Send</button></div>
     <p class="mu" id="tmTo"></p>
@@ -704,7 +744,7 @@ button.b:disabled{opacity:.45}
     <input id="tmMins" type="number" min="0" max="240" value="20" onchange="tmCfg()">
     <label class="sw"><span>Let the team use Nana's phone tools<small>they can ask Nana to open apps, read the screen, search. Off by default.</small></span><input type="checkbox" id="tmTools" onchange="tmCfg()"></label>
     <div class="btns"><button class="b ghost" onclick="tmClear()">Clear team chat</button></div>
-    <p class="mu">Every provider you added in AI &gt; Providers is a team member with its own chat. Tap a name above to talk to just that one, or stay in Room. Write @name to call someone in the Room. Say "stop" any time.</p>
+    <p class="mu">Every provider you added in AI &gt; Providers is a team member with its own chat. Tap a name above to talk to just that one, or stay in Room. Write @name to call someone in the Room. Say "stop" any time. Nana can also hand a job to this team herself and read their report. Employees only get the tools you allow here, and cannot hire others, hand work on or schedule anything.</p>
   </div>
 </section>
 
@@ -745,7 +785,7 @@ function tmPoll(){
   if(nm!=TM.names){TM.names=nm;var l=vg('tmLead');l.innerHTML='<option value="">Auto</option>';TM.agents.forEach(function(a){if(a.on===false)return;var o=document.createElement('option');o.value=a.name;o.textContent=a.name+' ('+a.model+')';l.appendChild(o);});l.value=s.leadPref||'';}
   if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmMins').value=s.mins;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
   s.events.forEach(function(e){TM.ev.push(e);if(e.id>TM.last)TM.last=e.id;});
-  TM.running=s.running;tmChips();tmEmps();
+  TM.running=s.running;tmChips();tmEmps();tmTree(s);
   vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns: '+s.turns+(s.max?' / '+s.max:'')+(s.lead?'  Boss: '+s.lead:'');
   if(s.events.length||TM.redo){tmRender(!!TM.redo,s.events);TM.redo=false;}
 }
@@ -766,6 +806,14 @@ function tmChips(){var c=vg('tmChips');
     var want=TM.sel==n;if(b.classList.contains('on')!=want)b.classList.toggle('on',want);});
   if(TM.sel!='room'&&!st.hasOwnProperty(TM.sel)){TM.sel='room';TM.redo=true;}
   tmTo();}
+function tmTree(s){var el=vg('tmTree');var on=TM.agents.filter(function(a){return a.on!==false;});
+  if(!s.running||!on.length){if(el._h){el._h='';el.innerHTML='';}return;}
+  var boss=on.filter(function(a){return a.boss;})[0];var rest=on.filter(function(a){return !a.boss;});
+  function row(a,l){var st=a.act?('using '+a.act):(a.status||'idle');var cls=st=='idle'?'':(st.indexOf('error')==0?' e':' t');
+    return '<div class="tm-tr" style="padding-left:'+(l*18)+'px"><span class="tm-dot'+cls+'"></span><b>'+esc(a.name)+'</b><span class="tm-ts">'+esc(st)+'</span></div>';}
+  var h='';if(s.job&&s.job.task)h+='<div class="tm-t0">'+esc(s.job.from||'')+': '+esc(s.job.task)+'</div>';
+  if(boss){h+=row(boss,1);rest.forEach(function(a){h+=row(a,2);});}else on.forEach(function(a){h+=row(a,1);});
+  if(el._h!==h){el._h=h;el.innerHTML=h;}}
 function tmEmps(){var c=vg('tmEmps'),key=TM.agents.map(function(a){return a.key+'|'+a.name}).join(',');
   if(c._k!==key){c._k=key;c.innerHTML='';
     TM.agents.forEach(function(a){var d=document.createElement('div');d.className='tm-emp';
