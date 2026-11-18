@@ -68,6 +68,12 @@ jobs:
           cp /tmp/sherpa-src/LICENSE app/src/main/assets/nana/LICENSE-sherpa-onnx.txt
           ls -la app/src/main/jniLibs/arm64-v8a app/src/main/java/com/k2fsa/sherpa/onnx
 
+      - name: Stamp build id (the in-app updater compares this)
+        run: |
+          mkdir -p app/src/main/assets
+          printf '%s\n%s\n' "$GITHUB_SHA" "$(date -u +'%Y-%m-%d %H:%M')" > app/src/main/assets/build.txt
+          cat app/src/main/assets/build.txt
+
       - name: Build debug APK
         run: gradle testDebugUnitTest assembleDebug --no-daemon --stacktrace
 
@@ -109,3 +115,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: mochi.apk
           make_latest: true
+          body: "build=${{ github.sha }}"

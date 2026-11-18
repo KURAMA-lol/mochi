@@ -1453,7 +1453,7 @@ class CompanionService : Service() {
         chibi?.mood = "neutral"
         val conf = ConfigStore.load(this)
         cfg = conf
-        val snapshot = history.takeLast(conf.persona.history).toList()
+        val snapshot = Compactor.build(this, conf, history.toList())
         val myTyping = t
         Thread {
             try {

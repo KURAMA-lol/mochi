@@ -199,6 +199,7 @@ class MainActivity : Activity() {
     }
 
     private var pendingCloneName = ""
+    @Volatile private var pendingUpd: Updater.Info? = null
 
     private fun js(code: String) { runOnUiThread { web.evaluateJavascript(code, null) } }
 
@@ -326,6 +327,68 @@ class MainActivity : Activity() {
         }
         @JavascriptInterface fun getLog(): String = AuditLog.json(this@MainActivity)
         @JavascriptInterface fun clearLog() { AuditLog.clear(this@MainActivity) }
+        @JavascriptInterface fun getSearch(): String = Search.json(this@MainActivity)
+
+        @JavascriptInterface fun setSearch(e: String, u: String, k: String) { Search.save(this@MainActivity, e, u, k) }
+
+        @JavascriptInterface fun testSearch() { Thread { val r = Search.test(this@MainActivity); js("srTested(" + JSONObject.quote(r) + ")") }.start() }
+
+        @JavascriptInterface fun memItems(q: String): String = Memory.itemsJson(this@MainActivity, q)
+
+        @JavascriptInterface fun memPin(id: Int, on: Boolean) { Memory.pin(this@MainActivity, id.toLong(), on) }
+
+        @JavascriptInterface fun memEdit(id: Int, t: String): String = Memory.edit(this@MainActivity, id.toLong(), t)
+
+        @JavascriptInterface fun memDelete(id: Int) { Memory.delete(this@MainActivity, id.toLong()) }
+
+        @JavascriptInterface fun memImp(id: Int, v: Int) { Memory.importance(this@MainActivity, id.toLong(), v) }
+
+        @JavascriptInterface fun memAdd(t: String, pin: Boolean): String = Memory.add(this@MainActivity, t, "manual", 4, pin)
+
+        @JavascriptInterface fun updState(): String {
+            val s = Updater.installed(this@MainActivity)
+            return JSONObject().put("installed", s.first).put("date", s.second).put("token", Updater.token(this@MainActivity).isNotEmpty()).toString()
+        }
+
+        @JavascriptInterface fun updSetToken(t: String) { Updater.setToken(this@MainActivity, t) }
+
+        @JavascriptInterface fun updDismiss(sha: String) { Updater.dismiss(this@MainActivity, sha) }
+
+        @JavascriptInterface fun updCheck(force: Boolean) {
+            Thread {
+                val c = this@MainActivity
+                if (Updater.token(c).isEmpty()) { if (force) js("updErr('Paste a GitHub token first.')"); return@Thread }
+                val p = c.getSharedPreferences("updater", Context.MODE_PRIVATE)
+                if (!force && System.currentTimeMillis() - p.getLong("last", 0L) < 1_800_000L) return@Thread
+                p.edit().putLong("last", System.currentTimeMillis()).apply()
+                try {
+                    val i = Updater.check(c)
+                    pendingUpd = i
+                    if (i == null) { if (force) js("updNone('You have the latest build.')") }
+                    else js("updFound(" + JSONObject.quote(i.json()) + "," + (force || Updater.dismissed(c) != i.sha) + ")")
+                } catch (e: Exception) { if (force) js("updErr(" + JSONObject.quote(e.message ?: "Check failed") + ")") }
+            }.start()
+        }
+
+        @JavascriptInterface fun updInstall() {
+            Thread {
+                val c = this@MainActivity
+                val i = pendingUpd
+                if (i == null) { js("updStatus('Check for updates first.')"); return@Thread }
+                if (!Updater.canInstall(c)) {
+                    runOnUiThread { Updater.openInstallPermission(c) }
+                    js("updStatus('Allow Install unknown apps for Nana, come back and tap Update now again.')")
+                    return@Thread
+                }
+                try {
+                    Updater.onMsg = { m -> js("updStatus(" + JSONObject.quote(m) + ")") }
+                    val f = Updater.download(c, i) { pr -> js("updProgress($pr)") }
+                    js("updProgress(100)")
+                    Updater.install(c, f)
+                } catch (e: Exception) { js("updStatus(" + JSONObject.quote("Update failed: " + (e.message ?: e.toString()).take(160)) + ")") }
+            }.start()
+        }
+
         @JavascriptInterface fun getMemory(): String = Memory.json(this@MainActivity)
         @JavascriptInterface fun getLearn(): Boolean = Memory.learnOn(this@MainActivity)
         @JavascriptInterface fun setLearn(on: Boolean) { Memory.setLearn(this@MainActivity, on) }

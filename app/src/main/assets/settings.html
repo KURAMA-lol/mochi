@@ -277,6 +277,25 @@ button.b:disabled{opacity:.45}
     <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Best with the offline wake model from Settings > Voice > Offline ears (no internet, no beeps). Without it she uses Google speech, which needs internet and the screen on. When she hears her name she pops up like the power button does, says Yes? and listens. "Last heard" shows what the phone understood, handy if it keeps missing.</p>
   </div>
 
+  <h2>Web search</h2>
+  <div class="card">
+    <div class="setrow"><span>Search with<div class="mut">used by Nana and by the team</div></span><select id="srEng" onchange="srSave()" style="width:auto;padding:8px 10px"><option value="searxng">SearXNG</option><option value="ddg">DuckDuckGo</option><option value="brave">Brave Search</option></select></div>
+    <label>SearXNG address <span class="mut">(your own instance or a public one)</span></label>
+    <input id="srUrl" placeholder="https://search.lumy.live" onchange="srSave()">
+    <label>Brave API key <span class="mut">(only for Brave)</span></label>
+    <input id="srKey" type="password" placeholder="BSA..." onchange="srSave()">
+    <div class="btns"><button class="b" onclick="srTest()">Test search</button></div>
+    <p class="mut" id="srMsg"></p>
+    <p class="mut">If the chosen engine fails, Nana falls back to DuckDuckGo. SearXNG and Brave also search images, videos and news when she is asked. SearXNG needs JSON output switched on in that instance.</p>
+    <script>
+    function srLoad(){try{var s=JSON.parse(Android.getSearch());document.getElementById('srEng').value=s.engine;document.getElementById('srUrl').value=s.searx;document.getElementById('srKey').value=s.brave;}catch(x){}}
+    function srSave(){try{Android.setSearch(document.getElementById('srEng').value,document.getElementById('srUrl').value,document.getElementById('srKey').value);}catch(x){}}
+    function srTest(){srSave();document.getElementById('srMsg').textContent='Testing...';try{Android.testSearch();}catch(x){document.getElementById('srMsg').textContent='Not available in this build.';}}
+    function srTested(m){document.getElementById('srMsg').textContent=m;}
+    window.addEventListener('load',srLoad);
+    </script>
+  </div>
+
   <h2>Abilities</h2>
   <div class="card">
     <label class="sw"><span>Use tools<small>web, her browser, phone screen</small></span><input type="checkbox" id="agOn" onchange="agSave()"></label>
@@ -328,6 +347,14 @@ button.b:disabled{opacity:.45}
     <textarea id="bk" placeholder="Settings JSON appears here"></textarea>
     <div class="btns" style="margin-bottom:14px"><button class="b ghost" onclick="exp()">Export</button><button class="b ghost" onclick="imp()">Import</button></div>
   </details>
+  <h2>Updates</h2>
+  <div class="card">
+    <div class="setrow"><span>Installed build<div class="mut" id="updCur">...</div></span><button class="b ghost" onclick="updCheck(true)">Check now</button></div>
+    <label>GitHub token <span class="mut">(read-only)</span></label>
+    <input id="updTok" type="password" placeholder="paste token" onchange="updTokSave()">
+    <p class="mut" id="updMsg"></p>
+    <p class="mut">The repo is private, so the app needs a token to see new builds. It stays on this phone only. Create one at GitHub > Settings > Developer settings > Fine-grained tokens: only the mochi repo, permission Contents = Read-only. When a new build is ready you get a popup here.</p>
+  </div>
   <h2>Clean up</h2>
   <div class="card">
     <div class="setrow"><span>Recent actions log<div class="mut">what she did on your phone</div></span><button class="b ghost" onclick="logClear();this.textContent='Cleared'">Clear</button></div>
@@ -352,6 +379,12 @@ button.b:disabled{opacity:.45}
   <div class="card">
     <input id="memQ" placeholder="Search what she knows" oninput="memLoad()" style="margin-bottom:6px">
     <div id="memList" class="mut">Loading...</div>
+  </div>
+  <div class="card">
+    <input id="memNew" placeholder="Tell her something to remember" style="margin-bottom:6px">
+    <label class="sw"><span>Pin it<small>pinned memories are never dropped</small></span><input type="checkbox" id="memNewPin"></label>
+    <div class="btns"><button class="b" onclick="memAdd()">Remember</button></div>
+    <p class="mut" id="memMsg"></p>
   </div>
   <div class="btns"><button class="b red" onclick="if(confirm('Make her forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
   <p class="mut">She never stores passwords, codes, card or ID numbers. Tap the cross to make her forget one thing. You can also just tell her "forget that".</p>
@@ -675,6 +708,28 @@ button.b:disabled{opacity:.45}
   </div>
 </section>
 
+<div id="updBox" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:24px">
+  <div class="card" style="max-width:360px;width:100%;margin:0">
+    <h2 style="margin-top:0">New version</h2>
+    <p id="updTxt" class="mut"></p>
+    <div class="btns"><button class="b" id="updGo" onclick="updInstall()">Update now</button><button class="b ghost" onclick="updLater()">Later</button></div>
+  </div>
+</div>
+<script>
+var UPD=null;
+function updShow(on){document.getElementById('updBox').style.display=on?'flex':'none';}
+function updFound(j,pop){UPD=JSON.parse(j);document.getElementById('updTxt').textContent='Build '+UPD.short+' from '+UPD.date+' (UTC), '+Math.round(UPD.size/1048576)+' MB. It installs over this one and keeps your settings and memory.';document.getElementById('updMsg').textContent='New build ready: '+UPD.short;document.getElementById('updGo').disabled=false;if(pop)updShow(true);}
+function updNone(m){document.getElementById('updMsg').textContent=m;}
+function updErr(m){document.getElementById('updMsg').textContent=m;}
+function updCheck(force){try{Android.updCheck(!!force);}catch(x){}}
+function updInstall(){document.getElementById('updGo').disabled=true;document.getElementById('updTxt').textContent='Downloading...';try{Android.updInstall();}catch(x){}}
+function updProgress(p){document.getElementById('updTxt').textContent='Downloading... '+p+'%';}
+function updStatus(m){document.getElementById('updTxt').textContent=m;document.getElementById('updMsg').textContent=m;document.getElementById('updGo').disabled=false;updShow(true);}
+function updLater(){try{if(UPD)Android.updDismiss(UPD.sha);}catch(x){}updShow(false);}
+function updTokSave(){var v=document.getElementById('updTok').value.trim();if(!v)return;try{Android.updSetToken(v);}catch(x){}document.getElementById('updTok').value='';document.getElementById('updTok').placeholder='saved (paste to replace)';updCheck(true);}
+function updInit(){try{var s=JSON.parse(Android.updState());document.getElementById('updCur').textContent=s.installed?('build '+s.installed.slice(0,7)+(s.date?' · '+s.date:'')):'unknown (older than the updater)';if(s.token)document.getElementById('updTok').placeholder='saved (paste to replace)';}catch(x){}}
+window.addEventListener('load',function(){updInit();setTimeout(function(){updCheck(false);},1500);});
+</script>
 <nav id="nav"></nav>
 <script>
 var TM={ev:[],last:0,sel:'room',agents:[],timer:null,cfg:false,names:''};
@@ -1134,7 +1189,22 @@ function remLoad(){try{var el=document.getElementById('remList');if(!el||!Androi
 function logClear(){try{Android.clearLog();logLoad()}catch(x){}}
 function bondLoad(){try{var el=document.getElementById('bond');if(!el||!Android.getBond)return;var b=JSON.parse(Android.getBond());el.innerHTML='<div class="kpis" style="margin:0"><div class="kpi"><b>'+(b.days||0)+'</b><span>days together</span></div><div class="kpi"><b>'+b.msgs+'</b><span>messages</span></div><div class="kpi"><b>'+b.facts+'</b><span>things I know</span></div></div>';if(Android.getLearn)document.getElementById('learnOn').checked=!!Android.getLearn()}catch(x){}}
 function learnSave(){try{Android.setLearn(document.getElementById('learnOn').checked)}catch(x){}}
-function memLoad(){var el=document.getElementById('memList');if(!el)return;bondLoad();try{if(!window.Android||!Android.getMemory){el.textContent='Memory is not available in this build.';return}var a=JSON.parse(Android.getMemory());document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';if(!a.length){el.textContent='Nothing yet. Just chat with her, she learns by herself.';return}var q=((document.getElementById('memQ')||{value:''}).value||'').trim().toLowerCase();var h=a.map(function(t,i){return [t,i]}).reverse().filter(function(p){return !q||p[0].toLowerCase().indexOf(q)>=0}).map(function(p){return '<div class="li"><span>'+esc(p[0])+'</span><button class="x" onclick="Android.deleteMemory('+p[1]+');memLoad()">'+IC_NO+'</button></div>'}).join('');el.innerHTML=h||'No match.'}catch(x){el.textContent='Could not load memory: '+x}}
+var memEditId=-1;
+function memSrc(s){return {chat:'learned from chat',tool:'she saved it',manual:'added by you',imported:'old memory',team:'team'}[s]||s||'unknown';}
+function memRow(m){var imp='';for(var i=1;i<=5;i++)imp+=(i<=m.imp?'★':'☆');
+  var body=memEditId==m.id?'<input id="memEdit" value="'+esc(m.text).replace(/"/g,'&quot;')+'" style="margin:0 0 6px"><div class="btns"><button class="b" onclick="memSave('+m.id+')">Save</button><button class="b ghost" onclick="memEditId=-1;memLoad()">Cancel</button></div>':'<div>'+esc(m.text)+'</div>';
+  return '<div style="padding:10px 0;border-top:1px solid var(--line)">'+body+'<div class="mut" style="font-size:12px;margin-top:4px">'+(m.pinned?'📌 pinned · ':'')+imp+' · '+memSrc(m.source)+(m.note?' · "'+esc(m.note)+'"':'')+'</div>'
+   +'<div class="btns" style="margin-top:6px"><button class="b ghost" onclick="Android.memPin('+m.id+','+(!m.pinned)+');memLoad()">'+(m.pinned?'Unpin':'Pin')+'</button><button class="b ghost" onclick="memEditId='+m.id+';memLoad()">Edit</button><button class="b ghost" onclick="Android.memImp('+m.id+','+(m.imp%5+1)+');memLoad()">Importance</button><button class="b ghost" onclick="Android.memDelete('+m.id+');memLoad()">Delete</button></div></div>';}
+function memLoad(){var el=document.getElementById('memList');if(!el)return;bondLoad();
+  try{if(!window.Android||!Android.memItems){el.textContent='Memory is not available in this build.';return}
+    if(memEditId>=0&&document.activeElement&&document.activeElement.id=='memEdit')return;
+    var q=((document.getElementById('memQ')||{value:''}).value||'').trim();
+    var a=JSON.parse(Android.memItems(q));
+    document.getElementById('memCount').textContent=a.length?('('+a.length+')'):'';
+    if(!a.length){el.textContent=q?'No match.':'Nothing yet. Just chat with her, she learns by herself.';return}
+    el.innerHTML=a.map(memRow).join('');}catch(x){el.textContent='Could not load memory: '+x}}
+function memSave(id){var r=Android.memEdit(id,document.getElementById('memEdit').value);if(r!='ok'){alert(r);return}memEditId=-1;memLoad();}
+function memAdd(){var i=document.getElementById('memNew');var t=i.value.trim();if(!t)return;document.getElementById('memMsg').textContent=Android.memAdd(t,document.getElementById('memNewPin').checked);i.value='';memLoad();}
 window.addEventListener('load',function(){agLoad();memLoad();logLoad()});
 </script>
 </body>
