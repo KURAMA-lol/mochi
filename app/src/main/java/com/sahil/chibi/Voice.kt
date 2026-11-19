@@ -8,7 +8,7 @@ import android.os.Looper
 import org.json.JSONObject
 import java.io.File
 
-/** Speaks Nana's replies with an on-phone voice: Piper (small and fast) or Pocket-TTS (more natural). */
+/** Speaks Nana's replies with an on-phone voice: Piper (small and fast), Pocket-TTS (more natural) or tiny-voca (small, two English voices). */
 object Voice {
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
@@ -26,8 +26,12 @@ object Voice {
 
     fun cfg(ctx: Context): JSONObject = try { JSONObject(raw(ctx)) } catch (e: Exception) { JSONObject() }
 
-    /** "piper" or "pocket". Older saved engines (phone voice, cloud APIs) fall back to Piper. */
-    fun engine(ctx: Context): String = if (cfg(ctx).optString("engine") == "pocket") "pocket" else "piper"
+    /** "piper", "pocket" or "tiny". Older saved engines (phone voice, cloud APIs) fall back to Piper. */
+    fun engine(ctx: Context): String = when (cfg(ctx).optString("engine")) {
+        "pocket" -> "pocket"
+        "tiny" -> "tiny"
+        else -> "piper"
+    }
 
     private fun clean(t: String): String {
         var s = t.replace(Regex("\\[(.*?)\\]\\(.*?\\)"), "$1")

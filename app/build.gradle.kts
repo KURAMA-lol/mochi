@@ -43,6 +43,14 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // sherpa-onnx brings its own libonnxruntime.so (1.28.x) and so does onnxruntime-android (tiny-voca).
+    // Keep one copy; both Java and sherpa work with either since the Java side is the older 1.28.0.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
 }
 
 // Embedded Python (Chaquopy) for Agent-Reach. The agent_reach package itself is copied into
@@ -56,10 +64,12 @@ chaquopy {
             install("pyyaml")
             install("yt-dlp[default]==2026.8.19")
             install("scrapy")
+            install("numpy")
         }
     }
 }
 
 dependencies {
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.0")
     testImplementation("junit:junit:4.13.2")
 }

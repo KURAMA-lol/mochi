@@ -547,6 +547,7 @@ button.b:disabled{opacity:.45}
     <select id="vEng" onchange="vSave()">
       <option value="piper">Piper - small and fast</option>
       <option value="pocket">Pocket-TTS - more natural, slower</option>
+      <option value="tiny">tiny-voca - tiny, fast, two English voices</option>
     </select>
     <div id="vPiper">
       <label>Piper voice</label>
@@ -567,6 +568,18 @@ button.b:disabled{opacity:.45}
       <div class="btns"><button class="b ghost" onclick="Android.pickPocketVoice();vg('vStat').textContent='Pick an audio file...'">Use my own voice file</button><button class="b ghost" id="pkCustDel" style="display:none" onclick="Android.pocketRemoveCustom();pkFill();vSave()">Remove my voice</button></div>
       <label>Speed</label><input id="pkSpeed" type="number" step="0.05" min="0.6" max="1.6" oninput="vSave()">
       <p class="mu">Kyutai Pocket-TTS, English only, runs fully on your phone. Big download, and each sentence takes a moment to make. For your own voice use 5 to 15 seconds of one clear speaker, and only voices you have the right to use.</p>
+    </div>
+    <div id="vTiny" style="display:none">
+      <div class="dl-top"><span class="mut">tiny-voca voice (about 26 MB)</span><span id="tyTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+      <div class="dl-msg" id="tyStat" style="margin-top:4px">...</div>
+      <div class="pbar" id="tyBar" style="display:none"><i id="tyBarI"></i></div>
+      <div class="btns"><button class="b" id="tyGet" onclick="eGet('tiny')">Download</button><button class="b ghost" id="tyCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="tyDel" style="display:none" onclick="eDel('tiny')">Delete</button></div>
+      <label>Voice</label>
+      <select id="tyVoice" onchange="vSave()"><option value="F2">F2 - female</option><option value="M2">M2 - male</option></select>
+      <label>Speed <span class="mut">(1 = as the model says it)</span></label><input id="tySpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
+      <label>Pitch shift <span class="mut">(semitones, -8 to 8)</span></label><input id="tyPitch" type="number" step="0.5" min="-8" max="8" oninput="vSave()">
+      <label>Pitch range <span class="mut">(0 = flat, 1 = natural, 2 = lively)</span></label><input id="tyRange" type="number" step="0.05" min="0" max="2" oninput="vSave()">
+      <p class="mu">tiny-voca by n4ze3m, 4.5 million parameters, English only, 24 kHz, works offline. It reads one sentence at a time. It cannot read Hindi or other scripts (those parts stay silent), and Roman-script Hindi gets an English accent. Names from other languages are often misread.</p>
     </div>
     <div class="btns" style="margin-top:14px"><button class="b" onclick="vTest()">Test voice</button></div>
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:8px"></div>
@@ -595,7 +608,7 @@ button.b:disabled{opacity:.45}
     <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. Turn on Hey Nana in its card first. English only.</p>
   </div>
   <script>
-  var VC={engine:'piper',piper:{voice:'en_US-amy-medium',speed:1},pocket:{speed:1,voice:''},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false,barge:true,accurate:true}};
+  var VC={engine:'piper',piper:{voice:'en_US-amy-medium',speed:1},pocket:{speed:1,voice:''},tiny:{voice:'F2',speed:1,pitch:0,range:1},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false,barge:true,accurate:true}};
   function vg(i){return document.getElementById(i)}
   var PV=[],sTimer=null;
   function setDl(p,st,dis){var g=function(i){return vg(p+i)};
@@ -616,6 +629,7 @@ button.b:disabled{opacity:.45}
     sRow(s,'kw','kws',s.kws,'kws','Not downloaded yet',cur,'wkStat');
     sRow(s,'as','asr',s.asr,'asr','Not downloaded yet',cur,'asStat');
     sRow(s,'pk','pocket',s.pocket,'pocket','Not downloaded yet',cur,'pkStat');
+    sRow(s,'ty','tiny',s.tiny,'tiny','Not downloaded yet',cur,'tyStat');
     if(s.busy){if(!sTimer)sTimer=setInterval(sTick,500);}
     else if(sTimer){clearInterval(sTimer);sTimer=null;pFill();pkFill();gsAll();try{Android.earsApply()}catch(x){}}
   }catch(x){}}
@@ -666,14 +680,16 @@ button.b:disabled{opacity:.45}
     a.forEach(function(v){var o=document.createElement('option');o.value=v.id;o.textContent=v.label;s.appendChild(o);});
     var ok=a.some(function(v){return v.id==cur});s.value=ok?cur:(a.length?a[0].id:'');vg('pkCustDel').style.display=a.some(function(v){return v.id=='custom'})?'':'none';gsAll();}
   window.onPocketVoice=function(ok,m){vg('vStat').textContent=ok?m:'Failed: '+m;if(ok){pkFill('custom');vSave();}};
-  function vShow(){vg('vPiper').style.display=VC.engine=='pocket'?'none':'block';vg('vPocket').style.display=VC.engine=='pocket'?'block':'none';gsAll();}
-  function vFill(){vg('vEng').value=VC.engine=='pocket'?'pocket':'piper';var p=VC.piper||{},x=VC.ears||{},k=VC.pocket||{};
+  function vShow(){var e=VC.engine;vg('vPiper').style.display=(e=='pocket'||e=='tiny')?'none':'block';vg('vPocket').style.display=e=='pocket'?'block':'none';vg('vTiny').style.display=e=='tiny'?'block':'none';gsAll();}
+  function vFill(){vg('vEng').value=(VC.engine=='pocket'||VC.engine=='tiny')?VC.engine:'piper';var p=VC.piper||{},x=VC.ears||{},k=VC.pocket||{},t=VC.tiny||{};
+    vg('tyVoice').value=t.voice=='M2'?'M2':'F2';vg('tySpeed').value=t.speed||1;vg('tyPitch').value=t.pitch||0;vg('tyRange').value=(t.range===undefined||t.range===null)?1:t.range;
     vg('pVoice').value=p.voice||'en_US-amy-medium';pFill();vg('pSpeed').value=p.speed||1;vg('pkSpeed').value=k.speed||1;pkFill(k.voice);vg('wkAcc').checked=x.accurate!==false;
     vg('wkSens').value=x.sens||'normal';vg('wkScr').checked=!!x.screenOff;vg('wkBarge').checked=x.barge!==false;vShow();sTick();}
-  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&typeof j=='object')VC=j;}catch(x){}VC.piper=VC.piper||{voice:'en_US-amy-medium',speed:1};VC.pocket=VC.pocket||{speed:1};VC.ears=VC.ears||{};vFill();}
+  function vLoad(){try{var j=JSON.parse(Android.getVoice());if(j&&typeof j=='object')VC=j;}catch(x){}VC.piper=VC.piper||{voice:'en_US-amy-medium',speed:1};VC.pocket=VC.pocket||{speed:1};VC.tiny=VC.tiny||{voice:'F2',speed:1,pitch:0,range:1};VC.ears=VC.ears||{};vFill();}
   function vSave(){VC.engine=vg('vEng').value;
     VC.piper={voice:vg('pVoice').value,speed:+vg('pSpeed').value||1};
     VC.pocket={speed:+vg('pkSpeed').value||1,voice:vg('pkVoice').value};
+    var tr=parseFloat(vg('tyRange').value);VC.tiny={voice:vg('tyVoice').value,speed:+vg('tySpeed').value||1,pitch:+vg('tyPitch').value||0,range:isNaN(tr)?1:tr};
     VC.ears={wake:'local',asr:'local',sens:vg('wkSens').value,screenOff:vg('wkScr').checked,barge:vg('wkBarge').checked,accurate:vg('wkAcc').checked};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
   function vTest(){vSave();vg('vStat').textContent='Making the voice...';Android.testVoice('Hi! This is my voice. How do I sound?');}

@@ -68,6 +68,18 @@ jobs:
           cp /tmp/sherpa-src/LICENSE app/src/main/assets/nana/LICENSE-sherpa-onnx.txt
           ls -la app/src/main/jniLibs/arm64-v8a app/src/main/java/com/k2fsa/sherpa/onnx
 
+      - name: Fetch tiny-voca phonemizer (dizione, Apache-2.0, not stored in this repo)
+        run: |
+          set -e
+          git clone https://github.com/n4ze3m/dizione /tmp/dizione
+          git -C /tmp/dizione checkout 8cd889e4de7be6bd1dd2e6891344a0729fa14dd4
+          mkdir -p app/src/main/assets/tinyvoca
+          cp -r /tmp/dizione/src/dizione app/src/main/assets/tinyvoca/dizione
+          rm -rf app/src/main/assets/tinyvoca/dizione/built app/src/main/assets/tinyvoca/dizione/__pycache__
+          cp /tmp/dizione/LICENSE app/src/main/assets/nana/LICENSE-dizione.txt
+          curl -fsSL -o app/src/main/assets/nana/LICENSE-tiny-voca.txt https://huggingface.co/n4ze3m/tiny-voca/resolve/1e73262226dbf4ef02e9df277e81aaa1db5ce16c/LICENSE
+          find app/src/main/assets/tinyvoca -type f | head -40
+
       - name: Stamp build id (the in-app updater compares this)
         run: |
           mkdir -p app/src/main/assets

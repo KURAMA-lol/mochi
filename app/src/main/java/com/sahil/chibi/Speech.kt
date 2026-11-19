@@ -95,6 +95,7 @@ object Speech {
         "kws" -> File(modelDir(ctx, "kws"), "tokens.txt").exists() && File(modelDir(ctx, "kws"), "encoder-epoch-12-avg-2-chunk-16-left-64.onnx").exists()
         "asr" -> File(modelDir(ctx, "asr"), "tokens.txt").exists() && File(modelDir(ctx, "asr"), "encoder.onnx").exists()
         "pocket" -> POCKET_FILES.all { File(modelDir(ctx, "pocket"), it).exists() }
+        "tiny" -> TinyVoca.ready(ctx)
         else -> false
     }
 
@@ -189,9 +190,9 @@ object Speech {
         for (v in VOICES) if (voiceReady(ctx, v.id)) installed.put(v.id)
         val g = guard(ctx)
         val dis = JSONArray()
-        for (k in listOf("tts", "kws", "asr", "pocket")) if (g.getBoolean(k, false)) dis.put(k)
+        for (k in listOf("tts", "kws", "asr", "pocket", "tiny")) if (g.getBoolean(k, false)) dis.put(k)
         return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("busyId", busyId).put("lastKind", lastKind).put("lastId", lastId).put("msg", msg).put("pct", pct)
-            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("voices", installed).put("disabled", dis)
+            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("tiny", ready(ctx, "tiny")).put("voices", installed).put("disabled", dis)
     }
 
     fun cancel() { cancelFlag = true }
@@ -231,6 +232,7 @@ object Speech {
     fun install(ctx: Context, kind: String, id: String) {
         if (busy.isNotEmpty()) return
         val app = ctx.applicationContext
+        if (kind == "tiny") { installTiny(app); return }
         val url: String
         val dest: File
         val label: String
@@ -272,8 +274,43 @@ object Speech {
         }.start()
     }
 
+    /** tiny-voca is not an archive: ten small files from Hugging Face (about 26 MB), kept in speech/tinyvoca. */
+    private fun installTiny(app: Context) {
+        if (TinyVoca.ready(app)) { lastKind = "tiny"; lastId = ""; msg = "Already downloaded."; return }
+        cancelFlag = false
+        busy = "tiny"; busyId = ""; lastKind = "tiny"; lastId = ""; msg = "Starting..."; pct = 0
+        Thread {
+            val dest = TinyVoca.dir(app)
+            val tmp = File(dest.parentFile, "tinyvoca.part")
+            try {
+                tmp.deleteRecursively(); tmp.mkdirs()
+                for ((remote, local) in TinyVoca.FILES) {
+                    val out = File(tmp, local)
+                    out.parentFile?.mkdirs()
+                    msg = "Downloading $local..."
+                    download(TinyVoca.HF + remote, out, local)
+                }
+                if (File(tmp, "model.onnx").length() < 15_000_000) throw RuntimeException("The model file is too small. Try again.")
+                synchronized(this) { TinyVoca.release() }
+                dest.deleteRecursively()
+                if (!tmp.renameTo(dest)) throw RuntimeException("Could not save the files.")
+                if (!TinyVoca.ready(app)) throw RuntimeException("The download did not contain the expected files.")
+                guard(app).edit().putBoolean("tiny", false).commit()
+                msg = "Done."
+            } catch (e: Throwable) {
+                msg = if (e.message == "Cancelled") "Cancelled." else "Failed: " + (e.message ?: e.toString()).take(160)
+            } finally {
+                tmp.deleteRecursively()
+                pct = -1
+                busy = ""
+                busyId = ""
+            }
+        }.start()
+    }
+
     fun remove(ctx: Context, kind: String, id: String) {
         when (kind) {
+            "tiny" -> { TinyVoca.release(); TinyVoca.dir(ctx).deleteRecursively() }
             "kws" -> modelDir(ctx, "kws").deleteRecursively()
             "asr" -> modelDir(ctx, "asr").deleteRecursively()
             "pocket" -> { synchronized(this) { releasePocket() }; modelDir(ctx, "pocket").deleteRecursively() }
@@ -292,8 +329,11 @@ object Speech {
         tts = null; ttsId = ""
     }
 
-    fun synth(ctx: Context, text: String): ByteArray =
-        if (Voice.engine(ctx) == "pocket") synthPocket(ctx, text) else synthPiper(ctx, text)
+    fun synth(ctx: Context, text: String): ByteArray = when (Voice.engine(ctx)) {
+        "pocket" -> synthPocket(ctx, text)
+        "tiny" -> TinyVoca.synth(ctx, text)
+        else -> synthPiper(ctx, text)
+    }
 
     // ------------------------------------------------------------ Pocket-TTS (Kyutai, 100M, runs on sherpa-onnx)
 
@@ -486,7 +526,7 @@ object Speech {
         return wav(a.samples, a.sampleRate)
     }
 
-    private fun wav(s: FloatArray, sr: Int): ByteArray {
+    fun wav(s: FloatArray, sr: Int): ByteArray {
         val n = s.size
         val bb = ByteBuffer.allocate(44 + n * 2).order(ByteOrder.LITTLE_ENDIAN)
         bb.put("RIFF".toByteArray()); bb.putInt(36 + n * 2); bb.put("WAVE".toByteArray())
