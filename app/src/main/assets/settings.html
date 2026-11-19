@@ -570,7 +570,7 @@ button.b:disabled{opacity:.45}
       <p class="mu">Kyutai Pocket-TTS, English only, runs fully on your phone. Big download, and each sentence takes a moment to make. For your own voice use 5 to 15 seconds of one clear speaker, and only voices you have the right to use.</p>
     </div>
     <div id="vTiny" style="display:none">
-      <div class="dl-top"><span class="mut">tiny-voca voice (about 26 MB)</span><span id="tyTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+      <div class="dl-top"><span class="mut">tiny-voca voice (about 26 MB, plus about 25 MB from the internet on first start)</span><span id="tyTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
       <div class="dl-msg" id="tyStat" style="margin-top:4px">...</div>
       <div class="pbar" id="tyBar" style="display:none"><i id="tyBarI"></i></div>
       <div class="btns"><button class="b" id="tyGet" onclick="eGet('tiny')">Download</button><button class="b ghost" id="tyCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="tyDel" style="display:none" onclick="eDel('tiny')">Delete</button></div>
@@ -579,7 +579,7 @@ button.b:disabled{opacity:.45}
       <label>Speed <span class="mut">(1 = as the model says it)</span></label><input id="tySpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
       <label>Pitch shift <span class="mut">(semitones, -8 to 8)</span></label><input id="tyPitch" type="number" step="0.5" min="-8" max="8" oninput="vSave()">
       <label>Pitch range <span class="mut">(0 = flat, 1 = natural, 2 = lively)</span></label><input id="tyRange" type="number" step="0.05" min="0" max="2" oninput="vSave()">
-      <p class="mu">tiny-voca by n4ze3m, 4.5 million parameters, English only, 24 kHz, works offline. It reads one sentence at a time. It cannot read Hindi or other scripts (those parts stay silent), and Roman-script Hindi gets an English accent. Names from other languages are often misread.</p>
+      <p class="mu">tiny-voca by n4ze3m, 4.5 million parameters, English only, 24 kHz. It runs the same way as the web demo, inside a hidden page. After the first start the files stay on the phone. It reads one sentence at a time. It cannot read Hindi or other scripts (those parts stay silent), and Roman-script Hindi gets an English accent. Names from other languages are often misread.</p>
     </div>
     <div class="btns" style="margin-top:14px"><button class="b" onclick="vTest()">Test voice</button></div>
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:8px"></div>
@@ -630,6 +630,7 @@ button.b:disabled{opacity:.45}
     sRow(s,'as','asr',s.asr,'asr','Not downloaded yet',cur,'asStat');
     sRow(s,'pk','pocket',s.pocket,'pocket','Not downloaded yet',cur,'pkStat');
     sRow(s,'ty','tiny',s.tiny,'tiny','Not downloaded yet',cur,'tyStat');
+    if(s.tiny&&s.tinyMsg&&!(s.busy&&s.busyKind=='tiny'))vg('tyStat').textContent='Downloaded. '+s.tinyMsg;
     if(s.busy){if(!sTimer)sTimer=setInterval(sTick,500);}
     else if(sTimer){clearInterval(sTimer);sTimer=null;pFill();pkFill();gsAll();try{Android.earsApply()}catch(x){}}
   }catch(x){}}

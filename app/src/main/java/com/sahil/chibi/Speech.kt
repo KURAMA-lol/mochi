@@ -192,7 +192,7 @@ object Speech {
         val dis = JSONArray()
         for (k in listOf("tts", "kws", "asr", "pocket", "tiny")) if (g.getBoolean(k, false)) dis.put(k)
         return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("busyId", busyId).put("lastKind", lastKind).put("lastId", lastId).put("msg", msg).put("pct", pct)
-            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("tiny", ready(ctx, "tiny")).put("voices", installed).put("disabled", dis)
+            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("tiny", ready(ctx, "tiny")).put("tinyMsg", TinyVoca.stateMsg()).put("voices", installed).put("disabled", dis)
     }
 
     fun cancel() { cancelFlag = true }
@@ -296,7 +296,8 @@ object Speech {
                 if (!tmp.renameTo(dest)) throw RuntimeException("Could not save the files.")
                 if (!TinyVoca.ready(app)) throw RuntimeException("The download did not contain the expected files.")
                 guard(app).edit().putBoolean("tiny", false).commit()
-                msg = "Done."
+                msg = "Done. The first start loads about 25 MB more from the internet."
+                TinyVoca.warm(app)
             } catch (e: Throwable) {
                 msg = if (e.message == "Cancelled") "Cancelled." else "Failed: " + (e.message ?: e.toString()).take(160)
             } finally {
@@ -310,7 +311,7 @@ object Speech {
 
     fun remove(ctx: Context, kind: String, id: String) {
         when (kind) {
-            "tiny" -> { TinyVoca.release(); TinyVoca.dir(ctx).deleteRecursively() }
+            "tiny" -> { TinyVoca.release(); TinyVoca.dir(ctx).deleteRecursively(); TinyVoca.deleteWebCache(ctx) }
             "kws" -> modelDir(ctx, "kws").deleteRecursively()
             "asr" -> modelDir(ctx, "asr").deleteRecursively()
             "pocket" -> { synchronized(this) { releasePocket() }; modelDir(ctx, "pocket").deleteRecursively() }

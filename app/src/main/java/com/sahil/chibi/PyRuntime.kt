@@ -40,13 +40,6 @@ object PyRuntime {
     fun unpack(ctx: Context, tar: String, dest: String): String =
         py(ctx).getModule("nana_models").callAttr("unpack", tar, dest).toString()
 
-    /** tiny-voca phonemizer (see nana_tinyvoca.py): start it from real files, then turn text into phoneme ids. */
-    fun tinyLoad(ctx: Context, src: String, data: String): String =
-        py(ctx).getModule("nana_tinyvoca").callAttr("load", src, data).toString()
-
-    fun tinyPlan(ctx: Context, text: String): String =
-        py(ctx).getModule("nana_tinyvoca").callAttr("plan", text).toString()
-
     /** Agent-Reach prints a JSON envelope; keep only what a model needs. */
     private fun compact(out: String): String {
         if (!out.startsWith("{")) return out

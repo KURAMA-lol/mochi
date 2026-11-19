@@ -1,0 +1,132 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>tiny-voca</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js"></script>
+</head><body><script>
+// Hidden page inside Nana. Same method as the tiny-voca web demo (web/public/worker.js of n4ze3m/tiny-voca, Apache-2.0):
+// the dizione phonemizer runs in Pyodide and the model runs in ONNX Runtime Web. Here it runs on the page itself,
+// and the finished WAV goes back to the app through the TV bridge.
+const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
+const ORT = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+const DATA = ["lexicon.tsv", "align.json", "g2p.json", "g2p.npz", "homographs.json"];
+let pyodide, phonemize, session, config;
+const st = (t) => { try { TV.status(t); } catch (e) {} };
+
+async function get(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url + ": " + r.status);
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+async function init() {
+  st("Reading the config");
+  config = await (await fetch("assets/config.json")).json();
+  st("Starting Python (first start loads files from the internet)");
+  pyodide = await loadPyodide({ indexURL: PYODIDE });
+  await pyodide.loadPackage("numpy");
+  st("Loading the phonemizer");
+  const [source, ...files] = await Promise.all([get("assets/dizione.zip"), ...DATA.map((n) => get("assets/phonemizer/" + n))]);
+  pyodide.FS.mkdirTree("/dizione-data");
+  DATA.forEach((n, i) => pyodide.FS.writeFile("/dizione-data/" + n, files[i]));
+  pyodide.unpackArchive(source.buffer, "zip", { extractDir: "/dizione-src" });
+  pyodide.runPython(`
+import json, os, sys
+os.environ["DIZIONE_DATA"] = "/dizione-data"
+sys.path.insert(0, "/dizione-src")
+import dizione
+
+def phonemize_json(text):
+    try:
+        result = dizione.phonemize(text)
+    except ValueError:
+        if any(word for mark, words in dizione.pieces(text) if not mark for word in words):
+            raise
+        return "null"
+    return json.dumps({"ids": list(result.ids), "stress": list(result.stress), "text": str(result)})
+
+phonemize_json("Warm up.")
+`);
+  phonemize = pyodide.globals.get("phonemize_json");
+  st("Loading the model");
+  ort.env.wasm.wasmPaths = ORT;
+  ort.env.wasm.numThreads = 1;
+  session = await ort.InferenceSession.create(await get("assets/model.onnx"), { executionProviders: ["wasm"] });
+}
+
+const ABBREVIATIONS = /(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|no|inc|ltd|co|e\.g|i\.e|a\.m|p\.m)|\b[A-Z])\.$/i;
+function sentences(text) {
+  const parts = [];
+  let current = "";
+  for (const piece of text.replace(/\s+/g, " ").trim().split(/(?<=[.!?…]["')\]]?)\s+(?=["'(\[]?[A-Z0-9])/)) {
+    current = current ? current + " " + piece : piece;
+    if (!ABBREVIATIONS.test(current)) { parts.push(current); current = ""; }
+  }
+  if (current) parts.push(current);
+  return parts.filter((p) => /[\p{L}\p{N}]/u.test(p));
+}
+function finished(text) {
+  const body = text.replace(/\s+$/, "");
+  if (!body) return text;
+  const last = body.split(/\s+/).pop();
+  const marked = /[\p{L}\p{N}]/u.test(last) ? /[.!?…,;:]["'”’)\]»]*$/.test(last) : /[.!?…]/.test(last) || /^[,;:]$/.test(last);
+  return marked ? text : body + ".";
+}
+const LIMIT = 220;
+function fit(sentence) {
+  const result = JSON.parse(phonemize(sentence));
+  if (!result) return [];
+  if (result.ids.length <= LIMIT) return [result];
+  const pieces = sentence.split(/(?<=[,;:—])\s+/);
+  if (pieces.length > 1) return pieces.flatMap(fit);
+  const words = sentence.split(" ");
+  if (words.length < 2) return [];
+  const half = Math.ceil(words.length / 2);
+  return [...fit(words.slice(0, half).join(" ")), ...fit(words.slice(half).join(" "))];
+}
+async function synthesize(p, voice, speed, shift, range) {
+  const n = p.ids.length;
+  const ints = (v) => new ort.Tensor("int64", BigInt64Array.from(v.map(BigInt)), [1, n]);
+  const one = (v) => new ort.Tensor("float32", Float32Array.from([v]), [1]);
+  const out = await session.run({
+    tokens: ints(p.ids), stress: ints(p.stress),
+    voice: new ort.Tensor("int64", BigInt64Array.from([BigInt(voice)]), [1]),
+    speed: one(speed), pitch_shift: one(shift), pitch_range: one(range),
+  });
+  return out.audio.data;
+}
+const PEAK = 0.99;
+function limitPeak(a) {
+  let m = 0;
+  for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i]));
+  if (m > PEAK) for (let i = 0; i < a.length; i++) a[i] *= PEAK / m;
+}
+function wavB64(a, rate) {
+  const n = a.length, buf = new Uint8Array(44 + n * 2), v = new DataView(buf.buffer);
+  const tag = (o, s) => { for (let i = 0; i < 4; i++) buf[o + i] = s.charCodeAt(i); };
+  tag(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); tag(8, "WAVE"); tag(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  tag(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, a[i])) * 32767, true);
+  let s = "";
+  for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+const ready = init().then(() => TV.ready(), (e) => { TV.initFail(String(e && e.message || e)); throw e; });
+ready.catch(() => {});
+
+async function tvSpeak(id, text, voice, speed, shift, range) {
+  try {
+    await ready;
+    const chunks = [];
+    for (const s of sentences(finished(text))) for (const p of fit(s)) chunks.push(await synthesize(p, voice, speed, shift, range));
+    if (!chunks.length) { TV.done(id, ""); return; }
+    const all = new Float32Array(chunks.reduce((a, c) => a + c.length, 0));
+    let o = 0;
+    for (const c of chunks) { all.set(c, o); o += c.length; }
+    limitPeak(all);
+    TV.done(id, wavB64(all, config.sample_rate));
+  } catch (e) { TV.fail(id, String(e && e.message || e)); }
+}
+</script></body></html>
