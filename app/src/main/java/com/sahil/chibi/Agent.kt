@@ -32,6 +32,17 @@ object Agent {
         if (ev.isEmpty()) return
         prefs(c).edit().putString("last_task", "REQUEST: " + req.take(300) + "\nDONE SO FAR:\n" + ev.takeLast(8).joinToString("\n").take(1400)).apply()
     }
+    /** Words that mean the message may need a tool or a lookup, so it must not take the quick chat path. */
+    private val NEEDS = Regex("""\b(weather|mausam|news|khabar|price|rate|score|latest|time|date|baje|remind\w*|alarm|timer|call|dial|whatsapp|telegram|battery|volume|brightness|wifi|wi-fi|bluetooth|torch|flashlight|screenshot|screen|notification\w*|note|notes|remember|forget|yaad|schedule|team|employee|google|youtube|video|calendar|location|map\w*|navigate|translate|skill\w*|memory|connect\w*|tasker|reach)\b""", RegexOption.IGNORE_CASE)
+
+    /** Small talk: short, no link, no action or tool word. These get a quick one-call reply with a lean prompt. */
+    private fun casual(t: String): Boolean {
+        val s = t.trim()
+        if (s.isEmpty() || s.length > 140 || s.split(Regex("\\s+")).size > 20) return false
+        if (s.contains("http", true) || s.contains("www.", true) || s.contains('@')) return false
+        return !(ACTION_WORDS.containsMatchIn(s) || RESUME.containsMatchIn(s) || NEEDS.containsMatchIn(s))
+    }
+
     private val RESUME = Regex("^\\s*(continue|resume|carry on|keep going|jaari rakho|aage badho|phir se|dobara|retry|try again|wahi|wohi|same thing|jo kar rahi thi|complete it|finish it|pura karo|ruk gayi kyu)\\b", RegexOption.IGNORE_CASE)
     fun save(c: Context, on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { prefs(c).edit().putBoolean("on", on).putBoolean("act", act).putBoolean("kb", kb).putBoolean("ask", ask).apply() }
     fun cfgJson(c: Context): String = JSONObject().put("on", enabled(c)).put("act", actions(c)).put("kb", kbAside(c)).put("ask", ask(c)).put("wake", wake(c)).toString()
@@ -204,6 +215,18 @@ How to work:
         ensureRegistered()
         val base = Persona.system(conf) + Memory.block(ctx, conf.persona.userName, history.lastOrNull { it.role == "user" }?.content ?: "")
         if (!enabled(ctx)) return chatRetry(conf, base, history, voice)
+        // Quick path: plain chat does not need the big tool manual, skills list or a tool loop. That prompt is what makes slow
+        // providers crawl. If the model finds it does need a tool, it says NEEDTOOLS and the full agent below takes over.
+        val req0 = history.lastOrNull { it.role == "user" }?.content ?: ""
+        if (!active && casual(req0)) {
+            val mine = gen
+            ev("think")
+            val lean = base + "\n\nQUICK CHAT: answer in character, short and natural, in one go. Only if the message really needs the phone, the web, a lookup, a reminder or any tool, reply with exactly NEEDTOOLS and nothing else."
+            val quick = history.takeLast(10).dropWhile { it.role != "user" }
+            val r = chatRetry(conf, lean, quick, voice)
+            if (gen != mine) throw Interrupted()
+            if (!r.text.trim().startsWith("NEEDTOOLS", ignoreCase = true)) return r
+        }
         val acc = NanaAccess.inst != null
         val live = "\n\nLIVE STATUS (trust this): tools ON; phone/browser actions " + (if (actions(ctx)) "ON" else "OFF (user switched it off in settings)") + "; screen control (accessibility) " + (if (acc) "ON" else "OFF (screen_* tools and tapping will not work)") + ". If a needed switch is OFF, say so plainly and tell the user which one to turn on. Never claim you did something unless a tool result in this conversation shows it."
         val system = base + live + "\n\n" + DOC + Skills.block(ctx) + Connect.block(ctx)
