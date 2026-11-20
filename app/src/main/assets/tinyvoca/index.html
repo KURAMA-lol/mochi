@@ -21,6 +21,13 @@ async function get(url) {
 async function init() {
   st("Reading the config");
   config = await (await fetch("assets/config.json")).json();
+  // the model loads at the same time as Python, not after it
+  const modelReady = (async () => {
+    ort.env.wasm.wasmPaths = ORT;
+    ort.env.wasm.numThreads = 1;
+    return ort.InferenceSession.create(await get("assets/model.onnx"), { executionProviders: ["wasm"] });
+  })();
+  modelReady.catch(() => {});
   st("Starting Python (first start loads files from the internet)");
   pyodide = await loadPyodide({ indexURL: PYODIDE });
   await pyodide.loadPackage("numpy");
@@ -48,9 +55,9 @@ phonemize_json("Warm up.")
 `);
   phonemize = pyodide.globals.get("phonemize_json");
   st("Loading the model");
-  ort.env.wasm.wasmPaths = ORT;
-  ort.env.wasm.numThreads = 1;
-  session = await ort.InferenceSession.create(await get("assets/model.onnx"), { executionProviders: ["wasm"] });
+  session = await modelReady;
+  st("Warming up");
+  for (const p of fit("Hi there.")) await synthesize(p, 0, 1, 0, 1);
 }
 
 const ABBREVIATIONS = /(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|no|inc|ltd|co|e\.g|i\.e|a\.m|p\.m)|\b[A-Z])\.$/i;

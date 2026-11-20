@@ -22,6 +22,8 @@ object Voice {
     fun save(ctx: Context, json: String) {
         JSONObject(json)
         ctx.getSharedPreferences("voice_cfg", Context.MODE_PRIVATE).edit().putString("json", json).apply()
+        // picking tiny-voca starts its hidden page right away
+        try { if (engine(ctx) == "tiny") TinyVoca.warm(ctx) } catch (e: Throwable) {}
     }
 
     fun cfg(ctx: Context): JSONObject = try { JSONObject(raw(ctx)) } catch (e: Exception) { JSONObject() }

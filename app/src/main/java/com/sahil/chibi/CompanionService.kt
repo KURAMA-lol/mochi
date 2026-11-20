@@ -211,6 +211,8 @@ class CompanionService : Service() {
         AgentBrowser.onUse = { main.post { showBrowserFloat() } }
         Agent.approver = { what -> requestApproval(what) }
         Agent.onEvent = { k, t -> main.post { (typing as? Timeline)?.onEvent(k, t) } }
+        // tiny-voca runs in a hidden page that needs a few seconds to start: start it now, not at the first sentence
+        try { if (Voice.engine(this) == "tiny") TinyVoca.warm(this) } catch (e: Throwable) {}
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
