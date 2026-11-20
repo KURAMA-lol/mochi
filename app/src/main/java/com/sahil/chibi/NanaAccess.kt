@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
@@ -29,6 +30,30 @@ class NanaAccess : AccessibilityService() {
     override fun onDestroy() { inst = null; super.onDestroy() }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
+
+    // Hold Volume Up + Volume Down together for half a second: opens the Nana chat ("Ask Nana"). Keys still work normally.
+    private var upHeld = false
+    private var downHeld = false
+    private val keyHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val chord = Runnable {
+        if (upHeld && downHeld) {
+            try { CompanionService.send(this, CompanionService.ACT_SUMMON) } catch (e: Exception) {}
+        }
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        val up = event.keyCode == KeyEvent.KEYCODE_VOLUME_UP
+        val dn = event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+        if (!up && !dn) return false
+        if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
+        val before = upHeld && downHeld
+        val down = event.action == KeyEvent.ACTION_DOWN
+        if (up) upHeld = down else downHeld = down
+        val now = upHeld && downHeld
+        if (!before && now) keyHandler.postDelayed(chord, 500)
+        if (before && !now) keyHandler.removeCallbacks(chord)
+        return false
+    }
 
     /** The app on screen, never Nana's own windows (chat panel, bubble, floating character, floating browser). */
     private fun targetRoot(): AccessibilityNodeInfo? {
