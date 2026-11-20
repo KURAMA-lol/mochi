@@ -37,9 +37,19 @@ class AttachActivity : Activity() {
                 "file" -> startActivityForResult(
                     Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
                         .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), 2)
-                else -> startActivityForResult(
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
-                        .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), 1)
+                else -> {
+                    // Android 13+: the system photo picker opens much faster than the document browser
+                    var ok = false
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        try {
+                            startActivityForResult(Intent("android.provider.action.PICK_IMAGES").putExtra("android.provider.extra.PICK_IMAGES_MAX", 6), 1)
+                            ok = true
+                        } catch (e: Exception) {}
+                    }
+                    if (!ok) startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+                            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), 1)
+                }
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Could not open that: " + (e.message ?: "no app found"), Toast.LENGTH_LONG).show()
@@ -70,7 +80,7 @@ class AttachActivity : Activity() {
                             if (bm != null) {
                                 val f = File(Attach.dir(this), System.currentTimeMillis().toString() + "_photo.jpg")
                                 f.outputStream().use { bm.compress(Bitmap.CompressFormat.JPEG, 92, it) }
-                                out.add(Att(f, "photo.jpg", "image/jpeg", f.length()).also { it.thumb = Attach.thumb(f) })
+                                out.add(Att(f, "photo.jpg", "image/jpeg", f.length()))
                             }
                         }
                     } else {

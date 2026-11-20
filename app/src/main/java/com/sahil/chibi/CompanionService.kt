@@ -253,13 +253,17 @@ class CompanionService : Service() {
             ACT_ATTACH -> {
                 ensureChibi(); if (hidden) showChibi()
                 if (!panelOpen) openPanel()
-                val atts = Attach.fromIntent(this, intent!!)
-                if (intent.getBooleanExtra("send", false) && atts.isNotEmpty()) {
-                    sendUserText(intent.getStringExtra("caption") ?: "", false, atts)
-                } else {
-                    pending.addAll(atts); refreshPending()
-                    input?.requestFocus()
-                }
+                val ai = intent!!
+                val doSendNow = ai.getBooleanExtra("send", false)
+                val cap = ai.getStringExtra("caption") ?: ""
+                Thread {
+                    val atts = Attach.fromIntent(this, ai)
+                    Attach.loadThumbs(atts)
+                    main.post {
+                        if (doSendNow && atts.isNotEmpty()) sendUserText(cap, false, atts)
+                        else { pending.addAll(atts); refreshPending(); input?.requestFocus() }
+                    }
+                }.start()
             }
             ACT_SAY -> {
                 ensureChibi(); if (hidden) showChibi()
@@ -1552,10 +1556,16 @@ class CompanionService : Service() {
         while (history.size > 60) history.removeAt(0)
         val conf = ConfigStore.load(this)
         cfg = conf
-        val snapshot = Compactor.build(this, conf, history.toList())
+        var snapshot = Compactor.build(this, conf, history.toList())
+        // a follow-up question about an earlier picture or file keeps its subject
+        val fu = Attach.followUp(history)
+        if (fu != null && snapshot.isNotEmpty() && snapshot.last().role == "user") {
+            snapshot = snapshot.dropLast(1) + Msg("user", snapshot.last().content + "\n\n" + fu)
+        }
+        val snap = snapshot
         Thread {
             try {
-                val res = Agent.run(this, conf, snapshot, voice) { _ -> }
+                val res = Agent.run(this, conf, snap, voice) { _ -> }
                 main.post { if (typing === myTyping) onReply(res, voice) }
             } catch (e: Agent.Interrupted) {
             } catch (e: Exception) {

@@ -72,9 +72,7 @@ object Attach {
                 }
             }
         } catch (e: Exception) { f.delete(); return null }
-        val a = Att(f, name, mime, f.length())
-        if (a.isImage) a.thumb = thumb(f)
-        return a
+        return Att(f, name, mime, f.length())
     }
 
     /** Decodes with a size limit and applies the EXIF rotation (camera photos). */
@@ -125,9 +123,7 @@ object Attach {
         for (k in p.indices) {
             val f = File(p[k])
             if (!f.exists() || !f.canonicalPath.startsWith(root)) continue
-            val a = Att(f, n?.getOrNull(k) ?: f.name, m?.getOrNull(k) ?: guessMime(f.name), f.length())
-            if (a.isImage) a.thumb = thumb(f)
-            out.add(a)
+            out.add(Att(f, n?.getOrNull(k) ?: f.name, m?.getOrNull(k) ?: guessMime(f.name), f.length()))
         }
         return out
     }
@@ -150,7 +146,7 @@ object Attach {
     fun augment(ctx: Context, caption: String, atts: List<Att>): String {
         val sb = StringBuilder(caption.trim())
         sb.append(MARK).append(' ').append(atts.size).append(if (atts.size == 1) " item" else " items")
-            .append(" - what the user sent with the message; answer naturally and do not mention these markers⟧")
+            .append(" - what the user sent with the message. They will probably ask follow-up questions about it, so remember it. Answer naturally and do not mention these markers⟧")
         for (a in atts) {
             sb.append("\n\n")
             when {
@@ -166,6 +162,26 @@ object Attach {
             }
         }
         return sb.toString()
+    }
+
+    /** Background-thread work: small square previews for the chip and the bubble. */
+    fun loadThumbs(atts: List<Att>) { for (a in atts) if (a.isImage && a.thumb == null) a.thumb = thumb(a.file) }
+
+    /**
+     * When the newest user message has no attachment but one was sent a few messages ago, returns what it contained,
+     * so a follow-up such as "what does it say?" still has its subject.
+     */
+    fun followUp(history: List<Msg>): String? {
+        if (history.isEmpty() || history.last().content.contains(MARK)) return null
+        val from = maxOf(0, history.size - 14)
+        for (k in history.size - 2 downTo from) {
+            val m = history[k]
+            if (m.role == "user" && m.content.contains(MARK)) {
+                return "(Context for you: the user's new message follows the attachment they sent earlier in this chat. When they say it, this, that, the picture, the file, they mean it. What it contained:\n" +
+                    m.content.substringAfter(MARK).take(4000) + ")"
+            }
+        }
+        return null
     }
 
     /** What the bubble shows for a stored message (the model-only part is hidden). */
