@@ -1141,7 +1141,7 @@ class CompanionService : Service() {
 
     private fun pickAttach(mode: String) {
         try {
-            startActivity(Intent(this, AttachActivity::class.java).putExtra("mode", mode).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            startActivity(Intent(this, when (mode) { "camera" -> CameraActivity::class.java; "gallery" -> GalleryActivity::class.java; else -> AttachActivity::class.java }).putExtra("mode", mode).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             closePanel()
         } catch (ex: Exception) {
             addMsg("Could not open the picker: " + (ex.message ?: ""), false, null)
