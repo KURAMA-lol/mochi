@@ -308,6 +308,17 @@ class MainActivity : Activity() {
         @JavascriptInterface fun speechInstall(kind: String, id: String) { Speech.install(this@MainActivity, kind, id) }
         @JavascriptInterface fun speechRemove(kind: String, id: String) { Speech.remove(this@MainActivity, kind, id); earsApply() }
         @JavascriptInterface fun speechCancel() { Speech.cancel() }
+        @JavascriptInterface fun mirageTest() {
+            Thread {
+                try {
+                    Thread.sleep(4000)
+                    val r = Mirage.lookScreen(this@MainActivity)
+                    js("window.onMirageTest && onMirageTest(" + !r.startsWith("Could not") + ", " + JSONObject.quote(r.take(1200)) + ")")
+                } catch (e: Throwable) {
+                    js("window.onMirageTest && onMirageTest(false, " + JSONObject.quote(e.message ?: e.toString()) + ")")
+                }
+            }.start()
+        }
         @JavascriptInterface fun earsApply() { if (CompanionService.running) CompanionService.send(this@MainActivity, CompanionService.ACT_WAKE) }
         @JavascriptInterface fun openAppSettings() {
             runOnUiThread { try { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + packageName))) } catch (e: Exception) {} }

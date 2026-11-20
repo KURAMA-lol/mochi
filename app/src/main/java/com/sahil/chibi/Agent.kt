@@ -33,7 +33,7 @@ object Agent {
         prefs(c).edit().putString("last_task", "REQUEST: " + req.take(300) + "\nDONE SO FAR:\n" + ev.takeLast(8).joinToString("\n").take(1400)).apply()
     }
     /** Words that mean the message may need a tool or a lookup, so it must not take the quick chat path. */
-    private val NEEDS = Regex("""\b(weather|mausam|news|khabar|price|rate|score|latest|time|date|baje|remind\w*|alarm|timer|call|dial|whatsapp|telegram|battery|volume|brightness|wifi|wi-fi|bluetooth|torch|flashlight|screenshot|screen|notification\w*|note|notes|remember|forget|yaad|schedule|team|employee|google|youtube|video|calendar|location|map\w*|navigate|translate|skill\w*|memory|connect\w*|tasker|reach)\b""", RegexOption.IGNORE_CASE)
+    private val NEEDS = Regex("""\b(weather|mausam|news|khabar|price|rate|score|latest|time|date|baje|remind\w*|alarm|timer|call|dial|whatsapp|telegram|battery|volume|brightness|wifi|wi-fi|bluetooth|torch|flashlight|screenshot|screen|notification\w*|note|notes|remember|forget|yaad|schedule|team|employee|google|youtube|video|calendar|location|map\w*|navigate|translate|skill\w*|memory|connect\w*|tasker|reach|dekh\w*|photo|picture|image|pic|dikha\w*)\b""", RegexOption.IGNORE_CASE)
 
     /** Small talk: short, no link, no action or tool word. These get a quick one-call reply with a lean prompt. */
     private fun casual(t: String): Boolean {
@@ -136,7 +136,7 @@ object Agent {
     private val UI_TOOLS = setOf("launch_app", "open_url", "browser_open", "browser_click_text", "browser_select", "browser_type", "browser_click", "browser_scroll", "browser_back", "browser_scroll_to", "browser_click_xy")
     private const val MAX_BATCH = 6
     private val SCREEN_ACTIONS = setOf("launch_app", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press")
-    private val NO_REPEAT_GUARD = setOf("screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "device_status", "read_notifications", "list_reminders", "remember", "forget")
+    private val NO_REPEAT_GUARD = setOf("look_screen", "screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "device_status", "read_notifications", "list_reminders", "remember", "forget")
 
     private val ACTION_WORDS = Regex("""\b(open|go to|goto|click|tap|press|check|read|look|show|reply|type|search|scroll|play|send|launch|start|close|swipe|select|find|visit|kholo|khol|jao|dabao|likho|bhejo|chalu|install|download|sign ?up|log ?in)\b""", RegexOption.IGNORE_CASE)
     private val PROMISE = Regex("""(\bi('ll| will| am going to|'m going to)\b|\blet me\b|\bon it\b|\bone moment\b|kar raha|kar rahi|karta hu|karti hu|karunga|karungi|dekhta hu|dekhti hu|\bruko\b|ek minute|abhi karta|abhi karti)""", RegexOption.IGNORE_CASE)
@@ -177,6 +177,7 @@ Tools:
 - browser_show {} : just shows the browser to the user. Use it when they ask you to open or show your browser, or when THEY must log in, solve a captcha or type a password; then wait and read again.
 - launch_app {"name":"YouTube"} : open an app on the phone. open_url {"url":"..."} : open a link in the user's own apps.
 - screen_read {} : numbered elements of whatever is on the phone screen right now (needs screen control enabled).
+- look_screen {} : take a screenshot and describe it with the on-phone vision model (scene, objects, text in pictures). Use it when the user asks what is on the screen visually, or when screen_read finds no text (pictures, videos, games). Only when asked. look_image {"url":"https://..."} : describe a picture from a link.
 - screen_tap_text {"text":"Jabed"} : taps the first thing on screen whose label contains that text (easiest way to tap).
 - screen_tap_xy {"x":540,"y":2300} : tap exact pixel coordinates (screen size is in the screen_read header; elements show @x,y centers). Works anywhere, including corners and edges. screen_long_press {"text":"..."|"id":n}.
 - screen_swipe {"direction":"up|down|left|right","edge":true|false} or {"x1":..,"y1":..,"x2":..,"y2":..} : drag a finger. edge:true starts at the screen edge (open drawers, pull the notification shade). screen_scroll_to {"text":"..."} : scrolls down until that text shows. screen_wait {"text":"...","seconds":5} : wait for text to appear. screen_press {"key":"back|home|recents|notifications|quick_settings"}.
@@ -570,6 +571,12 @@ How to work:
         reg("browser_back", "Go back in the browser.") { c, _ -> AgentBrowser.back(c) }
         reg("browser_scroll_to", "Scroll the browser until the text shows.", listOf(p("text", "string", true))) { c, a -> AgentBrowser.scrollTo(c, a.optString("text")) }
         reg("browser_click_xy", "Tap page pixel coordinates in the browser.", listOf(p("x", "int", true), p("y", "int", true))) { c, a -> AgentBrowser.clickXY(c, a.optInt("x", -1), a.optInt("y", -1)) }
+        reg("look_screen", "Take a screenshot and describe it with the on-phone vision model Mirage: scene, objects with boxes, text (OCR) and relations. Only when the user asks you to look at the screen or what is in an image or video on it. Needs screen control (Accessibility) on.", emptyList(), readOnly = true) { c, _ ->
+            try { Mirage.lookScreen(c) } catch (e: Throwable) { "Error: vision failed: " + (e.message ?: e.toString()).take(200) }
+        }
+        reg("look_image", "Describe a picture from a web link with the on-phone vision model Mirage: scene, objects, text. look_image{url}. Only when the user asked about that image.", listOf(p("url", "string", true)), readOnly = true) { c, a ->
+            try { Mirage.lookUrl(c, a.optString("url")) } catch (e: Throwable) { "Error: vision failed: " + (e.message ?: e.toString()).take(200) }
+        }
         reg("screen_read", "Numbered elements of the phone screen now.", readOnly = true) { _, _ -> acc { it.read() } }
         reg("screen_tap_text", "Tap the first element whose label contains the text.", listOf(p("text", "string", true))) { _, a -> acc { it.tapText(a.optString("text")) } }
         reg("screen_tap", "Tap an element by number.", listOf(p("id", "int", true))) { _, a -> acc { it.tap(a.optInt("id", -1)) } }

@@ -3,6 +3,7 @@ package com.sahil.chibi
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
@@ -11,6 +12,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** Lets Nana read and operate the screen (only when the user turns this service on in Accessibility settings). */
@@ -46,6 +48,30 @@ class NanaAccess : AccessibilityService() {
     }
 
     fun foregroundPkg(): String? = targetRoot()?.packageName?.toString()
+
+    /** Screenshot of the whole display (Android 11+). Null when it is not allowed or the app blocks screenshots. */
+    fun screenshot(): Bitmap? {
+        if (Build.VERSION.SDK_INT < 30) return null
+        var out: Bitmap? = null
+        val latch = CountDownLatch(1)
+        val ex = Executors.newSingleThreadExecutor()
+        try {
+            takeScreenshot(android.view.Display.DEFAULT_DISPLAY, ex, object : TakeScreenshotCallback {
+                override fun onSuccess(r: ScreenshotResult) {
+                    try {
+                        val hb = r.hardwareBuffer
+                        out = Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                        hb.close()
+                    } catch (e: Throwable) {}
+                    latch.countDown()
+                }
+                override fun onFailure(errorCode: Int) { latch.countDown() }
+            })
+            latch.await(6, TimeUnit.SECONDS)
+        } catch (e: Throwable) {
+        } finally { ex.shutdown() }
+        return out
+    }
 
     /** Top edge of the on-screen keyboard, or null when it is hidden. */
     fun imeTop(): Int? {

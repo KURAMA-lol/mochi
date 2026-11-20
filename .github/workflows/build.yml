@@ -79,6 +79,26 @@ jobs:
           curl -fsSL -o app/src/main/assets/nana/LICENSE-tiny-voca.txt https://huggingface.co/n4ze3m/tiny-voca/resolve/1e73262226dbf4ef02e9df277e81aaa1db5ce16c/LICENSE
           ls -la app/src/main/assets/tinyvoca
 
+      - name: Build the vision bridge (Cactus engine, Apache-2.0, not stored in this repo)
+        run: |
+          set -e
+          R=f4ab2741203a282c6e7b89983de2b5e5b2e805a8
+          B=https://huggingface.co/Cactus-Compute/cactus/resolve/$R/releases/4.1.4
+          mkdir -p /tmp/cactus
+          curl -fsSL -o /tmp/cactus/libcactus.a $B/android-arm64/libcactus.a
+          curl -fsSL -o /tmp/cactus/cactus.h $B/android-arm64/cactus.h
+          curl -fsSL -o app/src/main/assets/nana/LICENSE-cactus.txt $B/LICENSE
+          sha256sum /tmp/cactus/libcactus.a /tmp/cactus/cactus.h
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          echo "NDK: $NDK"
+          CXX="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          "$CXX" -shared -fPIC -O2 -std=c++17 -I/tmp/cactus -o app/src/main/jniLibs/arm64-v8a/libmirage_jni.so \
+            app/src/main/cpp/mirage_jni.cpp /tmp/cactus/libcactus.a -static-libstdc++ -llog \
+            -Wl,-z,max-page-size=16384 -Wl,--no-undefined
+          ls -la app/src/main/jniLibs/arm64-v8a
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D --defined-only app/src/main/jniLibs/arm64-v8a/libmirage_jni.so | grep Java_
+
       - name: Stamp build id (the in-app updater compares this)
         run: |
           mkdir -p app/src/main/assets

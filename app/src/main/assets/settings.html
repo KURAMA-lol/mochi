@@ -585,6 +585,16 @@ button.b:disabled{opacity:.45}
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:8px"></div>
   </div>
   <div class="card">
+    <label style="margin-top:0">Vision <span class="mut">(Mirage, runs on your phone)</span></label>
+    <div class="dl-top"><span class="mut">Mirage vision model (about 22 MB)</span><span id="mgTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
+    <div class="dl-msg" id="mgStat" style="margin-top:4px">...</div>
+    <div class="pbar" id="mgBar" style="display:none"><i id="mgBarI"></i></div>
+    <div class="btns"><button class="b" id="mgGet" onclick="eGet('mirage')">Download</button><button class="b ghost" id="mgCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="mgDel" style="display:none" onclick="eDel('mirage')">Delete</button></div>
+    <div class="btns" style="margin-top:10px"><button class="b ghost" onclick="mgTest()">Test: look at my screen (in 4 seconds)</button></div>
+    <div id="mgOut" style="color:var(--mut);font-size:13px;margin-top:8px;white-space:pre-wrap"></div>
+    <p class="mu">Lets Nana look at your screen or at a picture link when you ask her to: scene, objects, text in pictures. Mirage by Cactus Compute, fully on the phone. She never looks on her own. The result goes to your AI provider like any other tool result. Needs Nana's Accessibility service for screenshots. After an update, switch that service off and on once. Text reading is Latin script only.</p>
+  </div>
+  <div class="card">
     <label style="margin-top:0">Voice call <span class="mut">(like ChatGPT voice: stays on until you hang up, even in other apps)</span></label>
     <div class="dl-msg" id="callStat">Not on a call</div>
     <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
@@ -630,6 +640,7 @@ button.b:disabled{opacity:.45}
     sRow(s,'as','asr',s.asr,'asr','Not downloaded yet',cur,'asStat');
     sRow(s,'pk','pocket',s.pocket,'pocket','Not downloaded yet',cur,'pkStat');
     sRow(s,'ty','tiny',s.tiny,'tiny','Not downloaded yet',cur,'tyStat');
+    sRow(s,'mg','mirage',s.mirage,'mirage','Not downloaded yet',cur,'mgStat');
     if(s.tiny&&s.tinyMsg&&!(s.busy&&s.busyKind=='tiny'))vg('tyStat').textContent='Downloaded. '+s.tinyMsg;
     if(s.busy){if(!sTimer)sTimer=setInterval(sTick,500);}
     else if(sTimer){clearInterval(sTimer);sTimer=null;pFill();pkFill();gsAll();try{Android.earsApply()}catch(x){}}
@@ -694,6 +705,8 @@ button.b:disabled{opacity:.45}
     VC.ears={wake:'local',asr:'local',sens:vg('wkSens').value,screenOff:vg('wkScr').checked,barge:vg('wkBarge').checked,accurate:vg('wkAcc').checked};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
   function vTest(){vSave();vg('vStat').textContent='Making the voice...';Android.testVoice('Hi! This is my voice. How do I sound?');}
+  function mgTest(){vg('mgOut').textContent='Switch to the screen you want me to look at. Looking in 4 seconds...';try{Android.mirageTest();}catch(x){}}
+  window.onMirageTest=function(ok,t){vg('mgOut').textContent=(ok?'':'Problem: ')+t;};
   window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works!':'Error: '+m;};
   var callOn=false;
   function callToggle(){try{if(callOn)Android.callStop();else{vSave();Android.callStart();}}catch(x){}setTimeout(callPoll,600);}

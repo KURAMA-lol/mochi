@@ -96,6 +96,7 @@ object Speech {
         "asr" -> File(modelDir(ctx, "asr"), "tokens.txt").exists() && File(modelDir(ctx, "asr"), "encoder.onnx").exists()
         "pocket" -> POCKET_FILES.all { File(modelDir(ctx, "pocket"), it).exists() }
         "tiny" -> TinyVoca.ready(ctx)
+        "mirage" -> Mirage.ready(ctx)
         else -> false
     }
 
@@ -190,9 +191,9 @@ object Speech {
         for (v in VOICES) if (voiceReady(ctx, v.id)) installed.put(v.id)
         val g = guard(ctx)
         val dis = JSONArray()
-        for (k in listOf("tts", "kws", "asr", "pocket", "tiny")) if (g.getBoolean(k, false)) dis.put(k)
+        for (k in listOf("tts", "kws", "asr", "pocket", "tiny", "mirage")) if (g.getBoolean(k, false)) dis.put(k)
         return JSONObject().put("busy", busy.isNotEmpty()).put("busyKind", busy).put("busyId", busyId).put("lastKind", lastKind).put("lastId", lastId).put("msg", msg).put("pct", pct)
-            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("tiny", ready(ctx, "tiny")).put("tinyMsg", TinyVoca.stateMsg()).put("voices", installed).put("disabled", dis)
+            .put("kws", ready(ctx, "kws")).put("asr", ready(ctx, "asr")).put("pocket", ready(ctx, "pocket")).put("mirage", ready(ctx, "mirage")).put("tiny", ready(ctx, "tiny")).put("tinyMsg", TinyVoca.stateMsg()).put("voices", installed).put("disabled", dis)
     }
 
     fun cancel() { cancelFlag = true }
@@ -233,6 +234,7 @@ object Speech {
         if (busy.isNotEmpty()) return
         val app = ctx.applicationContext
         if (kind == "tiny") { installTiny(app); return }
+        if (kind == "mirage") { installMirage(app); return }
         val url: String
         val dest: File
         val label: String
@@ -309,8 +311,39 @@ object Speech {
         }.start()
     }
 
+    /** Mirage vision model: one file (about 22 MB) from Hugging Face at a fixed revision, checked against its SHA-256. */
+    private fun installMirage(app: Context) {
+        if (Mirage.ready(app)) { lastKind = "mirage"; lastId = ""; msg = "Already downloaded."; return }
+        cancelFlag = false
+        busy = "mirage"; busyId = ""; lastKind = "mirage"; lastId = ""; msg = "Starting..."; pct = 0
+        Thread {
+            val dest = Mirage.file(app)
+            val tmp = File(dest.path + ".part")
+            try {
+                dest.parentFile?.mkdirs()
+                tmp.delete()
+                download(Mirage.URL_MODEL, tmp, "mirage.cact")
+                msg = "Checking the file..."; pct = -1
+                if (Mirage.sha256(tmp) != Mirage.SHA256) throw RuntimeException("The file did not match its checksum. Try again.")
+                synchronized(this) { Mirage.release() }
+                dest.delete()
+                if (!tmp.renameTo(dest)) throw RuntimeException("Could not save the file.")
+                guard(app).edit().putBoolean("mirage", false).commit()
+                msg = "Done."
+            } catch (e: Throwable) {
+                msg = if (e.message == "Cancelled") "Cancelled." else "Failed: " + (e.message ?: e.toString()).take(160)
+            } finally {
+                tmp.delete()
+                pct = -1
+                busy = ""
+                busyId = ""
+            }
+        }.start()
+    }
+
     fun remove(ctx: Context, kind: String, id: String) {
         when (kind) {
+            "mirage" -> { Mirage.release(); Mirage.file(ctx).delete() }
             "tiny" -> { TinyVoca.release(); TinyVoca.dir(ctx).deleteRecursively(); TinyVoca.deleteWebCache(ctx) }
             "kws" -> modelDir(ctx, "kws").deleteRecursively()
             "asr" -> modelDir(ctx, "asr").deleteRecursively()
