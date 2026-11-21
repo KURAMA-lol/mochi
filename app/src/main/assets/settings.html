@@ -441,6 +441,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card mut">
     Nana, your tiny phone companion.<br>
     Characters: LivLiv (livliv.ai), shown with LivLiv Player (Apache-2.0). Personal, non-commercial use.<br>
+    Bloub by Jérémy Perret (MIT).<br>
     Private build: do not share the APK.
   </div>
 </section>
@@ -540,6 +541,10 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
 <!-- BEHAVIOUR -->
 <section id="beh">
+  <div class="card" style="display:flex;align-items:center;gap:12px">
+    <div id="b" style="width:64px;height:64px;flex:none" onclick="Bloub&&Bloub.state(['idle','wink','wide','play','orbit','swirl'][Math.floor(Math.random()*6)])"></div>
+    <div style="font-size:12.5px;color:var(--mut)">Bloub, Nana's little buddy. Tap it. It is only a toy here, it never does anything on your phone.</div>
+  </div>
   <div class="card">
     <label style="margin-top:0">Size: <span id="sizev"></span></label>
     <input type="range" min="80" max="240" id="size" oninput="document.getElementById('sizev').textContent=this.value;Pz('size',+this.value)">
@@ -1335,5 +1340,6 @@ window.addEventListener('load',function(){agLoad();memLoad();logLoad()});
   }catch(e){}
 })();
 </script>
+<script src="bloub/bloub.js"></script>
 </body>
 </html>
