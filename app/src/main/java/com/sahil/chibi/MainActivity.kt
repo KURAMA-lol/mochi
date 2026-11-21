@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private var bNext = 0L; private var bLookOn = false; private var bLookNext = 0L; private var bGaze = 0L; private var bEye = 0L
     private var touching = false; private var lastTouch = 0L
     private var bvx = 0f; private var bvy = 0f; private var bLastT = 0L; private var bHop = 0L; private var bAng = 0.0; private var bWasTouch = false; private var bPoke = 0L
+    private var bAway = false; private var bAwayX = 0f; private var bAwayY = 0f; private var bAwayNext = 0L
     private val hideBubbleRun = Runnable { bubble.animate().alpha(0f).setDuration(250).start() }
     private val pokeLines = listOf(
         "Hehe, that tickles!", "Yes? I'm listening~", "Don't poke too much!", "Nana is here~",
@@ -278,10 +279,21 @@ class MainActivity : Activity() {
             w.rotation = (bvx / W * 8f).coerceIn(-6f, 6f)
             val bcx = bx + sz / 2; val bcy = by + sz / 2
             val ncx = W / 2; val ncy = Hh - nana.height * 0.7f
-            if (t - bEye > 200 && bReady) {
+            // Bloub's own gaze: mostly at Nana's face, now and then somewhere else
+            if (t > bAwayNext) {
+                if (bAway) { bAway = false; bAwayNext = t + 3500 + (Math.random() * 4000).toLong() }
+                else if (Math.random() < 0.4) {
+                    bAway = true
+                    bAwayX = (Math.random() * W).toFloat(); bAwayY = (Math.random() * Hh).toFloat()
+                    bAwayNext = t + 1100 + (Math.random() * 1400).toLong()
+                } else bAwayNext = t + 2000 + (Math.random() * 2000).toLong()
+            }
+            if (t - bEye > 120 && bReady) {
                 bEye = t
-                val yaw = ((ncx - bcx) / W * 90f).coerceIn(-40f, 40f)
-                val pitch = ((ncy - bcy) / Hh * 60f).coerceIn(-25f, 25f)
+                val gx = if (bAway) bAwayX else ncx
+                val gy = if (bAway) bAwayY else ncy
+                val yaw = ((gx - bcx) / W * 100f).coerceIn(-40f, 40f)
+                val pitch = ((bcy - gy) / Hh * 70f).coerceIn(-25f, 25f)
                 w.evaluateJavascript("Bloub.look(" + "%.1f,%.1f".format(java.util.Locale.US, yaw, pitch) + ")", null)
             }
             if (t > bLookNext) {
