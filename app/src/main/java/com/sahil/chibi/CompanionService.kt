@@ -72,6 +72,7 @@ class CompanionService : Service() {
         const val ACT_SHOW = "chibi.show"
         const val ACT_ASK = "chibi.ask"
         const val ACT_ATTACH = "chibi.attach"
+        const val ACT_BROWSER = "chibi.browser"
         private const val CH = "chibi_channel_v2"
         private const val NID = 1
         @Volatile var running = false
@@ -276,6 +277,7 @@ class CompanionService : Service() {
                 ensureChibi()
                 if (hidden) showChibi() else hideChibi()
             }
+            ACT_BROWSER -> { ensureChibi(); showBrowserFloat() }
             ACT_SUMMON -> {
                 ensureChibi()
                 if (hidden) showChibi()
@@ -425,38 +427,52 @@ class CompanionService : Service() {
         val card = LinearLayout(this)
         card.orientation = LinearLayout.VERTICAL
         card.background = GradientDrawable().apply {
-            setColor(Theme.panelBg); cornerRadius = dp(16).toFloat(); setStroke(dp(2), Theme.ac)
+            setColor(Theme.panelBg); cornerRadius = dp(20).toFloat(); setStroke(dp(2), Theme.ac)
         }
         card.clipToOutline = true
+        card.elevation = dp(8).toFloat()
+        fun chip(t: String): TextView = TextView(this).apply {
+            text = t; setTextColor(0xFFF2F3F5.toInt()); textSize = 15f; gravity = Gravity.CENTER
+            background = GradientDrawable().apply { setColor(0x26FFFFFF); cornerRadius = dp(14).toFloat() }
+            minWidth = dp(30); minHeight = dp(28); setPadding(dp(8), 0, dp(8), 0)
+        }
+        fun pillLp() = LinearLayout.LayoutParams(0, dp(28), 1f).apply { marginStart = dp(6); marginEnd = dp(6) }
         val bar = LinearLayout(this)
         bar.orientation = LinearLayout.HORIZONTAL
         bar.gravity = Gravity.CENTER_VERTICAL
-        bar.setPadding(dp(12), dp(6), dp(6), dp(6))
-        val title = TextView(this)
-        title.text = "Nana's browser"
-        title.setTextColor(Theme.ac)
-        title.textSize = 13f
-        title.typeface = Typeface.DEFAULT_BOLD
-        bar.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        val size = TextView(this)
-        size.text = "\u2922"
-        size.setTextColor(0xFFF2F3F5.toInt())
-        size.textSize = 17f
-        size.setPadding(dp(12), dp(4), dp(12), dp(4))
+        bar.setPadding(dp(10), dp(6), dp(8), dp(4))
+        val dot = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Theme.ac) } }
+        bar.addView(dot, LinearLayout.LayoutParams(dp(8), dp(8)).apply { marginEnd = dp(4) })
+        val back = chip("‹")
+        back.textSize = 18f
+        back.setOnClickListener { if (AgentBrowser.canGoBack()) AgentBrowser.goBackUi() }
+        bar.addView(back)
+        val pill = TextView(this).apply {
+            text = "Nana's browser"; setTextColor(0xFFF2F3F5.toInt()); textSize = 12f; maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), 0, dp(10), 0)
+            background = GradientDrawable().apply { setColor(0x1AFFFFFF); cornerRadius = dp(14).toFloat() }
+        }
+        bar.addView(pill, pillLp())
+        val size = chip("⤢")
         size.setOnClickListener { toggleBfSize() }
         bar.addView(size)
-        val close = TextView(this)
-        close.text = "\u2715"
-        close.setTextColor(0xFFF2F3F5.toInt())
-        close.textSize = 17f
-        close.setPadding(dp(12), dp(4), dp(12), dp(4))
+        val close = chip("✕")
         close.setOnClickListener { hideBrowserFloat() }
-        bar.addView(close)
+        bar.addView(close, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(4) })
         card.addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val prog = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        prog.max = 100
+        prog.progressTintList = android.content.res.ColorStateList.valueOf(Theme.ac)
+        prog.visibility = View.INVISIBLE
+        card.addView(prog, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(2)))
         val holder = FrameLayout(this)
         card.addView(holder, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        val w = (sw * 0.94f).toInt()
-        val h = (sh * 0.36f).toInt()
+        val grip = FrameLayout(this)
+        grip.addView(View(this).apply { background = GradientDrawable().apply { setColor(0x66FFFFFF); cornerRadius = dp(2).toFloat() } }, FrameLayout.LayoutParams(dp(40), dp(4), Gravity.CENTER))
+        card.addView(grip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(16)))
+        val w = minOf((sw * 0.8f).toInt(), dp(330))
+        val h = (sh * 0.30f).toInt().coerceAtLeast(dp(200))
         val l = overlayLp(w, h, bfFlags(false))
         l.x = (sw - w) / 2
         l.y = dp(56)
@@ -472,9 +488,51 @@ class CompanionService : Service() {
             }
             true
         }
+        var gx = 0f; var gy = 0f; var gw = 0; var gh = 0
+        grip.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { gx = e.rawX; gy = e.rawY; gw = l.width; gh = l.height; setBfFocusable(false) }
+                MotionEvent.ACTION_MOVE -> {
+                    l.width = (gw + (e.rawX - gx).toInt()).coerceIn(dp(220), (sw * 0.96f).toInt())
+                    l.height = (gh + (e.rawY - gy).toInt()).coerceIn(dp(160), (sh * 0.85f).toInt())
+                    try { wm.updateViewLayout(card, l) } catch (ex: Exception) {}
+                }
+            }
+            true
+        }
+        pill.setOnClickListener {
+            val et = EditText(this)
+            et.setSingleLine(); et.setTextColor(0xFFF2F3F5.toInt()); et.textSize = 12f
+            et.hint = "Search or type a link"; et.setHintTextColor(0x88F2F3F5.toInt())
+            et.imeOptions = EditorInfo.IME_ACTION_GO; et.setPadding(dp(10), 0, dp(10), 0)
+            et.background = GradientDrawable().apply { setColor(0x33FFFFFF); cornerRadius = dp(14).toFloat() }
+            val at = bar.indexOfChild(pill)
+            bar.removeView(pill)
+            bar.addView(et, at, pillLp())
+            setBfFocusable(true)
+            et.requestFocus()
+            et.postDelayed({ (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(et, 0) }, 150)
+            et.setOnEditorActionListener { _, _, _ ->
+                val s = et.text.toString().trim()
+                if (s.isNotEmpty()) {
+                    val u = when {
+                        s.startsWith("http://") || s.startsWith("https://") -> s
+                        s.contains(" ") || !s.contains(".") -> "https://duckduckgo.com/?q=" + android.net.Uri.encode(s)
+                        else -> "https://" + s
+                    }
+                    AgentBrowser.loadUrl(this@CompanionService, u)
+                }
+                bar.removeView(et)
+                bar.addView(pill, at, pillLp())
+                true
+            }
+        }
+        AgentBrowser.onTitle = { t, u -> pill.text = if (t.isNotBlank()) t else (android.net.Uri.parse(u).host ?: u) }
+        AgentBrowser.onProgress = { p -> prog.progress = p; prog.visibility = if (p in 1..99) View.VISIBLE else View.INVISIBLE }
         val web = AgentBrowser.view(this)
         (web.parent as? android.view.ViewGroup)?.removeView(web)
         holder.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        try { val tt = web.title; if (!tt.isNullOrBlank()) pill.text = tt } catch (ex: Exception) {}
         // touching the page lets the keyboard work for it
         web.setOnTouchListener { _, e ->
             if (e.actionMasked == MotionEvent.ACTION_DOWN) setBfFocusable(true)
@@ -486,14 +544,17 @@ class CompanionService : Service() {
     private fun toggleBfSize() {
         val l = bfLp ?: return
         val card = bfCard ?: return
-        val (_, sh) = screen()
+        val (sw, sh) = screen()
         bfBig = !bfBig
-        l.height = (sh * (if (bfBig) 0.72f else 0.36f)).toInt()
+        if (bfBig) { l.width = (sw * 0.96f).toInt(); l.height = (sh * 0.62f).toInt() }
+        else { l.width = minOf((sw * 0.8f).toInt(), dp(330)); l.height = (sh * 0.30f).toInt().coerceAtLeast(dp(200)) }
+        l.x = (sw - l.width) / 2
         try { wm.updateViewLayout(card, l) } catch (ex: Exception) {}
     }
 
     private fun hideBrowserFloat() {
         val card = bfCard ?: return
+        AgentBrowser.onTitle = null; AgentBrowser.onProgress = null
         try { bfHolder?.removeAllViews() } catch (ex: Exception) {}
         try { wm.removeView(card) } catch (ex: Exception) {}
         bfCard = null; bfHolder = null

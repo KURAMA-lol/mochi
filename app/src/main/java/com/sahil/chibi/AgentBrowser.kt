@@ -28,6 +28,9 @@ object AgentBrowser {
     @Volatile private var mark: Int? = null
     /** Set by the floating companion: shows the floating browser window when the agent uses the browser. */
     @Volatile var onUse: (() -> Unit)? = null
+    /** Set by the floating browser window so it can show the page title and load progress. */
+    @Volatile var onTitle: ((String, String) -> Unit)? = null
+    @Volatile var onProgress: ((Int) -> Unit)? = null
 
     class TabView(ctx: Context) : WebView(ctx) {
         override fun isShown(): Boolean = true
@@ -79,10 +82,13 @@ object AgentBrowser {
             w.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(v: WebView?, url: String?) {
                     CookieManager.getInstance().flush()
+                    onTitle?.invoke(v?.title ?: "", url ?: "")
                     loadLatch?.countDown()
                 }
             }
             w.webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) { onProgress?.invoke(newProgress) }
+                override fun onReceivedTitle(view: WebView?, title: String?) { onTitle?.invoke(title ?: "", view?.url ?: "") }
                 // popups and target=_blank open in the same tab
                 override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
                     val t = WebView(view.context)

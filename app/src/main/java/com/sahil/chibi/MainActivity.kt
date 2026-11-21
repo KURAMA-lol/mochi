@@ -556,7 +556,7 @@ class MainActivity : Activity() {
             runOnUiThread { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         }
         @JavascriptInterface fun openBrowser() {
-            runOnUiThread { startActivity(Intent(this@MainActivity, BrowserActivity::class.java)) }
+            runOnUiThread { if (CompanionService.running && Settings.canDrawOverlays(this@MainActivity)) CompanionService.send(this@MainActivity, CompanionService.ACT_BROWSER) else startActivity(Intent(this@MainActivity, BrowserActivity::class.java)) }
         }
 
         @JavascriptInterface fun requestPerms() { runOnUiThread { askRuntimePerms() } }
