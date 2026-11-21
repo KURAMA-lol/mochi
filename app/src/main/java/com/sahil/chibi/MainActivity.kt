@@ -36,6 +36,11 @@ class MainActivity : Activity() {
     private lateinit var bubble: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var lastLook = 0L
+    private var bloub: WebView? = null
+    private var bReady = false
+    private var bx = 0f; private var by = 0f; private var btx = 0f; private var bty = 0f
+    private var bNext = 0L; private var bLookOn = false; private var bLookNext = 0L; private var bGaze = 0L; private var bEye = 0L
+    private var touching = false; private var lastTouch = 0L
     private val hideBubbleRun = Runnable { bubble.animate().alpha(0f).setDuration(250).start() }
     private val pokeLines = listOf(
         "Hehe, that tickles!", "Yes? I'm listening~", "Don't poke too much!", "Nana is here~",
@@ -114,6 +119,7 @@ class MainActivity : Activity() {
             alpha = 0f
         }
         header.addView(bubble, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(14) })
+        startBloub()
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         root.viewTreeObserver.addOnGlobalLayoutListener {
             val r = Rect(); root.getWindowVisibleDisplayFrame(r)
@@ -128,6 +134,8 @@ class MainActivity : Activity() {
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val a = ev.actionMasked
+        if (a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_MOVE) { touching = true; lastTouch = android.os.SystemClock.uptimeMillis() }
+        else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) { touching = false; lastTouch = android.os.SystemClock.uptimeMillis() }
         if ((a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_MOVE) && ::nana.isInitialized && header.visibility == View.VISIBLE) {
             val now = System.currentTimeMillis()
             if (a == MotionEvent.ACTION_DOWN || now - lastLook > 60) {
@@ -145,6 +153,8 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         ui.removeCallbacksAndMessages(null)
+        try { bloub?.destroy() } catch (e: Exception) {}
+        bloub = null
         if (::nana.isInitialized) nana.release()
         super.onDestroy()
     }
@@ -179,8 +189,93 @@ class MainActivity : Activity() {
         askRuntimePerms()
     }
 
+    override fun onPause() {
+        ui.removeCallbacks(bloubTick)
+        bloub?.evaluateJavascript("Bloub.pause()", null)
+        super.onPause()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun startBloub() {
+        val sz = dp(52)
+        val w = object : WebView(this) {
+            override fun dispatchTouchEvent(e: MotionEvent): Boolean = false
+        }
+        w.setBackgroundColor(0)
+        w.isVerticalScrollBarEnabled = false
+        w.isHorizontalScrollBarEnabled = false
+        w.settings.javaScriptEnabled = true
+        w.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(v: WebView?, u: String?) { bReady = true; applyBloub() }
+        }
+        header.addView(w, FrameLayout.LayoutParams(sz, sz, Gravity.TOP or Gravity.START))
+        w.loadUrl("file:///android_asset/bloub/index.html")
+        bloub = w
+        ui.post(bloubTick)
+    }
+
+    private fun applyBloub() {
+        if (!bReady) return
+        val p = getSharedPreferences("bloub", MODE_PRIVATE)
+        val col = (p.getString("color", "#3b93f0") ?: "#3b93f0").filter { it.isLetterOrDigit() || it == '#' }
+        val sh = (p.getString("shape", "idle") ?: "idle").filter { it.isLetter() }
+        bloub?.evaluateJavascript("Bloub.color('$col');Bloub.state('$sh')", null)
+    }
+
+    private fun bloubMood() {
+        val m = listOf("wink", "wide", "play", "swirl", "orbit").random()
+        bloub?.evaluateJavascript("Bloub.state('$m')", null)
+        ui.postDelayed({ applyBloub() }, 1800L + (Math.random() * 900).toLong())
+    }
+
+    private val bloubTick = object : Runnable {
+        override fun run() {
+            val w = bloub ?: return
+            ui.postDelayed(this, 40)
+            if (header.visibility != View.VISIBLE || header.width == 0 || w.width == 0) return
+            val t = android.os.SystemClock.uptimeMillis()
+            val W = header.width.toFloat(); val Hh = header.height.toFloat(); val sz = w.width.toFloat()
+            val roam = getSharedPreferences("bloub", MODE_PRIVATE).getBoolean("roam", true)
+            if (t > bNext) {
+                if (roam) {
+                    val a = Math.random() * Math.PI * 2
+                    btx = (W / 2 + Math.cos(a) * W * 0.36).toFloat() - sz / 2
+                    bty = (Hh * 0.40 + Math.sin(a) * Hh * 0.28).toFloat() - sz / 2
+                    if (Math.random() < 0.4) bloubMood()
+                } else { btx = W * 0.8f - sz / 2; bty = Hh * 0.3f }
+                bNext = t + 2500 + (Math.random() * 3500).toLong()
+            }
+            bx += (btx - bx) * 0.03f; by += (bty - by) * 0.03f
+            w.translationX = bx
+            w.translationY = by + (Math.sin(t / 400.0) * 4).toFloat()
+            val bcx = bx + sz / 2; val bcy = by + sz / 2
+            val ncx = W / 2; val ncy = Hh - nana.height * 0.7f
+            if (t - bEye > 200 && bReady) {
+                bEye = t
+                val yaw = ((ncx - bcx) / W * 90f).coerceIn(-40f, 40f)
+                val pitch = ((ncy - bcy) / Hh * 60f).coerceIn(-25f, 25f)
+                w.evaluateJavascript("Bloub.look(" + "%.1f,%.1f".format(java.util.Locale.US, yaw, pitch) + ")", null)
+            }
+            if (t > bLookNext) {
+                bLookOn = !bLookOn
+                bLookNext = t + if (bLookOn) 1500 + (Math.random() * 2000).toLong() else 2500 + (Math.random() * 3500).toLong()
+            }
+            // Nana looks at Bloub only while no finger is on the screen (touch look wins)
+            if (bLookOn && !touching && t - lastTouch > 2500 && t - bGaze > 150) {
+                bGaze = t
+                val nx = ((bcx - ncx) / (W / 2) * 1.4f).coerceIn(-1f, 1f)
+                val ny = (-(bcy - ncy) / (Hh / 2)).coerceIn(-1f, 1f)
+                nana.lookAt(nx, ny)
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        if (bloub != null) {
+            ui.removeCallbacks(bloubTick); ui.post(bloubTick)
+            bloub?.evaluateJavascript("Bloub.resume()", null)
+        }
         web.evaluateJavascript("window.refreshStatus && refreshStatus()", null)
     }
 
@@ -271,6 +366,14 @@ class MainActivity : Activity() {
         @JavascriptInterface fun setAgent(on: Boolean, act: Boolean, kb: Boolean, ask: Boolean) { Agent.save(this@MainActivity, on, act, kb, ask) }
         @JavascriptInterface fun getAskMode(): String = Agent.askMode(this@MainActivity)
         @JavascriptInterface fun getWatchAlong(): Boolean = getSharedPreferences("nana_watch", MODE_PRIVATE).getBoolean("on", false)
+        @JavascriptInterface fun getBloubCfg(): String {
+            val p = getSharedPreferences("bloub", MODE_PRIVATE)
+            return org.json.JSONObject().put("color", p.getString("color", "#3b93f0")).put("shape", p.getString("shape", "idle")).put("roam", p.getBoolean("roam", true)).toString()
+        }
+        @JavascriptInterface fun setBloubCfg(color: String, shape: String, roam: Boolean) {
+            getSharedPreferences("bloub", MODE_PRIVATE).edit().putString("color", color).putString("shape", shape).putBoolean("roam", roam).apply()
+            runOnUiThread { applyBloub() }
+        }
         @JavascriptInterface fun setWatchAlong(on: Boolean) { getSharedPreferences("nana_watch", MODE_PRIVATE).edit().putBoolean("on", on).apply() }
         @JavascriptInterface fun watchLink(url: String) {
             runOnUiThread {
