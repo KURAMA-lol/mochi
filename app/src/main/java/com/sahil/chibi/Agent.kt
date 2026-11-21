@@ -139,6 +139,8 @@ object Agent {
     private val NO_REPEAT_GUARD = setOf("look_screen", "screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "device_status", "read_notifications", "list_reminders", "remember", "forget")
 
     private val ACTION_WORDS = Regex("""\b(open|go to|goto|click|tap|press|check|read|look|show|reply|type|search|scroll|play|send|launch|start|close|swipe|select|find|visit|kholo|khol|jao|dabao|likho|bhejo|chalu|install|download|sign ?up|log ?in)\b""", RegexOption.IGNORE_CASE)
+    /** A reply that says it did something (past tense). If no tool ran, that claim is false and is replaced by an honest message; plain chat is left alone. */
+    private val DONE_CLAIM = Regex("""\b(done|opened|sent|tapped|clicked|typed|searched|launched|played|turned (on|off)|i'?ve (opened|sent|typed|tapped|clicked|searched|set|turned|played)|kar diya|ho gaya|khol diya|bhej diya|laga diya)\b""", RegexOption.IGNORE_CASE)
     private val PROMISE = Regex("""(\bi('ll| will| am going to|'m going to)\b|\blet me\b|\bon it\b|\bone moment\b|kar raha|kar rahi|karta hu|karti hu|karunga|karungi|dekhta hu|dekhti hu|\bruko\b|ek minute|abhi karta|abhi karti)""", RegexOption.IGNORE_CASE)
     private val SIMPLE_OPEN = Regex("^\\s*(please\\s+)?(open|launch|start|kholo|khol do|khol|chalu karo)\\s+(the\\s+|my\\s+)?[\\w .&-]{1,24}?\\s*(app|ko|please|plz)?\\s*[.!]*\\s*$", RegexOption.IGNORE_CASE)
     private val TAG = Regex("""<tool>\s*([\s\S]*?)\s*</tool>""")
@@ -312,7 +314,7 @@ How to work:
                             continue
                         }
                     }
-                    if (actionish && steps == 0 && !res.text.contains("?")) {
+                    if (actionish && steps == 0 && !res.text.contains("?") && (PROMISE.containsMatchIn(res.text) || DONE_CLAIM.containsMatchIn(res.text))) {
                         val why = if (!actions(ctx)) "Actions are switched OFF in my settings, so I did nothing. Turn on 'Allow actions' on the Home tab."
                             else if (NanaAccess.inst == null && Regex("tap|click|type|scroll|screen|chat|message", RegexOption.IGNORE_CASE).containsMatchIn(request)) "Screen control is OFF, so I could not do that. Turn Nana on in Accessibility settings."
                             else "I did not actually do that: no action ran. Please say it again, a bit more specifically."

@@ -259,6 +259,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="swatches accSw"></div>
   <div class="dsec">Quick actions</div>
   <button class="dl" onclick="toggleRun();toggleMenu(false)"><span data-ri="Power"></span><span id="dRun">Start Nana</span></button>
+  <button class="dl" onclick="callToggle();toggleMenu(false)"><span data-ri="PhoneRing"></span><span id="dCall">Voice call</span></button>
   <button class="dl" onclick="Android.summon();toggleMenu(false)"><span data-ri="ChatRoundDots"></span>Call her</button>
   <button class="dl" onclick="Android.openBrowser()"><span data-ri="Globe"></span>Her browser</button>
   <button class="dl" onclick="Android.openAssistSettings()"><span data-ri="Phone"></span>Default assistant</button>
@@ -271,6 +272,13 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card hero">
     <div class="hl"><span id="hDot" class="dot"></span><div><b id="hTxt">Nana is off</b><div class="mut" id="hSub">Tap Start to bring her out</div></div></div>
     <button id="hBtn" class="b" onclick="toggleRun()">Start</button>
+  </div>
+  <div class="card">
+    <label style="margin-top:0"><span data-ri="PhoneRing" style="vertical-align:-4px;margin-right:6px"></span>Voice call <span class="mut">(like ChatGPT voice: stays on until you hang up, even in other apps)</span></label>
+    <div class="dl-msg" id="callStat">Not on a call</div>
+    <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
+    <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off; headphones work best</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
+    <p class="mu">Needs the speech recognition model below and a downloaded voice. You can also start it from the notification. Say "bye Nana" or tap Hang up to end it.</p>
   </div>
   <div class="btns" style="margin-top:0"><button class="b ghost ic" style="flex:1" onclick="Android.summon()"><span data-ri="ChatRoundDots"></span>Call her</button><button class="b ghost ic" style="flex:1" onclick="Android.openBrowser()"><span data-ri="Globe"></span>Her browser</button></div>
 
@@ -611,13 +619,6 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <p class="mu">Lets Nana look at your screen or at a picture link when you ask her to: scene, objects, text in pictures. Mirage by Cactus Compute, fully on the phone. She never looks on her own. The result goes to your AI provider like any other tool result. Needs Nana's Accessibility service for screenshots. After an update, switch that service off and on once. Text reading is Latin script only.</p>
   </div>
   <div class="card">
-    <label style="margin-top:0">Voice call <span class="mut">(like ChatGPT voice: stays on until you hang up, even in other apps)</span></label>
-    <div class="dl-msg" id="callStat">Not on a call</div>
-    <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
-    <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off; headphones work best</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
-    <p class="mu">Needs the speech recognition model below and a downloaded voice. You can also start it from the notification. Say "bye Nana" or tap Hang up to end it.</p>
-  </div>
-  <div class="card">
     <label style="margin-top:0">Hey Nana &amp; speech recognition <span class="mut">(run on your phone)</span></label>
     <div class="dl-top"><span class="mut">Wake word model</span><span id="kwTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
     <div class="dl-msg" id="wkStat" style="margin-top:4px">...</div>
@@ -729,7 +730,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   function callPoll(){try{var s=JSON.parse(Android.callState());callOn=!!s.active;
     var names={loading:'Getting ready...',listening:'Listening...',hearing:'Hearing you...',speaking:'Nana is talking (speak to interrupt)',muted:'Muted','mic-blocked':'Android is blocking the mic. Open Nana once, then start again.',off:'Not on a call'};
     vg('callStat').textContent=callOn?(names[s.state]||s.state):'Not on a call';
-    vg('callBtn').textContent=callOn?'Hang up':'Start voice call';}catch(x){}}
+    vg('callBtn').textContent=callOn?'Hang up':'Start voice call';var dc=document.getElementById('dCall');if(dc)dc.textContent=callOn?'Hang up call':'Voice call';}catch(x){}}
   setInterval(callPoll,1000);
   setTimeout(vLoad,300);
   </script>

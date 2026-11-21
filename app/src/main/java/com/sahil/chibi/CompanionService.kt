@@ -121,6 +121,8 @@ class CompanionService : Service() {
     private var lastPowerSay = 0L
     private var panelV = -1
     private var lastGreet = 0L
+    private var dead = false
+    private var shownAt = 0L
     /** Short time-of-day hello when Nana is summoned (at most once per 30 min). Speaks nothing else, does nothing. */
     private fun greetNow() {
         val now = SystemClock.uptimeMillis()
@@ -217,7 +219,7 @@ class CompanionService : Service() {
         Agent.approver = { what -> requestApproval(what) }
         Agent.onEvent = { k, t -> main.post { (typing as? Timeline)?.onEvent(k, t) } }
         // tiny-voca runs in a hidden page that needs a few seconds to start: start it now, not at the first sentence
-        try { if (Voice.engine(this) == "tiny") TinyVoca.warm(this) } catch (e: Throwable) {}
+        main.postDelayed({ try { if (!dead && Voice.engine(this) == "tiny") TinyVoca.warm(this) } catch (e: Throwable) {} }, 3500)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -286,6 +288,7 @@ class CompanionService : Service() {
     }
 
     override fun onDestroy() {
+        dead = true
         running = false
         Call.stop()
         Ears.stopAll()
@@ -300,6 +303,7 @@ class CompanionService : Service() {
         try { unregisterReceiver(powerRx) } catch (ex: Exception) {}
         closeRadial()
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
+        chibi = null; attached = false; bubble = null; bubbleAttached = false; panelAttached = false; panelOpen = false
         super.onDestroy()
     }
 
@@ -579,14 +583,14 @@ class CompanionService : Service() {
         nextAiChat = now + cfg.persona.aiChatterMin * 60_000L
         main.removeCallbacks(tick)
         main.post(tick)
-        main.postDelayed({ say("Hi ${cfg.persona.userName}! Tap me anytime~", "happy") }, 700)
+        main.postDelayed({ say("Hi ${cfg.persona.userName}! Tap me anytime~", "happy") }, 1300)
         refreshNotification()
     }
 
     private fun attachChibi() {
         val c = chibi ?: return
         if (attached) return
-        try { wm.addView(c, lp); attached = true } catch (ex: Exception) {}
+        try { wm.addView(c, lp); attached = true; shownAt = SystemClock.uptimeMillis() } catch (ex: Exception) {}
     }
 
     private fun detachChibi() {
@@ -1002,6 +1006,7 @@ class CompanionService : Service() {
 
     private fun say(text: String, mood: String, spoken: Boolean = false) {
         val c = chibi ?: return
+        if (dead) return
         val ms = (1800 + text.length * 55L).coerceAtMost(9000)
         val now = SystemClock.uptimeMillis()
         c.mood = if (mood in Persona.MOODS) mood else "neutral"
@@ -1009,10 +1014,17 @@ class CompanionService : Service() {
         talkUntil = now + (ms * 0.8).toLong()
         moodResetAt = now + ms + 3000
         if (spoken) speak(text)
-        if (!panelOpen && attached) showBubble(text, ms)
+        if (!panelOpen && attached) {
+            // the bubble waits until she is on screen, so it never appears before her
+            if (c.isAttachedToWindow && c.height > 0 && SystemClock.uptimeMillis() - shownAt > 500) showBubble(text, ms)
+            else main.postDelayed({
+                if (!dead && chibi === c && !panelOpen && attached && c.isAttachedToWindow && c.height > 0) showBubble(text, ms)
+            }, 650)
+        }
     }
 
     private fun showBubble(text: String, ms: Long) {
+        if (dead) return
         var b = bubble
         if (b == null) {
             b = TextView(this).apply {
