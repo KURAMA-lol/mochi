@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private var bx = 0f; private var by = 0f; private var btx = 0f; private var bty = 0f
     private var bNext = 0L; private var bLookOn = false; private var bLookNext = 0L; private var bGaze = 0L; private var bEye = 0L
     private var touching = false; private var lastTouch = 0L
+    private var bvx = 0f; private var bvy = 0f; private var bLastT = 0L; private var bHop = 0L; private var bAng = 0.0; private var bWasTouch = false
     private val hideBubbleRun = Runnable { bubble.animate().alpha(0f).setDuration(250).start() }
     private val pokeLines = listOf(
         "Hehe, that tickles!", "Yes? I'm listening~", "Don't poke too much!", "Nana is here~",
@@ -222,6 +223,11 @@ class MainActivity : Activity() {
         bloub?.evaluateJavascript("Bloub.color('$col');Bloub.state('$sh')", null)
     }
 
+    private fun bloubState(id: String, ms: Long) {
+        bloub?.evaluateJavascript("Bloub.state('$id')", null)
+        ui.postDelayed({ applyBloub() }, ms)
+    }
+
     private fun bloubMood() {
         val m = listOf("wink", "wide", "play", "swirl", "orbit").random()
         bloub?.evaluateJavascript("Bloub.state('$m')", null)
@@ -236,18 +242,44 @@ class MainActivity : Activity() {
             val t = android.os.SystemClock.uptimeMillis()
             val W = header.width.toFloat(); val Hh = header.height.toFloat(); val sz = w.width.toFloat()
             val roam = getSharedPreferences("bloub", MODE_PRIVATE).getBoolean("roam", true)
+            val dt = ((t - bLastT).coerceIn(1L, 64L)) / 1000f
+            bLastT = t
+            if (touching && !bWasTouch) { bHop = t; bloubState("wide", 1300) }
+            bWasTouch = touching
             if (t > bNext) {
                 if (roam) {
-                    val a = Math.random() * Math.PI * 2
-                    btx = (W / 2 + Math.cos(a) * W * 0.36).toFloat() - sz / 2
-                    bty = (Hh * 0.40 + Math.sin(a) * Hh * 0.28).toFloat() - sz / 2
-                    if (Math.random() < 0.4) bloubMood()
-                } else { btx = W * 0.8f - sz / 2; bty = Hh * 0.3f }
-                bNext = t + 2500 + (Math.random() * 3500).toLong()
+                    val r = Math.random()
+                    var wait = 1800L + (Math.random() * 2600).toLong()
+                    if (r < 0.55) {
+                        bAng += (if (Math.random() < 0.5) 1 else -1) * (0.7 + Math.random() * 1.0)
+                        btx = (W / 2 + Math.cos(bAng) * W * 0.36).toFloat() - sz / 2
+                        bty = (Hh * 0.40 + Math.sin(bAng) * Hh * 0.28).toFloat() - sz / 2
+                    } else if (r < 0.72) {
+                        btx = (Math.random() * (W - sz)).toFloat()
+                        bty = (Hh * (0.1 + Math.random() * 0.5)).toFloat()
+                        bloubState("swirl", 1300); wait = 1600L
+                    } else if (r < 0.85) {
+                        btx = (W / 2 + (if (Math.random() < 0.5) -1 else 1) * W * 0.2).toFloat() - sz / 2
+                        bty = Hh * 0.6f - sz / 2
+                    } else {
+                        bHop = t; bloubState("wink", 1200)
+                    }
+                    if (Math.random() < 0.3) bloubMood()
+                    bNext = t + wait
+                } else { btx = W * 0.8f - sz / 2; bty = Hh * 0.3f; bNext = t + 4000 }
             }
-            bx += (btx - bx) * 0.03f; by += (bty - by) * 0.03f
+            // spring: slight overshoot, so it floats and wobbles instead of gliding
+            bvx += ((btx - bx) * 38f - bvx * 6.5f) * dt
+            bvy += ((bty - by) * 38f - bvy * 6.5f) * dt
+            bx = (bx + bvx * dt).coerceIn(0f, W - sz); by = (by + bvy * dt).coerceIn(0f, Hh - sz)
+            val hopT = t - bHop
+            val hop = if (hopT in 0..450) -Math.abs(Math.sin(hopT / 450.0 * Math.PI)).toFloat() * dp(18) else 0f
+            val bob = (Math.sin(t / 340.0) * dp(3) + Math.sin(t / 910.0) * dp(2)).toFloat()
             w.translationX = bx
-            w.translationY = by + (Math.sin(t / 400.0) * 4).toFloat()
+            w.translationY = by + bob + hop
+            val stretch = ((Math.abs(bvx) - Math.abs(bvy)) / (W * 2f)).coerceIn(-0.2f, 0.2f)
+            w.scaleX = 1f + stretch; w.scaleY = 1f - stretch * 0.8f
+            w.rotation = (bvx / W * 14f).coerceIn(-14f, 14f)
             val bcx = bx + sz / 2; val bcy = by + sz / 2
             val ncx = W / 2; val ncy = Hh - nana.height * 0.7f
             if (t - bEye > 200 && bReady) {
