@@ -41,7 +41,7 @@ class MainActivity : Activity() {
     private var bx = 0f; private var by = 0f; private var btx = 0f; private var bty = 0f
     private var bNext = 0L; private var bLookOn = false; private var bLookNext = 0L; private var bGaze = 0L; private var bEye = 0L
     private var touching = false; private var lastTouch = 0L
-    private var bvx = 0f; private var bvy = 0f; private var bLastT = 0L; private var bHop = 0L; private var bAng = 0.0; private var bWasTouch = false
+    private var bvx = 0f; private var bvy = 0f; private var bLastT = 0L; private var bHop = 0L; private var bAng = 0.0; private var bWasTouch = false; private var bPoke = 0L
     private val hideBubbleRun = Runnable { bubble.animate().alpha(0f).setDuration(250).start() }
     private val pokeLines = listOf(
         "Hehe, that tickles!", "Yes? I'm listening~", "Don't poke too much!", "Nana is here~",
@@ -249,37 +249,33 @@ class MainActivity : Activity() {
             if (t > bNext) {
                 if (roam) {
                     val r = Math.random()
-                    var wait = 1800L + (Math.random() * 2600).toLong()
-                    if (r < 0.55) {
-                        bAng += (if (Math.random() < 0.5) 1 else -1) * (0.7 + Math.random() * 1.0)
-                        btx = (W / 2 + Math.cos(bAng) * W * 0.36).toFloat() - sz / 2
-                        bty = (Hh * 0.40 + Math.sin(bAng) * Hh * 0.28).toFloat() - sz / 2
-                    } else if (r < 0.72) {
-                        btx = (Math.random() * (W - sz)).toFloat()
-                        bty = (Hh * (0.1 + Math.random() * 0.5)).toFloat()
-                        bloubState("swirl", 1300); wait = 1600L
-                    } else if (r < 0.85) {
+                    var wait = 3200L + (Math.random() * 2600).toLong()
+                    if (r < 0.72) {
+                        bAng += (if (Math.random() < 0.5) 1 else -1) * (0.35 + Math.random() * 0.5)
+                        btx = (W / 2 + Math.cos(bAng) * W * 0.34).toFloat() - sz / 2
+                        bty = (Hh * 0.40 + Math.sin(bAng) * Hh * 0.26).toFloat() - sz / 2
+                    } else if (r < 0.92) {
                         btx = (W / 2 + (if (Math.random() < 0.5) -1 else 1) * W * 0.2).toFloat() - sz / 2
                         bty = Hh * 0.6f - sz / 2
                     } else {
                         bHop = t; bloubState("wink", 1200)
                     }
-                    if (Math.random() < 0.3) bloubMood()
+                    if (Math.random() < 0.25) bloubMood()
                     bNext = t + wait
                 } else { btx = W * 0.8f - sz / 2; bty = Hh * 0.3f; bNext = t + 4000 }
             }
             // spring: slight overshoot, so it floats and wobbles instead of gliding
-            bvx += ((btx - bx) * 38f - bvx * 6.5f) * dt
-            bvy += ((bty - by) * 38f - bvy * 6.5f) * dt
+            bvx += ((btx - bx) * 9f - bvx * 5.5f) * dt
+            bvy += ((bty - by) * 9f - bvy * 5.5f) * dt
             bx = (bx + bvx * dt).coerceIn(0f, W - sz); by = (by + bvy * dt).coerceIn(0f, Hh - sz)
             val hopT = t - bHop
             val hop = if (hopT in 0..450) -Math.abs(Math.sin(hopT / 450.0 * Math.PI)).toFloat() * dp(18) else 0f
             val bob = (Math.sin(t / 340.0) * dp(3) + Math.sin(t / 910.0) * dp(2)).toFloat()
             w.translationX = bx
             w.translationY = by + bob + hop
-            val stretch = ((Math.abs(bvx) - Math.abs(bvy)) / (W * 2f)).coerceIn(-0.2f, 0.2f)
+            val stretch = ((Math.abs(bvx) - Math.abs(bvy)) / (W * 4f)).coerceIn(-0.1f, 0.1f)
             w.scaleX = 1f + stretch; w.scaleY = 1f - stretch * 0.8f
-            w.rotation = (bvx / W * 14f).coerceIn(-14f, 14f)
+            w.rotation = (bvx / W * 8f).coerceIn(-6f, 6f)
             val bcx = bx + sz / 2; val bcy = by + sz / 2
             val ncx = W / 2; val ncy = Hh - nana.height * 0.7f
             if (t - bEye > 200 && bReady) {
@@ -290,14 +286,16 @@ class MainActivity : Activity() {
             }
             if (t > bLookNext) {
                 bLookOn = !bLookOn
-                bLookNext = t + if (bLookOn) 1500 + (Math.random() * 2000).toLong() else 2500 + (Math.random() * 3500).toLong()
+                bLookNext = t + if (bLookOn) 3500 + (Math.random() * 3500).toLong() else 1500 + (Math.random() * 2000).toLong()
             }
             // Nana looks at Bloub only while no finger is on the screen (touch look wins)
-            if (bLookOn && !touching && t - lastTouch > 2500 && t - bGaze > 150) {
+            if (bLookOn && !touching && t - lastTouch > 2500 && t - bGaze > 100) {
                 bGaze = t
                 val nx = ((bcx - ncx) / (W / 2) * 1.4f).coerceIn(-1f, 1f)
                 val ny = (-(bcy - ncy) / (Hh / 2)).coerceIn(-1f, 1f)
                 nana.lookAt(nx, ny)
+                // when Bloub drifts close to her face she gives a tiny happy hop, rarely
+                if (Math.hypot((bcx - ncx).toDouble(), (bcy - ncy).toDouble()) < sz * 1.7 && t - bPoke > 30000) { bPoke = t; nana.poke() }
             }
         }
     }
