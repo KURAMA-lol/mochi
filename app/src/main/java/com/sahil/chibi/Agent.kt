@@ -120,7 +120,7 @@ object Agent {
 
     private val ACTIONS = setOf(
         "launch_app", "open_url", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press", "set_reminder", "cancel_reminder", "set_alarm", "set_timer", "flashlight", "set_volume", "dial", "copy_text",
-        "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type", "app_connect"
+        "browser_click", "browser_click_text", "browser_click_xy", "browser_select", "browser_type", "app_connect", "browser_keys", "screen_collect"
     )
     /** Other names a model may use for a parameter. They are copied to the real name before checking. */
     private val ARG_ALIASES = mapOf(
@@ -133,10 +133,10 @@ object Agent {
         "match" to listOf("text", "name", "query"),
         "fact" to listOf("text", "memory")
     )
-    private val UI_TOOLS = setOf("launch_app", "open_url", "browser_open", "browser_click_text", "browser_select", "browser_type", "browser_click", "browser_scroll", "browser_back", "browser_scroll_to", "browser_click_xy")
+    private val UI_TOOLS = setOf("launch_app", "open_url", "browser_open", "browser_click_text", "browser_select", "browser_type", "browser_click", "browser_scroll", "browser_back", "browser_scroll_to", "browser_click_xy", "browser_keys")
     private const val MAX_BATCH = 6
     private val SCREEN_ACTIONS = setOf("launch_app", "screen_tap", "screen_tap_text", "screen_tap_xy", "screen_long_press", "screen_swipe", "screen_type", "screen_scroll", "screen_scroll_to", "screen_back", "screen_home", "screen_press")
-    private val NO_REPEAT_GUARD = setOf("look_screen", "screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "device_status", "read_notifications", "list_reminders", "remember", "forget")
+    private val NO_REPEAT_GUARD = setOf("look_screen", "screen_read", "browser_read", "browser_wait", "screen_wait", "screen_scroll", "screen_scroll_to", "screen_swipe", "browser_scroll", "browser_scroll_to", "browser_find", "screen_collect", "device_status", "read_notifications", "list_reminders", "remember", "forget")
 
     private val ACTION_WORDS = Regex("""\b(open|go to|goto|click|tap|press|check|read|look|show|reply|type|search|scroll|play|send|launch|start|close|swipe|select|find|visit|kholo|khol|jao|dabao|likho|bhejo|chalu|install|download|sign ?up|log ?in)\b""", RegexOption.IGNORE_CASE)
     /** A reply that says it did something (past tense). If no tool ran, that claim is false and is replaced by an honest message; plain chat is left alone. */
@@ -185,6 +185,9 @@ Tools:
 - screen_swipe {"direction":"up|down|left|right","edge":true|false} or {"x1":..,"y1":..,"x2":..,"y2":..} : drag a finger. edge:true starts at the screen edge (open drawers, pull the notification shade). screen_scroll_to {"text":"..."} : scrolls down until that text shows. screen_wait {"text":"...","seconds":5} : wait for text to appear. screen_press {"key":"back|home|recents|notifications|quick_settings"}.
 - screen_read shows "Scrollable: can scroll down yes/no, up yes/no". If it says no, do not scroll. screen_scroll says "Nothing moved" at the end of a list: stop scrolling then.
 - browser_scroll_to {"text":"..."} ; browser_click_xy {"x":..,"y":..} (page pixels) ; browser_read {"offset":1500} reads the page further down. browser_scroll reports "top/bottom reached".
+- browser_find {"text":"..."} : search the page text, returns matches with context. browser_keys {"key":"Enter|Escape|Tab|ArrowDown|ArrowUp|PageDown|PageUp|Home|End"} : press one special key on the focused element. browser_wait also takes "text" (stops as soon as it shows). browser_scroll direction can also be "top" or "bottom".
+- In browser reads: elements marked * are new since your last read; value="..." is what a field already holds; "(below screen)" needs a scroll first. If the result starts with WARNING that the page did not change, do not repeat that action: pick another element or approach.
+- screen_collect {"max":6} : scrolls the phone list down and returns all its text once (good for reading a whole list, then answer from it).
 - screen_tap {"id":n} ; screen_scroll {"direction":"down"|"up"} ; screen_back {} ; screen_home {}
 - screen_type {"text":"lofi","submit":true} : types into a text field and REPLACES whatever was there. "id" is optional (default: the focused field, else the first text field). submit:true presses search/enter.
 
@@ -565,14 +568,19 @@ How to work:
         reg("browser_read", "Read the current browser page.", listOf(p("offset", "int")), readOnly = true) { c, a -> AgentBrowser.snapshot(c, a.optInt("offset", 0)) }
         reg("browser_click_text", "Click the first element whose label contains the text.", listOf(p("text", "string", true))) { c, a -> AgentBrowser.clickText(c, a.optString("text")) }
         reg("browser_select", "Choose an option in a dropdown.", listOf(p("id", "int", true), p("value", "string"))) { c, a -> AgentBrowser.select(c, a.optInt("id", -1), a.optString("value")) }
-        reg("browser_wait", "Wait, then read the browser page again.", listOf(p("seconds", "int")), readOnly = true) { c, a -> AgentBrowser.waitAndRead(c, a.optInt("seconds", 3)) }
+        reg("browser_wait", "Wait, then read the browser page again.", listOf(p("seconds", "int"), p("text", "string")), readOnly = true) { c, a -> AgentBrowser.waitAndRead(c, a.optInt("seconds", 3), a.optString("text")) }
         reg("browser_show", "Show the browser to the user (for their own login or captcha).") { c, _ -> AgentBrowser.show(c) }
         reg("browser_type", "Type into a browser field.", listOf(p("id", "int"), p("text", "string"), p("submit", "bool"))) { c, a -> AgentBrowser.type(c, a.optInt("id", -1), a.optString("text"), a.optBoolean("submit", false)) }
         reg("browser_click", "Click a browser element by number.", listOf(p("id", "int", true))) { c, a -> AgentBrowser.click(c, a.optInt("id", -1)) }
-        reg("browser_scroll", "Scroll the browser page.", listOf(p("direction", "string", enums = listOf("up", "down")))) { c, a -> AgentBrowser.scroll(c, a.optString("direction", "down") != "up") }
+        reg("browser_scroll", "Scroll the browser page.", listOf(p("direction", "string", enums = listOf("up", "down", "top", "bottom")))) { c, a ->
+            when (a.optString("direction", "down")) { "top" -> AgentBrowser.scrollEdge(c, true); "bottom" -> AgentBrowser.scrollEdge(c, false); else -> AgentBrowser.scroll(c, a.optString("direction", "down") != "up") }
+        }
         reg("browser_back", "Go back in the browser.") { c, _ -> AgentBrowser.back(c) }
         reg("browser_scroll_to", "Scroll the browser until the text shows.", listOf(p("text", "string", true))) { c, a -> AgentBrowser.scrollTo(c, a.optString("text")) }
         reg("browser_click_xy", "Tap page pixel coordinates in the browser.", listOf(p("x", "int", true), p("y", "int", true))) { c, a -> AgentBrowser.clickXY(c, a.optInt("x", -1), a.optInt("y", -1)) }
+        reg("browser_find", "Search the browser page text; returns matches with context.", listOf(p("text", "string", true)), readOnly = true) { c, a -> AgentBrowser.find(c, a.optString("text")) }
+        reg("browser_keys", "Send one special key (Enter, Escape, Tab, arrows, PageDown...) to the focused browser element.", listOf(p("key", "string", true))) { c, a -> AgentBrowser.keys(c, a.optString("key")) }
+        reg("screen_collect", "Scroll the list on the phone screen down (up to 8 screens) and return all its text, de-duplicated.", listOf(p("max", "int"))) { _, a -> collectScreens(a.optInt("max", 6)) }
         reg("look_screen", "Take a screenshot and describe it with the on-phone vision model Mirage: scene, objects with boxes, text (OCR) and relations. Only when the user asks you to look at the screen or what is in an image or video on it. Needs screen control (Accessibility) on.", emptyList(), readOnly = true) { c, _ ->
             try { Mirage.lookScreen(c) } catch (e: Throwable) { "Error: vision failed: " + (e.message ?: e.toString()).take(200) }
         }
@@ -594,6 +602,23 @@ How to work:
         reg("screen_type", "Type into a field (replaces its text).", listOf(p("text", "string"), p("submit", "bool"), p("id", "int"))) { _, a -> acc { it.type(a.optInt("id", -1), a.optString("text"), a.optBoolean("submit", false)) } }
         reg("screen_back", "Press back.") { _, _ -> acc { it.back() } }
         reg("screen_home", "Go to the home screen.") { _, _ -> acc { it.home() } }
+    }
+
+    /** Reads the list on screen, scrolls, reads again... until the end, and returns every distinct line once. */
+    private fun collectScreens(max: Int): String = acc { a ->
+        val seen = LinkedHashSet<String>()
+        var n = 0
+        for (i in 0 until max.coerceIn(1, 8)) {
+            val txt = a.read()
+            if (txt.startsWith("No other app")) return@acc txt
+            txt.split("\n").drop(2).forEach { ln ->
+                val s = ln.replace(Regex("^\\[\\d+\\] [a-z]+( \\([^)]*\\))?: "), "").trim()
+                if (s.length > 1 && !s.startsWith("(unlabeled")) seen.add(s)
+            }
+            n = i + 1
+            if (a.scroll(true).startsWith("Nothing moved")) break
+        }
+        "Collected " + seen.size + " distinct lines over " + n + " screen(s) (the list is now scrolled down):\n" + seen.joinToString("\n").take(5500)
     }
 
     private fun isFailure(t: String): Boolean = t.startsWith("Error") || t.startsWith("Could not") || t.startsWith("Tried to") || t.startsWith("Screen control is off")
