@@ -83,7 +83,8 @@ object AgentBrowser {
                 override fun onPageFinished(v: WebView?, url: String?) {
                     CookieManager.getInstance().flush()
                     onTitle?.invoke(v?.title ?: "", url ?: "")
-                    loadLatch?.countDown()
+                    // the start page loads by itself; only real page loads release a waiting browser_open
+                    if (url == null || !url.contains("android_asset/start.html")) loadLatch?.countDown()
                 }
             }
             w.webChromeClient = object : WebChromeClient() {
@@ -106,6 +107,7 @@ object AgentBrowser {
             }
             relayout(ctx, w)
             wv = w
+            w.loadUrl("file:///android_asset/start.html?ac=" + String.format("%06X", Theme.ac and 0xFFFFFF))
             w
         }
     }
