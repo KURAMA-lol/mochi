@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shlex
 import sys
 import threading
@@ -116,6 +117,8 @@ def _relax_symlink_check(home):
     def check(path, label="path"):
         target = os.fspath(path)
         absolute = os.path.abspath(target)
+        # /data/user/N/<pkg> is the same folder as /data/data/<pkg>
+        absolute = re.sub(r"^/data/user/\d+/", "/data/data/", absolute)
         if absolute != base and not absolute.startswith(base + os.sep):
             return paths._orig_check(path, label)
         cur = base
@@ -142,6 +145,11 @@ def _relax_symlink_check(home):
 def run(command, home):
     os.makedirs(home, exist_ok=True)
     os.environ["HOME"] = home
+    tmp = os.path.join(home, "tmp")
+    os.makedirs(tmp, exist_ok=True)
+    os.environ["TMPDIR"] = tmp
+    import tempfile
+    tempfile.tempdir = tmp
     argv = shlex.split(command)
     out, err = io.StringIO(), io.StringIO()
     code = 0
@@ -154,6 +162,13 @@ def run(command, home):
             else:
                 from agent_reach import cli
                 _relax_symlink_check(home)
+                try:
+                    import pathlib
+                    from agent_reach import config as _cfg
+                    _cfg.Config.CONFIG_DIR = pathlib.Path(home) / ".agent-reach"
+                    _cfg.Config.CONFIG_FILE = _cfg.Config.CONFIG_DIR / "config.yaml"
+                except Exception:
+                    pass
                 old = sys.argv
                 sys.argv = ["agent-reach"] + argv
                 try:
