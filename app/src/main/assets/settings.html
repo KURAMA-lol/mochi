@@ -279,7 +279,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div class="dl-msg" id="callStat">Not on a call</div>
     <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
     <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off; headphones work best</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
-    <p class="mu">Needs the speech recognition model below and a downloaded voice. You can also start it from the notification. Say "bye Nana" or tap Hang up to end it.</p>
+    <p class="mu">Needs the recognition model and a downloaded voice. Say "bye Nana" or tap Hang up to end.</p>
   </div>
   <div class="btns" style="margin-top:0"><button class="b ghost ic" style="flex:1" onclick="Android.summon()"><span data-ri="ChatRoundDots"></span>Call her</button><button class="b ghost ic" style="flex:1" onclick="Android.openBrowser()"><span data-ri="Globe"></span>Her browser</button></div>
 
@@ -316,7 +316,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <input id="srKey" type="password" placeholder="BSA..." onchange="srSave()">
     <div class="btns"><button class="b" onclick="srTest()">Test search</button></div>
     <p class="mut" id="srMsg"></p>
-    <p class="mut">If the chosen engine fails, Nana falls back to DuckDuckGo. SearXNG and Brave also search images, videos and news when she is asked. SearXNG needs JSON output switched on in that instance.</p>
+    <p class="mut">Falls back to DuckDuckGo if the engine fails. SearXNG and Brave also search images, videos and news; SearXNG needs JSON output on.</p>
     <script>
     function srLoad(){try{var s=JSON.parse(Android.getSearch());document.getElementById('srEng').value=s.engine;document.getElementById('srUrl').value=s.searx;document.getElementById('srKey').value=s.brave;}catch(x){}}
     function srSave(){try{Android.setSearch(document.getElementById('srEng').value,document.getElementById('srUrl').value,document.getElementById('srKey').value);}catch(x){}}
@@ -328,7 +328,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
   <h2>App connections</h2>
   <div class="card">
-    <p class="mut" style="margin-top:0">Teach Nana to do things in other apps for you. Tap Add on what you want. Nana only uses it when you ask, and only if "Allow actions" is on.</p>
+    <p class="mut" style="margin-top:0">Teach Nana to do things in other apps. Tap Add. Used only when you ask and "Allow actions" is on.</p>
     <div id="cnList"></div>
     <label>Add one</label>
     <div id="cnPresets"></div>
@@ -407,7 +407,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card">
     <div class="dseg modeSeg" style="margin:0"></div>
     <div class="swatches accSw" style="margin:16px 4px 4px"></div>
-    <p class="mut">Mono is white on dark and black on light. Black is pure AMOLED black. Her floating chat and radial menu use the accent but stay dark so they read on any app.</p>
+    <p class="mut">Mono is white on dark, black on light. Black is pure AMOLED. Her floating chat and radial menu use the accent and stay dark.</p>
   </div>
   <h2>Preview</h2>
   <div class="card">
@@ -479,7 +479,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card">
     <select id="preset"></select>
     <div class="btns"><button class="b" onclick="addProvider()">+ Add</button></div>
-    <p class="mut">Any OpenAI-compatible API works (Groq, OpenRouter, DeepSeek, Together, Ollama, your own wrapper...). Pick "Custom" and paste its base URL.</p>
+    <p class="mut">Any OpenAI-compatible API works (Groq, OpenRouter, DeepSeek, Together, Ollama). Pick "Custom" and paste its base URL.</p>
   </div>
 </section>
 
@@ -514,7 +514,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div id="stSum" class="kpis"></div>
   <div id="st"></div>
   <div class="btns"><button class="b ghost" onclick="loadStats()">Refresh</button><button class="b ghost" onclick="Android.resetStats();loadStats()">Reset</button></div>
-  <p class="mut">Paused means the circuit breaker stopped using that provider for a while after repeated failures.</p>
+  <p class="mut">Paused: skipped for a while after repeated failures.</p>
 </section>
 
 <!-- PERSONALITY -->
@@ -730,10 +730,10 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     var tr=parseFloat(vg('tyRange').value);VC.tiny={voice:vg('tyVoice').value,speed:+vg('tySpeed').value||1,pitch:+vg('tyPitch').value||0,range:isNaN(tr)?1:tr};
     VC.ears={wake:'local',asr:'local',sens:vg('wkSens').value,screenOff:vg('wkScr').checked,barge:vg('wkBarge').checked,accurate:vg('wkAcc').checked};
     vShow();try{Android.saveVoice(JSON.stringify(VC));}catch(x){}}
-  function vTest(){vSave();vg('vStat').textContent='Making the voice...';Android.testVoice('Hi! This is my voice. How do I sound?');}
+  function vTest(){vSave();vg('vStat').textContent='Making the voice...';Android.testVoice('Hi, this is my voice. How do I sound?');}
   function mgTest(){vg('mgOut').textContent='Switch to the screen you want me to look at. Looking in 4 seconds...';try{Android.mirageTest();}catch(x){}}
   window.onMirageTest=function(ok,t){vg('mgOut').textContent=(ok?'':'Problem: ')+t;};
-  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works!':'Error: '+m;};
+  window.onVoiceTest=function(ok,m){vg('vStat').textContent=ok?'Playing. If you heard it, it works.':'Error: '+m;};
   var callOn=false;
   function callToggle(){try{if(callOn)Android.callStop();else{vSave();Android.callStart();}}catch(x){}setTimeout(callPoll,600);}
   function callPoll(){try{var s=JSON.parse(Android.callState());callOn=!!s.active;
