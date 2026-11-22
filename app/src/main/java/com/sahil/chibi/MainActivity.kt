@@ -416,6 +416,10 @@ class MainActivity : Activity() {
             getSharedPreferences("bloub", MODE_PRIVATE).edit().putString("color", color).putString("shape", shape).putBoolean("roam", roam).apply()
             runOnUiThread { applyBloub() }
         }
+        @JavascriptInterface fun getMail(): String = Mail.json(this@MainActivity)
+        @JavascriptInterface fun setMail(addr: String, pw: String) { Mail.save(this@MainActivity, addr, pw) }
+        @JavascriptInterface fun clearMail() { Mail.clear(this@MainActivity) }
+        @JavascriptInterface fun testMail() { Thread { val r = Mail.test(this@MainActivity); js("window.onMailTest && onMailTest(" + r.first + ", " + JSONObject.quote(r.second) + ")") }.start() }
         @JavascriptInterface fun setWatchAlong(on: Boolean) { getSharedPreferences("nana_watch", MODE_PRIVATE).edit().putBoolean("on", on).apply() }
         @JavascriptInterface fun watchLink(url: String) {
             runOnUiThread {

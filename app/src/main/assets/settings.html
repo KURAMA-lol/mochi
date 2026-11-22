@@ -326,6 +326,25 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     </script>
   </div>
 
+  <h2>Gmail</h2>
+  <div class="card">
+    <label>Gmail address</label>
+    <input id="mailAddr" type="email" placeholder="name@gmail.com" autocomplete="off">
+    <label>App password</label>
+    <input id="mailPw" type="password" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off">
+    <div class="btns"><button class="b" onclick="mailSave()">Save</button><button class="b ghost" onclick="mailTest()">Test</button><button class="b ghost" onclick="mailClear()">Remove</button></div>
+    <p class="mut" id="mailMsg"></p>
+    <p class="mut">Make it in Google Account > Security > 2-Step Verification > App passwords. It stays on this phone. Nana reads when asked and every send needs your Allow.</p>
+    <script>
+    function mailLoad(){try{var s=JSON.parse(Android.getMail());document.getElementById('mailAddr').value=s.addr||'';document.getElementById('mailPw').placeholder=s.set?'Saved (type to replace)':'xxxx xxxx xxxx xxxx';}catch(x){}}
+    function mailSave(){try{Android.setMail(document.getElementById('mailAddr').value,document.getElementById('mailPw').value);document.getElementById('mailPw').value='';mailLoad();document.getElementById('mailMsg').textContent='Saved.';}catch(x){document.getElementById('mailMsg').textContent='Not available in this build.';}}
+    function mailTest(){mailSave();document.getElementById('mailMsg').textContent='Testing...';try{Android.testMail();}catch(x){}}
+    function mailClear(){try{Android.clearMail();document.getElementById('mailAddr').value='';mailLoad();document.getElementById('mailMsg').textContent='Removed.';}catch(x){}}
+    window.onMailTest=function(ok,m){document.getElementById('mailMsg').textContent=m;};
+    window.addEventListener('load',mailLoad);
+    </script>
+  </div>
+
   <h2>App connections</h2>
   <div class="card">
     <p class="mut" style="margin-top:0">Teach Nana actions in other apps. Tap Add.</p>
