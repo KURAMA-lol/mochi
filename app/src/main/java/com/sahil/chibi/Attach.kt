@@ -19,6 +19,7 @@ class Att(val file: File, val name: String, val mime: String, val size: Long) {
 /** Attachments for the chat: copy in, turn into text the language model can use (Mirage describes pictures). */
 object Attach {
     const val MARK = "\n\n⟦attached"
+    private val REFERS = Regex("\\b(it|this|that|these|those|picture|pic|photo|image|file|document|doc|pdf|screenshot|attachment|above|earlier|ye|yeh|ise|isse|isme|iska|iski|iske|wo|woh|usse|usme|uska|uski|tasveer)\\b", RegexOption.IGNORE_CASE)
     private const val MAX_BYTES = 25L * 1024 * 1024
     private const val MAX_TEXT = 8000
     private val TEXT_EXT = setOf("txt", "md", "markdown", "csv", "tsv", "json", "xml", "html", "htm", "log", "yaml", "yml", "ini", "toml",
@@ -146,7 +147,7 @@ object Attach {
     fun augment(ctx: Context, caption: String, atts: List<Att>): String {
         val sb = StringBuilder(caption.trim())
         sb.append(MARK).append(' ').append(atts.size).append(if (atts.size == 1) " item" else " items")
-            .append(" - what the user sent with the message. They will probably ask follow-up questions about it, so remember it. Answer naturally and do not mention these markers⟧")
+            .append(" - NEW, just sent by the user in this message. Respond to it now, naturally and briefly: say what it shows or contains and react like a friend. Do not talk about earlier pictures or earlier answers. Do not mention these markers⟧")
         for (a in atts) {
             sb.append("\n\n")
             when {
@@ -173,7 +174,8 @@ object Attach {
      */
     fun followUp(history: List<Msg>): String? {
         if (history.isEmpty() || history.last().content.contains(MARK)) return null
-        val from = maxOf(0, history.size - 14)
+        if (!REFERS.containsMatchIn(history.last().content)) return null
+        val from = maxOf(0, history.size - 8)
         for (k in history.size - 2 downTo from) {
             val m = history[k]
             if (m.role == "user" && m.content.contains(MARK)) {

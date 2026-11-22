@@ -28,6 +28,18 @@ object PyRuntime {
         return compact(out).take(6000)
     }
 
+    /** Python code for Nana's terminal (see nana_pyrun.py). Runs in her scratch folder. */
+    fun pyRun(ctx: Context, code: String, timeout: Int): String {
+        val home = java.io.File(ctx.filesDir, "shell").apply { mkdirs() }.canonicalPath
+        return py(ctx).getModule("nana_pyrun").callAttr("run", code, home, timeout.coerceIn(1, 120)).toString()
+    }
+
+    /** Installs a pure-Python package from PyPI into the scratch folder. */
+    fun pip(ctx: Context, spec: String): String {
+        val home = java.io.File(ctx.filesDir, "shell").apply { mkdirs() }.canonicalPath
+        return py(ctx).getModule("nana_pyrun").callAttr("pip", spec, home).toString()
+    }
+
     /** Scrapy crawl (see nana_scrapy.py). args is the tool's JSON. Returns text for the model. */
     fun scrape(ctx: Context, args: String): String {
         val raw = py(ctx).getModule("nana_scrapy").callAttr("run", args).toString()
