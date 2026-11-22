@@ -1325,6 +1325,7 @@ class CompanionService : Service() {
         chips.addView(chip(R.drawable.ni_search, "Search web") { fill("Search the web for ") })
         chips.addView(chip(R.drawable.ni_apps, "Open app") { fill("Open ") })
         chips.addView(chip(R.drawable.ni_battery, "Phone status") { sendUserText("What's my battery and the time?", false) })
+        if (Mail.ready(this)) chips.addView(chip(R.drawable.ni_doc, "Mail") { sendUserText("Check my inbox and tell me what is unread", false) })
         chipScroll.addView(chips)
         chipRow = chipScroll
         chipScroll.visibility = if (history.isEmpty()) View.VISIBLE else View.GONE
@@ -1348,7 +1349,7 @@ class CompanionService : Service() {
             background = glass(0x14FFFFFF, 0x26FFFFFF, 26)
         }
         val et = EditText(this).apply {
-            hint = "Message Nana..."
+            hint = "Message Nana"
             setHintTextColor(0x77FFFFFF); setTextColor(0xFFFFFFFF.toInt()); textSize = 15f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             imeOptions = EditorInfo.IME_ACTION_SEND
@@ -1391,7 +1392,7 @@ class CompanionService : Service() {
                 try { flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND; blurBehindRadius = dp(26) } catch (ex: Throwable) {}
             }
         }
-        if (history.isEmpty()) addMsg("Hi ${cfg.persona.userName}! What's up?", false, null)
+        if (history.isEmpty()) addMsg("Hi ${cfg.persona.userName}, what's up?", false, null)
         else history.takeLast(16).forEach { addMsg(Attach.shown(it.content), it.role == "user", null) }
         refreshPending()
         refreshBusy()
@@ -1569,7 +1570,9 @@ class CompanionService : Service() {
         col.addView(box, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { gravity = if (user) Gravity.END else Gravity.START; topMargin = dp(10) })
-        scroll?.post { scroll?.fullScroll(View.FOCUS_DOWN) }
+        box.alpha = 0f; box.translationY = dp(10).toFloat()
+        box.animate().alpha(1f).translationY(0f).setDuration(220).start()
+        scroll?.post { scroll?.smoothScrollTo(0, col.height) }
     }
 
     private fun doSend(voice: Boolean) {
