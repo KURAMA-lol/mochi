@@ -352,6 +352,23 @@ object Mail {
         } catch (e: Throwable) { nice(e) }
     }
 
+    fun unreadCached(c: Context): Int = if (ready(c)) prefs(c).getInt("unread", -1) else -1
+    fun unreadAge(c: Context): Long = System.currentTimeMillis() - prefs(c).getLong("unread_at", 0L)
+
+    /** Counts unread inbox mails for the home-screen widget. Returns -1 when it cannot. */
+    fun refreshUnread(c: Context): Int {
+        if (!ready(c)) return -1
+        return try {
+            val n = Imap(address(c), pass(c)).use { im ->
+                im.cmd("EXAMINE INBOX")
+                val line = im.cmd("UID SEARCH UNSEEN").lineSequence().firstOrNull { it.startsWith("* SEARCH") } ?: ""
+                line.removePrefix("* SEARCH").trim().split(" ").count { it.isNotEmpty() }
+            }
+            prefs(c).edit().putInt("unread", n).putLong("unread_at", System.currentTimeMillis()).apply()
+            n
+        } catch (e: Throwable) { -1 }
+    }
+
     fun test(c: Context): Pair<Boolean, String> {
         if (!ready(c)) return Pair(false, "Add the address and app password first.")
         return try {

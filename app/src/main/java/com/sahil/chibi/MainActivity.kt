@@ -416,6 +416,16 @@ class MainActivity : Activity() {
             getSharedPreferences("bloub", MODE_PRIVATE).edit().putString("color", color).putString("shape", shape).putBoolean("roam", roam).apply()
             runOnUiThread { applyBloub() }
         }
+        @JavascriptInterface fun getWidgetCfg(): String = NanaWidget.cfgJson(this@MainActivity)
+        @JavascriptInterface fun setWidgetCfg(shape: String, style: String, mail: Boolean) { NanaWidget.save(this@MainActivity, shape, style, mail) }
+        @JavascriptInterface fun pinWidget(): String {
+            val c = this@MainActivity
+            val m = android.appwidget.AppWidgetManager.getInstance(c)
+            return if (m.isRequestPinAppWidgetSupported) {
+                runOnUiThread { try { m.requestPinAppWidget(android.content.ComponentName(c, NanaWidget::class.java), null, null) } catch (e: Exception) {} }
+                "Asking your launcher. Confirm there."
+            } else "Your launcher cannot do this. Long-press the home screen, Widgets, Nana."
+        }
         @JavascriptInterface fun getMail(): String = Mail.json(this@MainActivity)
         @JavascriptInterface fun setMail(addr: String, pw: String) { Mail.save(this@MainActivity, addr, pw) }
         @JavascriptInterface fun clearMail() { Mail.clear(this@MainActivity) }

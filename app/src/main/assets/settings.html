@@ -561,6 +561,31 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
 <!-- BEHAVIOUR -->
 <section id="beh">
+  <h2>Home screen widget</h2>
+  <div class="card">
+    <style>
+    #wgPrev{position:relative;height:96px;padding:14px;margin-bottom:12px;overflow:hidden;border:1px solid var(--line);transition:border-radius .35s var(--spring),background .25s,color .25s}
+    #wgPrev .t{font-size:16px;font-weight:700}#wgPrev .l{font-size:12px;opacity:.7;margin-top:2px}
+    #wgPrev .d{position:absolute;top:16px;right:16px;width:10px;height:10px;border-radius:50%;background:var(--ac)}
+    </style>
+    <div id="wgPrev"><div class="t">Nana</div><div class="l">Good evening  &middot;  2 unread</div><div class="l">6:30 PM  drink water</div><span class="d"></span></div>
+    <div class="setrow"><span>Shape</span><select id="wgShape" onchange="wgSave()" style="width:auto;padding:8px 10px"><option value="round">Round</option><option value="soft">Soft</option><option value="pill">Pill</option><option value="leaf">Leaf</option><option value="square">Square</option></select></div>
+    <div class="setrow"><span>Colour</span><select id="wgStyle" onchange="wgSave()" style="width:auto;padding:8px 10px"><option value="dark">Dark</option><option value="black">Black</option><option value="light">Light</option><option value="accent">Accent</option></select></div>
+    <label class="sw"><span>Unread mail<small>needs the Gmail card</small></span><input type="checkbox" id="wgMail" onchange="wgSave()"></label>
+    <div class="btns"><button class="b" onclick="wgPin()">Add to home screen</button></div>
+    <p class="mut" id="wgMsg"></p>
+    <p class="mut">Buttons: chat, browser, Nana. Tap the text to refresh. Resize it on the home screen.</p>
+    <script>
+    function wgPrev(){var p=document.getElementById('wgPrev');if(!p)return;var sh=document.getElementById('wgShape').value,st=document.getElementById('wgStyle').value;
+      var R={round:'26px',soft:'34px',pill:'48px',leaf:'30px 6px 30px 6px',square:'8px'};var B={dark:['#121316','#f2f3f5'],black:['#000','#f2f3f5'],light:['#f4f5f8','#15171b'],accent:['var(--ac)','var(--onac)']};
+      p.style.borderRadius=R[sh]||R.round;p.style.background=(B[st]||B.dark)[0];p.style.color=(B[st]||B.dark)[1];}
+    function wgLoad(){try{var s=JSON.parse(Android.getWidgetCfg());document.getElementById('wgShape').value=s.shape;document.getElementById('wgStyle').value=s.style;document.getElementById('wgMail').checked=!!s.mail;}catch(x){}wgPrev();}
+    function wgSave(){try{Android.setWidgetCfg(document.getElementById('wgShape').value,document.getElementById('wgStyle').value,document.getElementById('wgMail').checked);}catch(x){}wgPrev();}
+    function wgPin(){var m='Not available in this build.';try{m=Android.pinWidget();}catch(x){}document.getElementById('wgMsg').textContent=m;}
+    window.addEventListener('load',function(){wgLoad();setTimeout(wgLoad,500);});
+    </script>
+  </div>
+
   <div class="card" id="bcard">
     <label style="margin-top:0">Bloub colour</label>
     <div id="bsw" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"></div>
