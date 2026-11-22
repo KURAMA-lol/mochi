@@ -275,11 +275,11 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <button id="hBtn" class="b" onclick="toggleRun()">Start</button>
   </div>
   <div class="card">
-    <label style="margin-top:0"><span data-ri="PhoneRing" style="vertical-align:-4px;margin-right:6px"></span>Voice call <span class="mut">(like ChatGPT voice: stays on until you hang up, even in other apps)</span></label>
+    <label style="margin-top:0"><span data-ri="PhoneRing" style="vertical-align:-4px;margin-right:6px"></span>Voice call <span class="mut">(stays on until you hang up)</span></label>
     <div class="dl-msg" id="callStat">Not on a call</div>
     <div class="btns" style="margin-top:10px"><button class="b" id="callBtn" onclick="callToggle()">Start voice call</button></div>
-    <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off; headphones work best</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
-    <p class="mu">Needs the recognition model and a downloaded voice. Say "bye Nana" or tap Hang up to end.</p>
+    <label class="sw"><span>Talk over her to stop her<small>turn off if she cuts herself off</small></span><input type="checkbox" id="wkBarge" onchange="vSave()"></label>
+    <p class="mu">Needs the recognition model and a voice. Say "bye Nana" to end.</p>
   </div>
   <div class="btns" style="margin-top:0"><button class="b ghost ic" style="flex:1" onclick="Android.summon()"><span data-ri="ChatRoundDots"></span>Call her</button><button class="b ghost ic" style="flex:1" onclick="Android.openBrowser()"><span data-ri="Globe"></span>Her browser</button></div>
 
@@ -300,11 +300,11 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
   <h2>Hey Nana</h2>
   <div class="card">
-    <label class="sw"><span>Wake word<small>say "Hey Nana", "Hi Nana" or "Okay Nana"</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
+    <label class="sw"><span>Wake word<small>say "Hey Nana"</small></span><input type="checkbox" id="wakeOn" onchange="wakeSave()"></label>
     <div class="setrow"><span class="mut">Status</span><span id="wakeStat" class="tag">...</span></div>
     <div class="setrow" style="border-bottom:0"><span class="mut">Last heard</span><span id="wakeHeard" class="tag">-</span></div>
     <div class="btns"><button id="wakeFix" class="b" style="display:none" onclick="wakeSave()">Fix / retry</button><button class="b ghost" onclick="Android.openAppSettings()">App permissions</button></div>
-    <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Best with the offline wake model from Settings > Voice > Offline ears (no internet, no beeps). Without it she uses Google speech, which needs internet and the screen on. When she hears her name she pops up like the power button does, says Yes? and listens. "Last heard" shows what the phone understood, handy if it keeps missing.</p>
+    <p class="mut">Turning it on asks for the microphone and starts Nana if she is off. Best with the offline wake model from Settings > Voice > Offline ears (no internet). Without it Google speech is used: needs internet and screen on. "Last heard" shows what the phone understood.</p>
   </div>
 
   <h2>Web search</h2>
@@ -316,7 +316,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <input id="srKey" type="password" placeholder="BSA..." onchange="srSave()">
     <div class="btns"><button class="b" onclick="srTest()">Test search</button></div>
     <p class="mut" id="srMsg"></p>
-    <p class="mut">Falls back to DuckDuckGo if the engine fails. SearXNG and Brave also search images, videos and news; SearXNG needs JSON output on.</p>
+    <p class="mut">Falls back to DuckDuckGo. SearXNG and Brave also search images, videos, news. SearXNG needs JSON on.</p>
     <script>
     function srLoad(){try{var s=JSON.parse(Android.getSearch());document.getElementById('srEng').value=s.engine;document.getElementById('srUrl').value=s.searx;document.getElementById('srKey').value=s.brave;}catch(x){}}
     function srSave(){try{Android.setSearch(document.getElementById('srEng').value,document.getElementById('srUrl').value,document.getElementById('srKey').value);}catch(x){}}
@@ -328,11 +328,11 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
   <h2>App connections</h2>
   <div class="card">
-    <p class="mut" style="margin-top:0">Teach Nana to do things in other apps. Tap Add. Used only when you ask and "Allow actions" is on.</p>
+    <p class="mut" style="margin-top:0">Teach Nana actions in other apps. Tap Add.</p>
     <div id="cnList"></div>
     <label>Add one</label>
     <div id="cnPresets"></div>
-    <details style="margin-top:10px"><summary class="mut">Advanced: make your own (for Tasker, MacroDroid and other apps)</summary>
+    <details style="margin-top:10px"><summary class="mut">Advanced: your own (Tasker, MacroDroid)</summary>
       <label>Name</label>
       <input id="cnName" placeholder="e.g. tasker-task">
       <div class="setrow"><span>Type</span><select id="cnKind" style="width:auto;padding:8px 10px"><option value="broadcast">Background signal</option><option value="activity">Open a link / app</option><option value="service">Start a service</option></select></div>
@@ -380,20 +380,20 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <label class="sw"><span>Ask before risky actions<small>Allow / Deny card for pay, send, delete</small></span><input type="checkbox" id="askOn" onchange="agSave()"></label>
     <div class="setrow" style="border-bottom:0"><span>Ask me for<div class="mut">payments only skips every other approval</div></span><select id="askMode" onchange="askModeSave()" style="width:auto;padding:8px 10px"><option value="money">Payments only</option><option value="all">Risky things</option><option value="everything">Everything (ask every screen action)</option></select></div>
     <label class="sw"><span>Move aside for keyboard<small>she slides away while you type</small></span><input type="checkbox" id="kbOn" onchange="agSave()"></label>
-    <p class="mut">She never types passwords, cards or OTPs and never acts unless you ask.</p>
+    <p class="mut">She never types passwords, cards or OTPs.</p>
   </div>
 
   <h2>Watching</h2>
   <div class="card">
-    <label class="sw"><span>Watch along<small>she comments now and then on Reels / Shorts you scroll (needs screen control, off by default)</small></span><input type="checkbox" id="waOn" onchange="waSave()"></label>
+    <label class="sw"><span>Watch along<small>comments on Reels / Shorts you scroll (needs screen control)</small></span><input type="checkbox" id="waOn" onchange="waSave()"></label>
     <label>Make her watch a link</label>
     <div class="kw"><input id="waUrl" placeholder="Reel, Short, TikTok or YouTube link" autocapitalize="off" autocomplete="off"><button type="button" class="b sm" onclick="waGo()">Watch</button></div>
-    <p class="mut">YouTube and Shorts: she reads the captions. TikTok, Instagram and others: only the public caption, so she tells you when she did not see the video itself. You can also share a link to Nana from any app. Watch along sends the visible text of video apps to your AI provider, only while it is on.</p>
+    <p class="mut">YouTube and Shorts: reads captions. Other apps: public caption only. You can also share a link to Nana. Watch along sends visible text to your AI provider while on.</p>
   </div>
 
   <h2>Ways to call her</h2>
   <div class="card mut">
-    Hold the <b>power button</b> or swipe from a corner (after choosing Nana as default assistant)<br>
+    Hold the <b>power button</b> or swipe from a corner (set Nana as default assistant)<br>
     Say <b>"Hey Nana"</b> (turn it on above)<br>
     Quick Settings tile: edit tiles and add <b>Call Nana</b><br>
     Notification buttons: <b>Call / Hide / Stop</b><br>
@@ -407,7 +407,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card">
     <div class="dseg modeSeg" style="margin:0"></div>
     <div class="swatches accSw" style="margin:16px 4px 4px"></div>
-    <p class="mut">Mono is white on dark, black on light. Black is pure AMOLED. Her floating chat and radial menu use the accent and stay dark.</p>
+    <p class="mut">Mono is white on dark, black on light. Black is pure AMOLED.</p>
   </div>
   <h2>Preview</h2>
   <div class="card">
@@ -430,7 +430,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <label>GitHub token <span class="mut">(read-only)</span></label>
     <input id="updTok" type="password" placeholder="paste token" onchange="updTokSave()">
     <p class="mut" id="updMsg"></p>
-    <p class="mut">The repo is private, so the app needs a token to see new builds. It stays on this phone only. Create one at GitHub > Settings > Developer settings > Fine-grained tokens: only the mochi repo, permission Contents = Read-only. When a new build is ready you get a popup here.</p>
+    <p class="mut">The repo is private, so the app needs a token to see new builds. It stays on this phone only. Create one at GitHub > Settings > Developer settings > Fine-grained token, mochi repo only, Contents = Read-only. A popup shows when a new build is ready.</p>
   </div>
   <h2>Clean up</h2>
   <div class="card">
@@ -451,7 +451,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 <section id="mem">
   <div class="card" id="bond"></div>
   <div class="card">
-    <label class="sw"><span>Learn about me automatically<small>she picks up lasting facts from our chats and grows with you (one small extra API call every few messages)</small></span><input type="checkbox" id="learnOn" onchange="learnSave()"></label>
+    <label class="sw"><span>Learn about me automatically<small>learns lasting facts from chats (small extra API call now and then)</small></span><input type="checkbox" id="learnOn" onchange="learnSave()"></label>
   </div>
   <h2>What she knows <span id="memCount" class="tag"></span></h2>
   <div class="card">
@@ -465,7 +465,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <p class="mut" id="memMsg"></p>
   </div>
   <div class="btns"><button class="b red" onclick="if(confirm('Make her forget everything?')){Android.clearMemory();memLoad()}">Forget everything</button></div>
-  <p class="mut">She never stores passwords, codes, card or ID numbers. Tap the cross to make her forget one thing. You can also just tell her "forget that".</p>
+  <p class="mut">Never stores passwords, codes, card or ID numbers. Tap the cross to forget one, or say "forget that".</p>
 </section>
 
 <!-- PROVIDERS -->
@@ -479,7 +479,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <div class="card">
     <select id="preset"></select>
     <div class="btns"><button class="b" onclick="addProvider()">+ Add</button></div>
-    <p class="mut">Any OpenAI-compatible API works (Groq, OpenRouter, DeepSeek, Together, Ollama). Pick "Custom" and paste its base URL.</p>
+    <p class="mut">Any OpenAI-compatible API (Groq, OpenRouter, DeepSeek, Ollama). Pick "Custom", paste the base URL.</p>
   </div>
 </section>
 
@@ -499,7 +499,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   <h2>Rules <span class="tag">first match wins</span></h2>
   <div id="rules"></div>
   <div class="btns" style="margin-top:0"><button class="b ghost" onclick="addRule()">+ Add rule</button></div>
-  <p class="mut">Example: regex "code|python|bug" → tag:code. Give providers tags in the Providers tab.</p>
+  <p class="mut">Example: regex "code|python|bug" → tag:code. Set tags in Providers.</p>
   <h2>Route tester</h2>
   <div class="card">
     <input id="dtext" placeholder="Type a message to see who would answer...">
@@ -547,7 +547,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div id="bsw" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"></div>
     <label>Bloub shape</label>
     <div id="bsh" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    <label class="sw"><span>Bloub roams around Nana<small>the little blob next to Nana at the top of Home</small></span><input type="checkbox" id="broam" onchange="bloubSet('roam',this.checked)"></label>
+    <label class="sw"><span>Bloub roams around Nana<small>the blob next to Nana on Home</small></span><input type="checkbox" id="broam" onchange="bloubSet('roam',this.checked)"></label>
   </div>
   <div class="card">
     <label style="margin-top:0">Size: <span id="sizev"></span></label>
@@ -589,18 +589,18 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
       <div class="pbar" id="pBar" style="display:none"><i id="pBarI"></i></div>
       <div class="btns"><button class="b" id="pGet" onclick="pInstall()">Download this voice</button><button class="b ghost" id="pCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="pDel" style="display:none" onclick="pRemove()">Delete</button></div>
       <label>Speed</label><input id="pSpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
-      <p class="mu">About 21 MB per voice, works offline. Hindi voices need Devanagari text.</p>
+      <p class="mu">About 21 MB per voice, offline. Hindi needs Devanagari text.</p>
     </div>
     <div id="vPocket" style="display:none">
       <div class="dl-top"><span class="mut">Pocket-TTS voice</span><span id="pkTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
       <div class="dl-msg" id="pkStat" style="margin-top:4px">...</div>
       <div class="pbar" id="pkBar" style="display:none"><i id="pkBarI"></i></div>
       <div class="btns"><button class="b" id="pkGet" onclick="eGet('pocket')">Download</button><button class="b ghost" id="pkCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="pkDel" style="display:none" onclick="eDel('pocket')">Delete</button></div>
-      <label>Voice <span class="mut">(Pocket copies the voice from a short clip)</span></label>
+      <label>Voice <span class="mut">(copies a short clip)</span></label>
       <select id="pkVoice" onchange="vSave()"></select>
       <div class="btns"><button class="b ghost" onclick="Android.pickPocketVoice();vg('vStat').textContent='Pick an audio file...'">Use my own voice file</button><button class="b ghost" id="pkCustDel" style="display:none" onclick="Android.pocketRemoveCustom();pkFill();vSave()">Remove my voice</button></div>
       <label>Speed</label><input id="pkSpeed" type="number" step="0.05" min="0.6" max="1.6" oninput="vSave()">
-      <p class="mu">Kyutai Pocket-TTS, English only, runs fully on your phone. Big download, and each sentence takes a moment to make. For your own voice use 5 to 15 seconds of one clear speaker, and only voices you have the right to use.</p>
+      <p class="mu">Kyutai Pocket-TTS, English only, fully on your phone. Big download, slow per sentence. For your own voice use 5 to 15 s of one clear speaker you have rights to.</p>
     </div>
     <div id="vTiny" style="display:none">
       <div class="dl-top"><span class="mut">tiny-voca voice (about 26 MB, plus about 25 MB from the internet on first start)</span><span id="tyTick" class="dl-ok" style="display:none">&#10003; Downloaded</span></div>
@@ -612,7 +612,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
       <label>Speed <span class="mut">(1 = as the model says it)</span></label><input id="tySpeed" type="number" step="0.05" min="0.5" max="2" oninput="vSave()">
       <label>Pitch shift <span class="mut">(semitones, -8 to 8)</span></label><input id="tyPitch" type="number" step="0.5" min="-8" max="8" oninput="vSave()">
       <label>Pitch range <span class="mut">(0 = flat, 1 = natural, 2 = lively)</span></label><input id="tyRange" type="number" step="0.05" min="0" max="2" oninput="vSave()">
-      <p class="mu">tiny-voca by n4ze3m, 4.5 million parameters, English only, 24 kHz. It runs the same way as the web demo, inside a hidden page. After the first start the files stay on the phone. It reads one sentence at a time. It cannot read Hindi or other scripts (those parts stay silent), and Roman-script Hindi gets an English accent. Names from other languages are often misread.</p>
+      <p class="mu">tiny-voca by n4ze3m, English only, 24 kHz, one sentence at a time. Files stay on the phone after first start. Hindi script stays silent; Roman Hindi gets an English accent.</p>
     </div>
     <div class="btns" style="margin-top:14px"><button class="b" onclick="vTest()">Test voice</button></div>
     <div id="vStat" style="color:var(--mut);font-size:13px;margin-top:8px"></div>
@@ -625,7 +625,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div class="btns"><button class="b" id="mgGet" onclick="eGet('mirage')">Download</button><button class="b ghost" id="mgCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="mgDel" style="display:none" onclick="eDel('mirage')">Delete</button></div>
     <div class="btns" style="margin-top:10px"><button class="b ghost" onclick="mgTest()">Test: look at my screen (in 4 seconds)</button></div>
     <div id="mgOut" style="color:var(--mut);font-size:13px;margin-top:8px;white-space:pre-wrap"></div>
-    <p class="mu">Lets Nana look at your screen or at a picture link when you ask her to: scene, objects, text in pictures. Mirage by Cactus Compute, fully on the phone. She never looks on her own. The result goes to your AI provider like any other tool result. Needs Nana's Accessibility service for screenshots. After an update, switch that service off and on once. Text reading is Latin script only.</p>
+    <p class="mu">Nana looks at your screen or a picture link when asked: scene, objects, text. Mirage by Cactus Compute, on the phone. Never looks on its own. Needs the Accessibility service (switch off and on once after an update). Latin text only.</p>
   </div>
   <div class="card">
     <label style="margin-top:0">Hey Nana &amp; speech recognition <span class="mut">(run on your phone)</span></label>
@@ -639,9 +639,9 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div class="btns"><button class="b" id="asGet" onclick="eGet('asr')">Download (57 MB)</button><button class="b ghost" id="asCancel" style="display:none" onclick="Android.speechCancel();sTick()">Cancel</button><button class="b ghost" id="asDel" style="display:none" onclick="eDel('asr')">Delete</button></div>
     <label>Wake sensitivity</label>
     <select id="wkSens" onchange="vSave();eApply()"><option value="low">Low (fewer false wakes)</option><option value="normal">Normal</option><option value="high">High (hears you easier)</option></select>
-    <label class="sw"><span>Accurate wake<small>also reads what you say, so "Hey Nana" works with more accents. Uses more battery. Needs the recognition model.</small></span><input type="checkbox" id="wkAcc" onchange="vSave();eApply()"></label>
+    <label class="sw"><span>Accurate wake<small>also reads what you say, so "Hey Nana" works with more accents. Uses more battery.</small></span><input type="checkbox" id="wkAcc" onchange="vSave();eApply()"></label>
     <label class="sw"><span>Listen when the screen is off<small>uses more battery</small></span><input type="checkbox" id="wkScr" onchange="vSave();eApply()"></label>
-    <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. Turn on Hey Nana in its card first. English only.</p>
+    <p class="mu">Say "Hey Nana", "Hi Nana" or "Okay Nana", then your request. English only.</p>
   </div>
   <script>
   var VC={engine:'piper',piper:{voice:'en_US-amy-medium',speed:1},pocket:{speed:1,voice:''},tiny:{voice:'F2',speed:1,pitch:0,range:1},ears:{wake:'local',asr:'local',sens:'normal',screenOff:false,barge:true,accurate:true}};
@@ -749,7 +749,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 <section id="skills">
   <div class="card">
     <label style="margin-top:0">Skills</label>
-    <p class="mu">A skill is a short instruction sheet. Nana sees only the name and one line of every skill that is ON, and opens the full text when your job matches. Needs Nana's tools to be on.</p>
+    <p class="mu">A skill is a short instruction sheet. Nana sees its name and one line, and opens the rest when needed.</p>
     <div id="skList"></div>
   </div>
   <div class="card">
@@ -764,7 +764,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <label style="margin-top:0">Import from a link</label>
     <input id="skUrl" placeholder="https://github.com/.../SKILL.md">
     <div class="btns"><button class="b" onclick="skImport()">Import</button></div>
-    <p class="mu">Works with a SKILL.md style file (name and description at the top). GitHub links are fine. Read a skill before turning it on: it tells Nana what to do.</p>
+    <p class="mu">Use a SKILL.md style file or a GitHub link. Read a skill before turning it on.</p>
   </div>
   <script>
   var SK=[];
@@ -800,20 +800,20 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
   </div>
   <div class="card">
     <label style="margin-top:0">Employees</label>
-    <p class="mu">Each provider is an employee. Give it a role and choose what it may do on its own. Turn one off to take it out of the team.</p>
+    <p class="mu">Each provider is a team member. Set a role and what it may do. Turn one off to remove it.</p>
     <div id="tmEmps"></div>
   </div>
   <div class="card">
     <label style="margin-top:0">Team settings</label>
-    <label>Boss <span class="mut">(splits the job, checks the work, gives the final answer. If the boss goes offline, the next one takes over)</span></label>
+    <label>Boss <span class="mut">(splits the job, checks, answers; next one takes over if the boss is offline)</span></label>
     <select id="tmLead" onchange="tmCfg()"><option value="">Auto</option></select>
     <label>Max turns per job <span class="mut">(0 = no limit)</span></label>
     <input id="tmMax" type="number" min="0" max="500" value="0" onchange="tmCfg()">
-    <label>Max minutes per job <span class="mut">(0 = no limit. The team also stops by itself if they start repeating)</span></label>
+    <label>Max minutes per job <span class="mut">(0 = no limit)</span></label>
     <input id="tmMins" type="number" min="0" max="240" value="20" onchange="tmCfg()">
-    <label class="sw"><span>Let the team use Nana's phone tools<small>they can ask Nana to open apps, read the screen, search. Off by default.</small></span><input type="checkbox" id="tmTools" onchange="tmCfg()"></label>
+    <label class="sw"><span>Let the team use Nana's phone tools<small>can open apps, read the screen, search. Off by default.</small></span><input type="checkbox" id="tmTools" onchange="tmCfg()"></label>
     <div class="btns"><button class="b ghost" onclick="tmClear()">Clear team chat</button></div>
-    <p class="mu">Every provider you added in AI &gt; Providers is a team member with its own chat. Tap a name above to talk to just that one, or stay in Room. Write @name to call someone in the Room. Say "stop" any time. Nana can also hand a job to this team herself and read their report. Employees only get the tools you allow here, and cannot hire others, hand work on or schedule anything.</p>
+    <p class="mu">Every provider from AI &gt; Providers is a team member with its own chat. Tap a name to talk to one, or stay in Room. Write @name to call someone. Say "stop" any time. Employees only get the tools you allow here.</p>
   </div>
 </section>
 
@@ -890,7 +890,7 @@ function tmEmps(){var c=vg('tmEmps'),key=TM.agents.map(function(a){return a.key+
        +'<label class="sw"><span>On the team</span><input type="checkbox" data-k="on"></label>'
        +'<input type="text" data-k="alias" maxlength="24" placeholder="Nickname (the team can also pick names themselves)">'
        +'<input type="text" data-k="role" maxlength="160" placeholder="Role, e.g. researcher, writer, checker">'
-       +'<label class="sw"><span>Web research<small>search, read pages, Scrapy, Agent-Reach, video captions</small></span><input type="checkbox" data-k="research"></label>'
+       +'<label class="sw"><span>Web research<small>search, read pages, captions</small></span><input type="checkbox" data-k="research"></label>'
        +'<label class="sw"><span>Downloads<small>save files to Downloads/Nana</small></span><input type="checkbox" data-k="download"></label>'
        +'<label class="sw"><span>Skills<small>can open your skills</small></span><input type="checkbox" data-k="skills"></label>';
       d.querySelector('b').textContent=(a.boss?'\u2605 ':'')+a.name+'  \u00b7  '+a.model;
@@ -1129,7 +1129,7 @@ function renderPrio(){
       <button class="ib" onclick="mv(${i},-1)" ${i ? '' : 'disabled'}>&#9650;</button>
       <button class="ib" onclick="mv(${i},1)" ${i < n - 1 ? '' : 'disabled'}>&#9660;</button>
     </div>`).join('') || '<div class="mut">No providers yet. Add one below.</div>')
-    + (n > 1 ? '<div class="mut" style="margin-top:8px">Tap the dot to switch a provider on or off. The Priority + failover strategy uses this order (see Routing).</div>' : '');
+    + (n > 1 ? '<div class="mut" style="margin-top:8px">Tap the dot to turn a provider on or off. Priority + failover uses this order.</div>' : '');
 }
 function eye(i){
   const e = $('key'+i), b = $('eye'+i); if (!e || !b) return;
@@ -1199,7 +1199,7 @@ function renderProviders(){
         <div><label>Method</label><select onchange="P(${i},'method',this.value)"><option ${p.method!=='POST'?'selected':''}>GET</option><option ${p.method==='POST'?'selected':''}>POST</option></select></div>
         <div><label>Text sent</label><select onchange="P(${i},'promptMode',this.value)"><option value="full" ${p.promptMode!=='last'?'selected':''}>Personality + chat</option><option value="last" ${p.promptMode==='last'?'selected':''}>Only my message</option></select></div>
       </div>
-      <label>Answer location in JSON (blank = auto-detect, e.g. result or data.text)</label>
+      <label>Answer path in JSON (blank = auto)</label>
       <input value="${esc(p.responsePath||'')}" oninput="P(${i},'responsePath',this.value.trim())" autocapitalize="off" placeholder="auto">
       <label>POST body (blank = {&quot;prompt&quot;:&quot;{prompt}&quot;})</label>
       <textarea style="min-height:60px" oninput="P(${i},'bodyTemplate',this.value)" autocapitalize="off">${esc(p.bodyTemplate||'')}</textarea>
@@ -1211,7 +1211,7 @@ function renderProviders(){
         <div class="btns" style="margin-top:0"><button class="ib" onclick="mv(${i},-1)" ${i ? '' : 'disabled'}>&#9650; Up</button><button class="ib" onclick="mv(${i},1)" ${i < cfg.providers.length - 1 ? '' : 'disabled'}>&#9660; Down</button></div></div>
       <div><label>Weight</label><input type="number" min="1" value="${p.weight}" onchange="P(${i},'weight',+this.value)"></div>
     </div>
-    <label>Tags (comma separated, used by routing rules)</label><input value="${esc(p.tags)}" oninput="P(${i},'tags',this.value)" autocapitalize="off">
+    <label>Tags (comma separated, for routing)</label><input value="${esc(p.tags)}" oninput="P(${i},'tags',this.value)" autocapitalize="off">
     <div class="row">
       <div><label>Timeout (s)</label><input type="number" value="${p.timeoutSec}" onchange="P(${i},'timeoutSec',+this.value)"></div>
       <div><label>Max tokens</label><input type="number" value="${p.maxTokens}" onchange="P(${i},'maxTokens',+this.value)"></div>
@@ -1223,7 +1223,7 @@ function renderProviders(){
       <button class="b red" onclick="delProvider(${i})">Delete</button>
     </div>
     <div id="res${i}" class="res" style="margin-bottom:12px"></div>
-  </details>`).join('') || '<div class="card mut">No providers yet. Add one below and paste your API key.</div>';
+  </details>`).join('') || '<div class="card mut">No providers yet. Add one below.</div>';
   cfg.providers.forEach((p,i) => { if (MODELS[p.id]) renderModels(i); });
 }
 
@@ -1260,7 +1260,7 @@ function renderRoute(){
       <label>prefer</label>
       <select onchange="Rl(${i},'target',this.value)">${(tg.includes(r.target)?tg:[r.target,...tg]).map(t => `<option ${t===r.target?'selected':''}>${esc(t)}</option>`).join('')}</select>
       <div class="btns"><button class="b red" onclick="delRule(${i})">Remove</button></div>
-    </div>`).join('') || '<div class="card mut">No rules - the strategy decides everything.</div>';
+    </div>`).join('') || '<div class="card mut">No rules. The strategy decides.</div>';
   if (window.__ready) { try { dry(); } catch (e) {} }
 }
 function dry(){
