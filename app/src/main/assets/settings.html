@@ -246,6 +246,42 @@ button.b svg{width:16px;height:16px}
 button.b.ic{display:inline-flex;align-items:center;justify-content:center;gap:7px}
 h2 .ht{display:inline-flex;align-items:center;gap:7px}
 h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
+
+/* ---- Quiet surfaces: flat graphite, hairlines, one accent ---- */
+:root{--rim:transparent;--rim2:transparent;--spec:transparent;--lens:var(--field);--spring:cubic-bezier(.2,0,0,1)}
+body{background:var(--bg);letter-spacing:0;padding-bottom:84px}
+#top{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+.glass,.card,details.p,.rule,.pc,.kpi,#seg,.mbox{background:var(--card);border:1px solid var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.card,details.p{border-radius:16px}.rule,.pc,.kpi{border-radius:14px}.mbox{background:var(--bg);border-radius:20px}
+#menuBtn{background:var(--card);border:1px solid var(--line);box-shadow:none;border-radius:12px}
+#pgName,#drawer .dh{font-weight:600}
+#seg button.on,.dseg button.on{background:var(--field);box-shadow:none}
+h2{font-size:13px;letter-spacing:0;text-transform:none;font-weight:500}
+.dsec,.gtitle{font-size:12px;letter-spacing:0;text-transform:none;font-weight:500}
+input,select,textarea{box-shadow:none;border:1px solid var(--line);border-radius:12px}
+input:focus,select:focus,textarea:focus{box-shadow:none;border-color:var(--ac)}
+button.b{background:var(--ac);box-shadow:none;border-radius:12px;font-weight:500}
+button.b.ghost{background:var(--field);border:1px solid var(--line);box-shadow:none}
+button.b.red{box-shadow:none}
+.sw input[type=checkbox]{box-shadow:none;background:var(--sw)}
+.sw input[type=checkbox]::after{background:var(--knob);box-shadow:none}
+.sw input[type=checkbox]:checked{background:var(--ac)}
+.sw input[type=checkbox]:checked::after{background:var(--onac)}
+nav{left:0;right:0;bottom:0;padding:0;border-radius:0;border:0;border-top:1px solid var(--line);background:var(--bg);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+nav button{border-radius:0;font-weight:500}
+nav button.on{background:none;box-shadow:none}
+nav button.on svg{transform:none}
+#drawer{background:var(--bg);box-shadow:none;border-right:1px solid var(--line);border-radius:0;-webkit-backdrop-filter:none;backdrop-filter:none}
+.dl.on,.gi.on{background:var(--field);box-shadow:none;border-color:transparent}
+.dl svg{box-shadow:none}
+.gsb,button.ib,.mc,.order span,.rk{background:var(--field);box-shadow:none}
+.mc.on,.gk,.bar i,.pbar i{background:var(--ac);box-shadow:none}
+.gk,.dl-ok{font-weight:600}
+.gmenu{background:var(--bg);border:1px solid var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.gscrim,.mdl{-webkit-backdrop-filter:none;backdrop-filter:none}
+.pd.on,.dot.ok{box-shadow:none}
+.swatches button,.swatches button.on{box-shadow:none}.swatches button.on{border-color:var(--tx)}
+.pill{background:var(--field);border-color:var(--line);color:var(--tx);font-weight:500}
 </style>
 </head>
 <body>
