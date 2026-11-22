@@ -75,7 +75,7 @@ object Agent {
     }
 
     /** Cancels whatever task is running (a newer run also cancels the older one). */
-    fun stop() { gen++ }
+    fun stop() { synchronized(this) { gen++; active = false; curRequest = "" } }
     /** Live progress hook for the timeline UI: kinds think | tool | ok | fail | check. */
     @Volatile var onEvent: ((String, String) -> Unit)? = null
     private fun ev(k: String, t: String = "") { try { onEvent?.invoke(k, t) } catch (e: Throwable) {} }
@@ -257,7 +257,7 @@ How to work:
         val lastIdx = msgs.indexOfLast { it.role == "user" }
         if (actionish && lastIdx >= 0) {
             msgs[lastIdx] = Msg("user", msgs[lastIdx].content +
-                "\n\n(System note: if this needs the phone or the browser, do it NOW with tool calls and reply with only the tool call. Do exactly this request only.)")
+                "\n\n(System note: if this needs the phone or the browser, do it NOW with tool calls and reply with only the tool call. Do exactly this request only. If the message is just conversation and not a task, answer it normally in character; never say there is nothing to do.)")
         }
         if (resume && lastIdx >= 0) {
             msgs[lastIdx] = Msg("user", msgs[lastIdx].content + "\n\n(System note: the user wants you to continue or redo your previous task. Previous task:\n" + prevTask + "\nLook at the screen/page now and carry on from where it stopped. Do only that task.)")
