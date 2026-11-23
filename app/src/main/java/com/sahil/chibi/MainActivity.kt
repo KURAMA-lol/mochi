@@ -416,6 +416,8 @@ class MainActivity : Activity() {
             getSharedPreferences("bloub", MODE_PRIVATE).edit().putString("color", color).putString("shape", shape).putBoolean("roam", roam).apply()
             runOnUiThread { applyBloub() }
         }
+        @JavascriptInterface fun getDock(): Boolean = Dock.enabled(this@MainActivity)
+        @JavascriptInterface fun setDock(on: Boolean) { Dock.set(this@MainActivity, on); runOnUiThread { restartCompanion() } }
         @JavascriptInterface fun getWidgetCfg(): String = NanaWidget.cfgJson(this@MainActivity)
         @JavascriptInterface fun setWidgetCfg(shape: String, style: String, mail: Boolean) { NanaWidget.save(this@MainActivity, shape, style, mail) }
         @JavascriptInterface fun pinWidget(): String {

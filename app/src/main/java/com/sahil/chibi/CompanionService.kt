@@ -84,6 +84,7 @@ class CompanionService : Service() {
     }
 
     private lateinit var wm: WindowManager
+    private var dock: Dock? = null
     private val main = Handler(Looper.getMainLooper())
     private lateinit var cfg: AppConfig
 
@@ -210,6 +211,7 @@ class CompanionService : Service() {
         createChannel()
         loadChat()
         running = true
+        if (Dock.enabled(this) && Settings.canDrawOverlays(this)) { dock = Dock(this, wm) { onDockAction(it) }; dock?.show() }
         try {
             val f = android.content.IntentFilter().apply {
                 addAction(Intent.ACTION_BATTERY_LOW); addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -304,6 +306,7 @@ class CompanionService : Service() {
         try { tts?.shutdown() } catch (ex: Exception) {}
         try { unregisterReceiver(powerRx) } catch (ex: Exception) {}
         closeRadial()
+        dock?.destroy(); dock = null
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         chibi = null; attached = false; bubble = null; bubbleAttached = false; panelAttached = false; panelOpen = false
         super.onDestroy()
@@ -1398,6 +1401,18 @@ class CompanionService : Service() {
         refreshBusy()
     }
 
+    private fun onDockAction(k: String) {
+        when (k) {
+            "chat" -> { ensureChibi(); if (hidden) showChibi(); if (!panelOpen) openPanel() }
+            "browser" -> { ensureChibi(); showBrowserFloat() }
+            "screen" -> { ensureChibi(); if (!panelOpen) openPanel(); sendUserText("What's on my screen right now?", false) }
+            "mail" -> { ensureChibi(); if (!panelOpen) openPanel(); sendUserText("Check my inbox and tell me what is unread", false) }
+            "battery" -> { ensureChibi(); if (!panelOpen) openPanel(); sendUserText("What's my battery and the time?", false) }
+            "remind" -> { ensureChibi(); if (!panelOpen) openPanel(); input?.setText("Remind me in 30 minutes to "); input?.setSelection(input?.text?.length ?: 0) }
+            "settings" -> startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     private fun openPanel() {
         if (panelOpen) return
         Theme.load(this)
@@ -1405,6 +1420,7 @@ class CompanionService : Service() {
         if (panel != null && panelV != Theme.version) panel = null
         if (panel == null) buildPanel()
         hideBubble()
+        dock?.hide()
         val (_, sh) = screen()
         panelSbH = statusBarH(); panelBaseH = (sh * 0.5f).toInt()
         val ph = panelLp!!.height
@@ -1500,6 +1516,7 @@ class CompanionService : Service() {
         if (!panelOpen) return
         stopListening()
         panelOpen = false
+        dock?.show()
         val pv = panel
         if (pv != null && panelAttached) { try { wm.removeView(pv) } catch (ex: Exception) {}; panelAttached = false }
         android.view.Choreographer.getInstance().removeFrameCallback(anchorFrame)

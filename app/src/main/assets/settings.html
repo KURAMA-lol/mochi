@@ -561,6 +561,11 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
 <!-- BEHAVIOUR -->
 <section id="beh">
+  <h2>Bottom pill</h2>
+  <div class="card">
+    <label class="sw"><span>Glass pill<small>tap it for quick actions</small></span><input type="checkbox" id="dockSw" onchange="try{Android.setDock(this.checked)}catch(x){}"></label>
+    <script>window.addEventListener('load',function(){function d(){try{document.getElementById('dockSw').checked=Android.getDock();}catch(x){}}d();setTimeout(d,500);});</script>
+  </div>
   <h2>Home screen widget</h2>
   <div class="card">
     <style>
