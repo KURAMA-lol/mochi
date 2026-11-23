@@ -161,7 +161,15 @@ class NanaWidget : AppWidgetProvider() {
                 val ah = minOf(barTop - (pad + 22 * d), 110 * d, wf * 0.4f * nb.height / nb.width)
                 if (ah >= 40 * d) {
                     val dw = nb.width * ah / nb.height
-                    cv.drawBitmap(nb, null, RectF(wf - pad - dw, barTop - ah, wf - pad, barTop), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                    val dst = RectF(wf - pad - dw - 6 * d, barTop - ah, wf - pad - 6 * d, barTop)
+                    // draw on a layer and fade the right edge, so the cropped sleeve melts into the glass
+                    val lyr = cv.saveLayer(dst.left, dst.top, dst.right, dst.bottom, null)
+                    cv.drawBitmap(nb, null, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                    val mask = Paint()
+                    mask.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN)
+                    mask.shader = LinearGradient(dst.right - dw * 0.3f, 0f, dst.right, 0f, 0xFF000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+                    cv.drawRect(dst, mask)
+                    cv.restoreToCount(lyr)
                 }
             }
             cv.restore()
