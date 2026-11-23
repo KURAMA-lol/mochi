@@ -101,10 +101,22 @@ class NanaWidget : AppWidgetProvider() {
         }
 
         private fun fill(style: String): Int = when (style) {
-            "black" -> 0xF2000000.toInt()
-            "light" -> 0xF0F4F5F8.toInt()
-            "accent" -> Theme.ac
-            else -> 0xE6121316.toInt()
+            "black" -> 0xC8000000.toInt()
+            "light" -> 0xCCF4F5F8.toInt()
+            "accent" -> (Theme.ac and 0x00FFFFFF) or 0xD0000000.toInt()
+            else -> 0xB8121316.toInt()
+        }
+
+        @Volatile private var nanaBmp: Bitmap? = null
+
+        /** Nana's resting picture (the same one the app uses as a fallback). */
+        private fun nana(c: Context): Bitmap? {
+            nanaBmp?.let { return it }
+            return try {
+                val s = c.assets.open("rest.b64").bufferedReader().use { it.readText() }.trim()
+                val raw = android.util.Base64.decode(s, android.util.Base64.DEFAULT)
+                android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size).also { nanaBmp = it }
+            } catch (e: Throwable) { null }
         }
 
         private fun radii(shape: String, w: Int, h: Int, d: Float): FloatArray {
@@ -123,34 +135,63 @@ class NanaWidget : AppWidgetProvider() {
             val d = c.resources.displayMetrics.density
             val w = (wDp * d).toInt().coerceIn(160, 1200)
             val h = (hDp * d).toInt().coerceIn(100, 800)
+            val wf = w.toFloat()
+            val hf = h.toFloat()
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val cv = Canvas(bmp)
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            val path = Path().apply { addRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), radii(shape, w, h, d), Path.Direction.CW) }
+            val light = style == "light"
+            val path = Path().apply { addRoundRect(RectF(0f, 0f, wf, hf), radii(shape, w, h, d), Path.Direction.CW) }
             p.color = fill(style)
             cv.drawPath(path, p)
             cv.save()
             cv.clipPath(path)
-            p.shader = LinearGradient(0f, 0f, 0f, h * 0.5f, 0x26FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
-            cv.drawRect(0f, 0f, w.toFloat(), h * 0.5f, p)
+            // liquid glass: light pooling at the top-left, a soft shade at the bottom
+            p.shader = android.graphics.RadialGradient(wf * 0.18f, -hf * 0.1f, wf * 0.9f, intArrayOf(0x40FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+            cv.drawRect(0f, 0f, wf, hf, p)
+            p.shader = LinearGradient(0f, hf * 0.6f, 0f, hf, 0x00000000, if (light) 0x14000000 else 0x30000000, Shader.TileMode.CLAMP)
+            cv.drawRect(0f, hf * 0.6f, wf, hf, p)
             p.shader = null
-            cv.restore()
-            val light = style == "light"
             val pad = 14 * d
-            val rowH = 40 * d
-            val cw = (w - 2 * pad) / 3f
-            p.color = if (light) 0x14000000 else 0x1AFFFFFF
-            for (i in 0..2) {
-                val rr = RectF(pad + i * cw + 3 * d, h - pad - rowH, pad + (i + 1) * cw - 3 * d, h - pad)
-                cv.drawRoundRect(rr, rowH / 2f, rowH / 2f, p)
+            val barH = 40 * d
+            val barTop = hf - pad - barH
+            // Nana stands behind the button bar: her cut edge sits exactly on the bar's top edge, below the dot
+            val nb = nana(c)
+            if (nb != null) {
+                val ah = minOf(barTop - (pad + 22 * d), 110 * d, wf * 0.4f * nb.height / nb.width)
+                if (ah >= 40 * d) {
+                    val dw = nb.width * ah / nb.height
+                    cv.drawBitmap(nb, null, RectF(wf - pad - dw, barTop - ah, wf - pad, barTop), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                }
             }
-            val dot = try { Color.parseColor(c.getSharedPreferences("bloub", Context.MODE_PRIVATE).getString("color", "#3b93f0")) } catch (e: Exception) { 0xFF3B93F0.toInt() }
-            p.color = dot
-            cv.drawCircle(w - pad - 6 * d, pad + 9 * d, 5 * d, p)
+            cv.restore()
+            // one glass bar for the three buttons
+            val bar = RectF(pad, barTop, wf - pad, hf - pad)
+            p.style = Paint.Style.FILL
+            p.color = if (light) 0x10000000 else 0x18000000
+            cv.drawRoundRect(bar, barH / 2f, barH / 2f, p)
+            p.shader = LinearGradient(0f, bar.top, 0f, bar.bottom, 0x30FFFFFF, 0x0AFFFFFF, Shader.TileMode.CLAMP)
+            cv.drawRoundRect(bar, barH / 2f, barH / 2f, p)
+            p.shader = null
+            val cw = (wf - 2 * pad) / 3f
+            p.color = if (light) 0x22000000 else 0x26FFFFFF
+            for (i in 1..2) cv.drawRect(pad + i * cw - d / 2f, barTop + 11 * d, pad + i * cw + d / 2f, hf - pad - 11 * d, p)
             p.style = Paint.Style.STROKE
-            p.strokeWidth = d
-            p.color = if (light) 0x1A000000 else 0x2EFFFFFF
+            p.strokeWidth = 1.2f * d
+            p.shader = LinearGradient(0f, bar.top, 0f, bar.bottom, 0x70FFFFFF, 0x14FFFFFF, Shader.TileMode.CLAMP)
+            cv.drawRoundRect(bar, barH / 2f, barH / 2f, p)
+            p.shader = null
+            // Bloub's colour as a small status dot
+            val dot = try { Color.parseColor(c.getSharedPreferences("bloub", Context.MODE_PRIVATE).getString("color", "#3b93f0")) } catch (e: Exception) { 0xFF3B93F0.toInt() }
+            p.style = Paint.Style.FILL
+            p.color = dot
+            cv.drawCircle(wf - pad - 6 * d, pad + 8 * d, 5 * d, p)
+            // outer glass rim
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = 1.5f * d
+            p.shader = LinearGradient(0f, 0f, wf, hf, 0x90FFFFFF.toInt(), 0x18FFFFFF, Shader.TileMode.CLAMP)
             cv.drawPath(path, p)
+            p.shader = null
             return bmp
         }
 
