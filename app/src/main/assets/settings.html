@@ -489,6 +489,30 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
 <!-- PROVIDERS -->
 <section id="prov">
+  <h2>Offline model</h2>
+  <div class="card">
+    <div class="mut" id="llmSt">No file yet</div>
+    <div class="btns"><button class="b" onclick="llmPick()">Choose GGUF</button><button class="b ghost" onclick="llmAdd()">Add provider</button></div>
+    <div class="btns"><button class="b ghost" onclick="llmTest()">Test</button><button class="b red" onclick="llmDel()">Remove</button></div>
+    <p class="mut" id="llmMsg"></p>
+    <p class="mut">Pick the .gguf from Downloads. It is copied in once, then works without internet. Add it last so it only answers when the others fail.</p>
+    <script>
+    function llmLoad(){try{var s=JSON.parse(Android.llmStatus());document.getElementById('llmSt').textContent=s.ready?('Ready \u00b7 '+s.mb+' MB'+(s.has?' \u00b7 provider added':'')):'No file yet';}catch(x){}}
+    function llmPick(){document.getElementById('llmMsg').textContent='';try{Android.pickLlm();}catch(x){}}
+    function llmDel(){try{Android.removeLlm();}catch(x){}llmLoad();}
+    function llmTest(){document.getElementById('llmMsg').textContent='Running...';try{Android.testLlm();}catch(x){}}
+    function llmAdd(){
+      if(cfg.providers.some(function(p){return p.type==='local';})){document.getElementById('llmMsg').textContent='Already added';return;}
+      var id='p'+Date.now().toString(36);
+      cfg.providers.push({id:id,name:'Offline (on phone)',type:'local',baseUrl:'on-device',apiKey:'',model:'local',enabled:true,priority:cfg.providers.length+1,weight:1,tags:'offline,free',timeoutSec:120,maxTokens:300,temperature:0.7,method:'GET',headers:'',bodyTemplate:'',responsePath:'',promptMode:'full'});
+      renum();flushSave();refreshAI();document.getElementById('llmMsg').textContent='Added at the bottom';llmLoad();
+    }
+    window.onLlm=function(ok,m){document.getElementById('llmMsg').textContent=m;llmLoad();};
+    window.onLlmProg=function(mb){document.getElementById('llmSt').textContent='Copying... '+mb+' MB';};
+    window.onLlmTest=function(ok,m){document.getElementById('llmMsg').textContent=(ok?'OK: ':'Failed: ')+m;};
+    window.addEventListener('load',function(){llmLoad();setTimeout(llmLoad,600);});
+    </script>
+  </div>
   <h2>Priority order <span class="tag">top is tried first</span></h2>
   <div class="card" id="prio"></div>
   <div class="btns" style="margin-top:12px"><button class="b ghost" style="flex:1" onclick="testAll()">Test all</button></div>
@@ -1229,11 +1253,11 @@ window.onTest = (id, ok, text) => {
 function renderProviders(){
   $('plist').innerHTML = cfg.providers.map((p,i) => `
   <details class="p" ${openP.has(p.id) ? 'open' : ''} ontoggle="OP('${p.id}',this.open)">
-    <summary><span class="pn"><i class="pd ${p.enabled?'on':''}"></i><span><b>${esc(p.name)}</b><span class="tag" id="tst${i}">${esc(p.model||p.type)}${(!p.apiKey&&p.type!=='generic')?' · no key':''}</span></span></span><span class="tag">#${i+1}</span></summary>
+    <summary><span class="pn"><i class="pd ${p.enabled?'on':''}"></i><span><b>${esc(p.name)}</b><span class="tag" id="tst${i}">${esc(p.model||p.type)}${(!p.apiKey&&p.type!=='generic'&&p.type!=='local')?' · no key':''}</span></span></span><span class="tag">#${i+1}</span></summary>
     <label>Name</label><input value="${esc(p.name)}" oninput="P(${i},'name',this.value)">
     <label>API type</label>
     <select onchange="T(${i},this.value)">
-      ${[['openai','OpenAI-compatible'],['anthropic','Anthropic'],['gemini','Gemini'],['generic','Custom endpoint (any URL: GET / POST)']].map(t => `<option value="${t[0]}" ${p.type===t[0]?'selected':''}>${t[1]}</option>`).join('')}
+      ${[['openai','OpenAI-compatible'],['anthropic','Anthropic'],['gemini','Gemini'],['generic','Custom endpoint (any URL: GET / POST)'],['local','On-phone model (offline)']].map(t => `<option value="${t[0]}" ${p.type===t[0]?'selected':''}>${t[1]}</option>`).join('')}
     </select>
     <label>${p.type==='generic'?'URL template  (use {prompt}, {message}, {key}, {model})':'Base URL'}</label><input value="${esc(p.baseUrl)}" oninput="P(${i},'baseUrl',this.value.trim())" autocapitalize="off">
     <label>API key</label>

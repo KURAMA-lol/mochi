@@ -8,7 +8,7 @@ data class Msg(val role: String, val content: String)
 data class Provider(
     var id: String,
     var name: String,
-    var type: String,          // openai | anthropic | gemini | generic
+    var type: String,          // openai | anthropic | gemini | generic | local
     var baseUrl: String,
     var apiKey: String,
     var model: String,
@@ -36,8 +36,8 @@ data class Provider(
     }
 
     fun usable(): Boolean =
-        enabled && baseUrl.isNotBlank() &&
-            (type == "generic" || (model.isNotBlank() && (apiKey.isNotBlank() || isLocal())))
+        enabled && (type == "local" || baseUrl.isNotBlank()) &&
+            (type == "local" || type == "generic" || (model.isNotBlank() && (apiKey.isNotBlank() || isLocal())))
 
     companion object {
         fun fromJson(o: JSONObject) = Provider(

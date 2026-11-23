@@ -43,12 +43,14 @@ object Adapters {
             "anthropic" -> anthropic(p, system, clean)
             "gemini" -> gemini(p, system, clean)
             "generic" -> Generic.call(p, system, clean)
+            "local" -> LocalLlm.call(p, system, clean)
             else -> openai(p, system, clean)
         }
     }
 
     /** Model ids the provider's own API offers (for the "Fetch models" button). */
     fun listModels(p: Provider): List<String> {
+        if (p.type == "local") return listOf("on-device")
         if (p.type == "generic") throw Exception("Custom endpoints have no model list. Type the model name only if the URL uses {model}.")
         if (p.baseUrl.isBlank()) throw Exception("Fill the Base URL first.")
         val base = p.baseUrl.trimEnd('/')

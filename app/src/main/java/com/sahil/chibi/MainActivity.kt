@@ -348,6 +348,7 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 81) { llmPicked(resultCode, data); return }
         if (requestCode == 80) {
             if (resultCode != RESULT_OK) return
             val u = data?.data ?: return
@@ -360,6 +361,38 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
+    }
+
+    private fun llmPicked(resultCode: Int, data: Intent?) {
+        if (resultCode != RESULT_OK) return
+        val u = data?.data ?: return
+        Thread {
+            try {
+                val dir = java.io.File(filesDir, "llm"); dir.mkdirs()
+                val tmp = java.io.File(dir, "model.part")
+                var total = 0L
+                contentResolver.openInputStream(u)!!.use { i ->
+                    val head = ByteArray(4)
+                    val n = i.read(head)
+                    if (n != 4 || String(head, Charsets.ISO_8859_1) != "GGUF") throw Exception("that is not a GGUF file")
+                    tmp.outputStream().use { o ->
+                        o.write(head); total = 4
+                        val b = ByteArray(1 shl 16); var last = 0L
+                        while (true) {
+                            val r = i.read(b); if (r <= 0) break
+                            o.write(b, 0, r); total += r
+                            if (total - last > 25_000_000) { last = total; js("window.onLlmProg && onLlmProg(" + (total / 1_000_000L) + ")") }
+                        }
+                    }
+                }
+                val f = LocalLlm.file(this)
+                LocalLlm.remove(this)
+                if (!tmp.renameTo(f)) throw Exception("could not save the file")
+                js("window.onLlm && onLlm(true, " + JSONObject.quote("Saved, " + (total / 1_000_000L) + " MB") + ")")
+            } catch (ex: Throwable) {
+                js("window.onLlm && onLlm(false, " + JSONObject.quote(ex.message ?: ex.toString()) + ")")
+            }
+        }.start()
     }
 
     private fun askRuntimePerms() {
@@ -416,6 +449,15 @@ class MainActivity : Activity() {
             getSharedPreferences("bloub", MODE_PRIVATE).edit().putString("color", color).putString("shape", shape).putBoolean("roam", roam).apply()
             runOnUiThread { applyBloub() }
         }
+        @JavascriptInterface fun llmStatus(): String = LocalLlm.statusJson(this@MainActivity)
+        @JavascriptInterface fun pickLlm() {
+            runOnUiThread {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
+                startActivityForResult(i, 81)
+            }
+        }
+        @JavascriptInterface fun removeLlm() { LocalLlm.remove(this@MainActivity) }
+        @JavascriptInterface fun testLlm() { Thread { val r = LocalLlm.test(this@MainActivity); js("window.onLlmTest && onLlmTest(" + r.first + ", " + JSONObject.quote(r.second) + ")") }.start() }
         @JavascriptInterface fun getDock(): Boolean = Dock.enabled(this@MainActivity)
         @JavascriptInterface fun setDock(on: Boolean) { Dock.set(this@MainActivity, on); runOnUiThread { restartCompanion() } }
         @JavascriptInterface fun getWidgetCfg(): String = NanaWidget.cfgJson(this@MainActivity)
