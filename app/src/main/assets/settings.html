@@ -1541,5 +1541,11 @@ new MutationObserver(function(){sync();}).observe(grid,{attributes:true,subtree:
 sync();window.addEventListener('load',function(){sync();setTimeout(sync,400);});
 }catch(x){}})();
 </script>
+<style id="fontface">
+@font-face{font-family:"Geist";font-style:normal;font-weight:300 500;font-display:swap;src:url("fonts/geist-400.woff2") format("woff2")}
+@font-face{font-family:"Geist";font-style:normal;font-weight:600 800;font-display:swap;src:url("fonts/geist-600.woff2") format("woff2")}
+body{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.005em}
+#pgName{letter-spacing:-.02em}
+</style>
 </body>
 </html>
