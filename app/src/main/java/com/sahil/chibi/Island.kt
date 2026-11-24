@@ -61,6 +61,7 @@ class Island(private val ctx: Context, private val wm: WindowManager, private va
     private var titleT: TextView? = null
     private var lp: WindowManager.LayoutParams? = null
     private var attached = false
+    private var useWm: WindowManager = wm
     private var bReady = false
     private var mode = 0           // 0 pill, 1 peek, 2 open
     private var curW = cW; private var curH = cH
@@ -108,9 +109,18 @@ class Island(private val ctx: Context, private val wm: WindowManager, private va
         g.cornerRadius = cH / 2f
         s.background = g
         s.contentDescription = "Nana island"
-        s.setOnClickListener {
-            if (mode != 2) morph(2)
-            else { js("Bloub.resume();Bloub.state('wink')"); main.postDelayed({ applyBloub() }, 1400); wake() }
+        s.isClickable = true
+        s.setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.95f).scaleY(0.95f).setDuration(90).start()
+                MotionEvent.ACTION_UP -> {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+                    if (mode != 2) morph(2)
+                    else { js("Bloub.resume();Bloub.state('wink')"); main.postDelayed({ applyBloub() }, 1400); wake() }
+                }
+                MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+            }
+            true
         }
         val w = object : WebView(ctx) { override fun dispatchTouchEvent(e: MotionEvent): Boolean = false }
         w.setBackgroundColor(0)
@@ -220,7 +230,7 @@ class Island(private val ctx: Context, private val wm: WindowManager, private va
     private fun resizeWindow(w: Int, h: Int) {
         val l = lp ?: return
         l.width = w; l.height = h
-        if (attached) try { wm.updateViewLayout(root, l) } catch (ex: Exception) {}
+        if (attached) try { useWm.updateViewLayout(root, l) } catch (ex: Exception) {}
     }
 
     private fun fill() {
@@ -282,14 +292,30 @@ class Island(private val ctx: Context, private val wm: WindowManager, private va
         build()
         mode = 0; curW = cW; curH = cH
         apply(cW, cH); resizeWindow(cW, cH)
-        try { wm.addView(root, lp); attached = true } catch (ex: Exception) { attached = false; return }
+        // Nana's accessibility window can sit over the status bar and still get taps on phones that block normal overlays there
+        val acc = NanaAccess.inst
+        var placed = false
+        if (acc != null) {
+            try {
+                val awm = acc.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                lp?.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                awm.addView(root, lp); useWm = awm; placed = true
+            } catch (ex: Throwable) { placed = false }
+        }
+        if (!placed) {
+            try {
+                lp?.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                wm.addView(root, lp); useWm = wm; placed = true
+            } catch (ex: Throwable) { attached = false; return }
+        }
+        attached = true
         main.postDelayed(aliveR, 40_000)
     }
 
     fun hide() {
         anim?.cancel()
         main.removeCallbacksAndMessages(null)
-        if (attached) { try { wm.removeView(root) } catch (ex: Exception) {}; attached = false }
+        if (attached) { try { useWm.removeView(root) } catch (ex: Throwable) {}; attached = false }
     }
 
     fun destroy() {
