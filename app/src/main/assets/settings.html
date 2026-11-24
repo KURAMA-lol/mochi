@@ -494,13 +494,14 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div class="mut" id="llmSt">No file yet</div>
     <div class="btns"><button class="b" onclick="llmPick()">Choose GGUF</button><button class="b ghost" onclick="llmAdd()">Add provider</button></div>
     <div class="btns"><button class="b ghost" onclick="llmTest()">Test</button><button class="b red" onclick="llmDel()">Remove</button></div>
+    <vs-thinking-orb-search id="llmOrb" size="sm" style="display:none"></vs-thinking-orb-search>
     <p class="mut" id="llmMsg"></p>
     <p class="mut">Pick the .gguf from Downloads. It is copied in once, then works without internet. Add it last so it only answers when the others fail.</p>
     <script>
     function llmLoad(){try{var s=JSON.parse(Android.llmStatus());document.getElementById('llmSt').textContent=s.ready?('Ready \u00b7 '+s.mb+' MB'+(s.has?' \u00b7 provider added':'')):'No file yet';}catch(x){}}
     function llmPick(){document.getElementById('llmMsg').textContent='';try{Android.pickLlm();}catch(x){}}
     function llmDel(){try{Android.removeLlm();}catch(x){}llmLoad();}
-    function llmTest(){document.getElementById('llmMsg').textContent='Running...';try{Android.testLlm();}catch(x){}}
+    function llmTest(){document.getElementById('llmMsg').textContent='Running...';document.getElementById('llmOrb').style.display='inline-block';try{Android.testLlm();}catch(x){}}
     function llmAdd(){
       if(cfg.providers.some(function(p){return p.type==='local';})){document.getElementById('llmMsg').textContent='Already added';return;}
       var id='p'+Date.now().toString(36);
@@ -509,7 +510,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     }
     window.onLlm=function(ok,m){document.getElementById('llmMsg').textContent=m;llmLoad();};
     window.onLlmProg=function(mb){document.getElementById('llmSt').textContent='Copying... '+mb+' MB';};
-    window.onLlmTest=function(ok,m){document.getElementById('llmMsg').textContent=(ok?'OK: ':'Failed: ')+m;};
+    window.onLlmTest=function(ok,m){document.getElementById('llmOrb').style.display='none';document.getElementById('llmMsg').textContent=(ok?'OK: ':'Failed: ')+m;};
     window.addEventListener('load',function(){llmLoad();setTimeout(llmLoad,600);});
     </script>
   </div>
@@ -874,7 +875,7 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
     <div id="tmChips" class="tm-chips"></div>
     <div id="tmLog" class="tm-log"></div>
     <div id="tmTree" class="tm-tree"></div>
-    <div class="tm-info"><span id="tmInfo">...</span><button class="b ghost tm-stop" onclick="Android.teamStop()">Stop</button></div>
+    <div class="tm-info"><vs-thinking-orb-search id="tmOrb" size="sm" style="display:none;margin-right:6px"></vs-thinking-orb-search><span id="tmInfo">...</span><button class="b ghost tm-stop" onclick="Android.teamStop()">Stop</button></div>
     <div class="tm-compose"><textarea id="tmText" rows="1" placeholder="Give the team a job, or talk to them..."></textarea><button class="b" onclick="tmSend()">Send</button></div>
     <p class="mu" id="tmTo"></p>
   </div>
@@ -935,7 +936,7 @@ function tmPoll(){
   if(!TM.cfg){TM.cfg=true;vg('tmMax').value=s.max;vg('tmMins').value=s.mins;vg('tmTools').checked=!!s.tools;vg('tmLead').value=s.leadPref||'';}
   s.events.forEach(function(e){TM.ev.push(e);if(e.id>TM.last)TM.last=e.id;});
   TM.running=s.running;tmChips();tmEmps();tmTree(s);
-  vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns: '+s.turns+(s.max?' / '+s.max:'')+(s.lead?'  Boss: '+s.lead:'');
+  vg('tmOrb').style.display=s.running?'inline-block':'none';vg('tmInfo').textContent=(s.running?'Working... ':'Idle. ')+'Turns: '+s.turns+(s.max?' / '+s.max:'')+(s.lead?'  Boss: '+s.lead:'');
   if(s.events.length||TM.redo){tmRender(!!TM.redo,s.events);TM.redo=false;}
 }
 function tmChips(){var c=vg('tmChips');
@@ -1553,5 +1554,7 @@ sync();window.addEventListener('load',function(){sync();setTimeout(sync,400);});
 body{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.005em}
 #pgName{letter-spacing:-.02em}
 </style>
+<style>vs-thinking-orb-search{--vs-color:var(--ac)}</style>
+<script src="vs-thinking-orb-search.js"></script>
 </body>
 </html>

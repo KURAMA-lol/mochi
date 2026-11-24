@@ -1160,6 +1160,7 @@ class CompanionService : Service() {
 
     private var sendBtn: android.widget.ImageView? = null
     private var subtitle: TextView? = null
+    private var orbV: OrbView? = null
 
     /** Liquid-glass surface: translucent base, bright top-left specular sheen and a light rim. */
     private fun liquid(base: Int, r: Int, stroke: Int = 0x38FFFFFF): android.graphics.drawable.Drawable {
@@ -1194,6 +1195,8 @@ class CompanionService : Service() {
         val busy = typing != null
         subtitle?.text = if (busy) "working on it..." else "online"
         subtitle?.setTextColor(if (busy) Theme.ac else Theme.ac2)
+        orbV?.ink = Theme.ac
+        orbV?.visibility = if (busy) View.VISIBLE else View.GONE
         val empty = (input?.text?.toString()?.trim() ?: "").isEmpty() && pending.isEmpty()
         sendBtn?.setImageResource(if (busy && empty) R.drawable.ni_stop else R.drawable.ni_send)
     }
@@ -1316,6 +1319,11 @@ class CompanionService : Service() {
         })
         val sub = TextView(this).apply { text = "online"; textSize = 11f; setTextColor(Theme.ac2); setPadding(dp(8), dp(2), 0, 0) }
         titleRow.addView(sub)
+        val orb = OrbView(this)
+        orb.ink = Theme.ac
+        orb.visibility = View.GONE
+        titleRow.addView(orb, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginStart = dp(6) })
+        orbV = orb
         header.addView(titleRow, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(ghostBtn(R.drawable.ni_clear) { clearChat() })
         header.addView(ghostBtn(R.drawable.ni_close) { closePanel() })
