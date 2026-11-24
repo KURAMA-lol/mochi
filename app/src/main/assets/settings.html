@@ -1079,6 +1079,7 @@ function applyTheme(save){
 function setAcc(k){ TH.accent = k; applyTheme(true); }
 function setMode(m){ TH.mode = m; applyTheme(true); }
 function buildDrawerNav(){
+  if (1) return;
   const cur = (document.querySelector('section.on') || {}).id;
   $('dnav').innerHTML = Object.keys(GROUPS).map(k => {
     const g = GROUPS[k];
@@ -1501,16 +1502,17 @@ document.addEventListener('change',function(e){var t=e.target;if(!t||!t.matches|
 nav.dk{left:50%;right:auto;width:184px;height:48px;padding:0;display:block;overflow:hidden;transform:translateX(-50%) translateZ(0);border-radius:30px;cursor:pointer;
   transition:width .5s cubic-bezier(.2,1,.3,1),height .5s cubic-bezier(.2,1,.3,1),border-radius .5s cubic-bezier(.2,1,.3,1),box-shadow .3s}
 nav.dk::before{display:none}
-nav.dk.open{width:calc(100% - 24px);height:min(316px,52vh);border-radius:36px;cursor:default}
+nav.dk.open{width:calc(100% - 24px);height:min(276px,46vh);border-radius:36px;cursor:default}
 nav.dk .nn{position:absolute;top:7px;left:50%;width:24px;height:3px;margin-left:-12px;border-radius:2px;background:currentColor;color:var(--mut);opacity:.5;pointer-events:none}
 nav.dk .nc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;padding-top:6px;color:var(--act);font-size:13.5px;font-weight:600;transition:opacity .18s,transform .3s;pointer-events:none}
-nav.dk .nc svg{width:19px;height:19px}
+nav.dk .nc svg{width:17px;height:17px}
 nav.dk.open .nc{opacity:0;transform:translateY(-8px)}
-nav.dk .ng{position:absolute;inset:0;padding:24px 14px 14px;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:10px;opacity:0;pointer-events:none;transform:translateY(14px) scale(.97);transition:opacity .16s,transform .3s}
+nav.dk .ng{position:absolute;inset:0;padding:22px 12px 12px;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:8px;opacity:0;pointer-events:none;transform:translateY(14px) scale(.97);transition:opacity .16s,transform .3s}
 nav.dk.open .ng{opacity:1;pointer-events:auto;transform:none;transition:opacity .28s .14s,transform .45s .1s cubic-bezier(.2,1,.3,1)}
-nav.dk .ng button{flex:none;padding:0;gap:9px;justify-content:center;font-size:13px;border-radius:26px;background:var(--card);border:1px solid var(--line);box-shadow:inset 1px 1px 0 var(--rim),inset -1px -1px 0 var(--rim2)}
-nav.dk .ng button svg{width:30px;height:30px}
+nav.dk .ng button{flex:none;padding:0;gap:6px;justify-content:center;font-size:12px;font-weight:600;border-radius:22px;background:var(--card);border:1px solid var(--line);box-shadow:inset 1px 1px 0 var(--rim),inset -1px -1px 0 var(--rim2)}
+nav.dk .ng button svg{width:21px;height:21px}
 nav.dk .ng button.on{background:var(--lens);color:var(--act)}
+#dnav{display:none}
 #nscrim{position:fixed;inset:0;background:rgba(0,0,0,.38);opacity:0;pointer-events:none;transition:opacity .35s;z-index:7}
 #nscrim.on{opacity:1;pointer-events:auto}
 </style>
