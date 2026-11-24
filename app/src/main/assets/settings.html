@@ -585,6 +585,17 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 
 <!-- BEHAVIOUR -->
 <section id="beh">
+  <h2>Dynamic island</h2>
+  <div class="card">
+    <label class="sw"><span>Island<small>top of the screen, shows while Nana is on</small></span><input type="checkbox" id="isSw" onchange="isSave()"></label>
+    <label>Height nudge</label>
+    <input type="range" id="isY" min="-12" max="24" step="1" value="0" onchange="isSave()">
+    <script>
+    function isLoad(){try{var s=JSON.parse(Android.getIsland());document.getElementById('isSw').checked=!!s.on;document.getElementById('isY').value=s.y;}catch(x){}}
+    function isSave(){try{Android.setIsland(document.getElementById('isSw').checked,+document.getElementById('isY').value);}catch(x){}}
+    window.addEventListener('load',function(){isLoad();setTimeout(isLoad,500);});
+    </script>
+  </div>
   <h2>Bottom pill</h2>
   <div class="card">
     <label class="sw"><span>Glass pill<small>tap it for quick actions</small></span><input type="checkbox" id="dockSw" onchange="try{Android.setDock(this.checked)}catch(x){}"></label>

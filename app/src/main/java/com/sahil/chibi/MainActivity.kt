@@ -458,6 +458,8 @@ class MainActivity : Activity() {
         }
         @JavascriptInterface fun removeLlm() { LocalLlm.remove(this@MainActivity) }
         @JavascriptInterface fun testLlm() { Thread { val r = LocalLlm.test(this@MainActivity); js("window.onLlmTest && onLlmTest(" + r.first + ", " + JSONObject.quote(r.second) + ")") }.start() }
+        @JavascriptInterface fun getIsland(): String = JSONObject().put("on", Island.enabled(this@MainActivity)).put("y", Island.nudge(this@MainActivity)).toString()
+        @JavascriptInterface fun setIsland(on: Boolean, y: Int) { Island.set(this@MainActivity, on, y); runOnUiThread { restartCompanion() } }
         @JavascriptInterface fun getDock(): Boolean = Dock.enabled(this@MainActivity)
         @JavascriptInterface fun setDock(on: Boolean) { Dock.set(this@MainActivity, on); runOnUiThread { restartCompanion() } }
         @JavascriptInterface fun getWidgetCfg(): String = NanaWidget.cfgJson(this@MainActivity)

@@ -85,6 +85,7 @@ class CompanionService : Service() {
 
     private lateinit var wm: WindowManager
     private var dock: Dock? = null
+    private var island: Island? = null
     private val main = Handler(Looper.getMainLooper())
     private lateinit var cfg: AppConfig
 
@@ -141,6 +142,11 @@ class CompanionService : Service() {
     }
     private val powerRx = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: android.content.Context, i: Intent) {
+            when (i.action) {
+                Intent.ACTION_POWER_CONNECTED -> island?.peek("Charging  " + Island.battery(c) + "%")
+                Intent.ACTION_POWER_DISCONNECTED -> island?.peek("Unplugged  " + Island.battery(c) + "%")
+                Intent.ACTION_BATTERY_LOW -> island?.peek("Battery low")
+            }
             if (hidden || chibi == null) return
             val now = SystemClock.uptimeMillis()
             if (now - lastPowerSay < 8000) return
@@ -212,6 +218,7 @@ class CompanionService : Service() {
         loadChat()
         running = true
         if (Dock.enabled(this) && Settings.canDrawOverlays(this)) { dock = Dock(this, wm) { onDockAction(it) }; dock?.show() }
+        if (Island.enabled(this) && Settings.canDrawOverlays(this)) { island = Island(this, wm) { onDockAction(it) }; island?.show() }
         try {
             val f = android.content.IntentFilter().apply {
                 addAction(Intent.ACTION_BATTERY_LOW); addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -307,6 +314,7 @@ class CompanionService : Service() {
         try { unregisterReceiver(powerRx) } catch (ex: Exception) {}
         closeRadial()
         dock?.destroy(); dock = null
+        island?.destroy(); island = null
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         chibi = null; attached = false; bubble = null; bubbleAttached = false; panelAttached = false; panelOpen = false
         super.onDestroy()
@@ -1679,6 +1687,7 @@ class CompanionService : Service() {
         history.add(Msg("assistant", clean))
         saveChat()
         addMsg(clean, false, "via ${res.provider.name} · ${res.ms}ms")
+        if (!panelOpen) island?.peek(clean.replace("\n", " ").take(46))
         val mode = cfg.persona.ttsMode
         say(clean, mood, spoken = Call.active || mode == "always" || (mode == "voice" && voice))
         Learner.after(this, cfg, history.takeLast(8).toList()) { _ -> main.post { if (typing == null) say("Noted, I'll remember that.", "happy") } }

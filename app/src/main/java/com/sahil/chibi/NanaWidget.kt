@@ -79,7 +79,7 @@ class NanaWidget : AppWidgetProvider() {
             return if (name.isNotBlank()) g + ", " + name else g
         }
 
-        private fun nextReminder(c: Context): String {
+        fun nextReminder(c: Context): String {
             return try {
                 val a = JSONArray(Reminders.json(c))
                 val now = System.currentTimeMillis()
