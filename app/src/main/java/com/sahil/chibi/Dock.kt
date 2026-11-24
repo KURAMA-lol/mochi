@@ -20,7 +20,7 @@ import android.widget.TextView
  */
 class Dock(private val ctx: Context, private val wm: WindowManager, private val onAct: (String) -> Unit) {
     companion object {
-        fun enabled(c: Context): Boolean = c.getSharedPreferences("chibi_cfg", Context.MODE_PRIVATE).getBoolean("dock", true)
+        fun enabled(c: Context): Boolean = c.getSharedPreferences("chibi_cfg", Context.MODE_PRIVATE).getBoolean("dock", false)
         fun set(c: Context, v: Boolean) { c.getSharedPreferences("chibi_cfg", Context.MODE_PRIVATE).edit().putBoolean("dock", v).apply() }
     }
 
