@@ -54,8 +54,21 @@ object Router {
         val rest = pool.filter { p -> preferred.none { it.id == p.id } }
         if (preferred.isEmpty() || cfg.router.fallback) ordered.addAll(order(rest, strat, advance))
         if (cfg.router.fallback || ordered.isEmpty()) ordered.addAll(cooled.sortedBy { statOf(it.id).cooldownUntil })
+        // no internet: the on-phone model goes first so she answers at once instead of waiting for cloud timeouts
+        if (!online()) {
+            val loc = ordered.filter { it.type == "local" }
+            if (loc.isNotEmpty()) return Plan(loc + ordered.filter { it.type != "local" }, "offline -> on-phone model")
+        }
         return Plan(ordered, matched)
     }
+
+    private fun online(): Boolean = try {
+        val app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as android.content.Context
+        val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val n = cm.activeNetwork
+        val caps = if (n == null) null else cm.getNetworkCapabilities(n)
+        caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    } catch (e: Throwable) { true }
 
     private fun matches(r: Rule, text: String, voice: Boolean): Boolean = try {
         when (r.kind) {
@@ -132,6 +145,7 @@ object Router {
                     val msg = e.message ?: e.toString()
                     trace.add("${p.name}: ${msg.take(140)}")
                     onFail(p, msg, code, cfg)
+                    if (p.type == "local") break
                     if (code == 400 || code == 401 || code == 403 || code == 404 || code == 422 || code == 429) break
                     if (a < attempts) Thread.sleep(400L * a)
                 }
