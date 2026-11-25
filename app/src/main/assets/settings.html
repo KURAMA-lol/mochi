@@ -262,23 +262,52 @@ h2 .ht svg{width:16px;height:16px;color:var(--act);flex:0 0 16px}
 #prio .prow.go{max-height:0;opacity:0;transform:translateX(24px);padding-top:0;padding-bottom:0}
 </style>
 <style id="tmfscss">
-.tmfs-h{display:none}
+.tmfs-h,.tm-scrim,.tm-drh,.tm-drc{display:none}
+.tm-dr{display:contents}
 .tm-men{display:none}
-#tmCard.fs{position:fixed;inset:0;z-index:99999;margin:0;border-radius:0;display:flex;flex-direction:column;height:100vh;height:100dvh;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;background:var(--bg);overflow:hidden}
-#tmCard.fs .tmfs-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+#tmCard.fs{position:fixed;inset:0;z-index:99999;margin:0;border:0;border-radius:0;display:flex;flex-direction:column;height:100vh;height:100dvh;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 12px) 0 0;background:radial-gradient(120% 60% at 50% 0%,rgba(var(--acr),.10),transparent 60%),var(--bg);overflow:hidden;-webkit-backdrop-filter:none;backdrop-filter:none}
+#tmCard.fs .tmfs-h{display:flex;align-items:center;gap:10px;padding:0 12px 10px;border-bottom:1px solid var(--line);flex:none}
+.ib2{flex:none;width:40px;height:40px;border-radius:13px;border:1px solid var(--line);background:var(--card);color:var(--tx);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;font-size:22px;line-height:1}
+.ib2 i{display:block;width:16px;height:1.6px;border-radius:2px;background:currentColor}
+.ib2.x{margin-left:auto}
+.tmav{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;color:#101114;background:var(--ac)}
 #tmCard.fs .tmfs-t{display:flex;flex-direction:column;min-width:0}
-#tmCard.fs .tmfs-t b{font-size:16px;font-weight:600}
+#tmCard.fs .tmfs-t b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #tmCard.fs .tmfs-t span{font-size:12px;color:var(--mut)}
-#tmCard.fs .tm-log{flex:1;height:auto;min-height:0;padding:8px 2px}
-#tmCard.fs .tm-m{font-size:15px}
-#tmCard.fs .tm-tree{max-height:20vh;overflow:auto;flex:none}
-#tmCard.fs .tm-chips{flex:none}
-#tmCard.fs .tm-info,#tmCard.fs .tm-compose{flex:none}
+#tmCard.fs .tm-log{flex:1;height:auto;min-height:0;padding:14px 16px;gap:16px;overscroll-behavior:contain}
+#tmCard.fs .tm-log:empty:before{content:"Give the team a job, or just talk. Use @name to call someone.";margin:auto;max-width:70%;text-align:center;color:var(--mut);font-size:15px;line-height:1.5}
+#tmCard.fs .tm-m{max-width:100%;padding:0;background:transparent;border-radius:0;font-size:15.5px;line-height:1.5}
+#tmCard.fs .tm-m b{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:4px;opacity:.95}
+#tmCard.fs .tm-m b:before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+#tmCard.fs .tm-m.me{align-self:flex-end;max-width:84%;padding:10px 14px;border-radius:18px 18px 6px 18px;background:rgba(var(--acr),.16);border:1px solid rgba(var(--acr),.35);color:var(--tx)}
+#tmCard.fs .tm-m.sys,#tmCard.fs .tm-m.err{align-self:center;text-align:center;font-size:12px}
+#tmCard.fs .tm-m.tool{align-self:flex-start;padding:6px 12px;border-radius:999px;font-size:12px;background:var(--card)}
+#tmCard.fs .tm-m.fin{padding:12px 14px;border-radius:16px;background:var(--card);border:1px solid rgba(var(--acr),.45)}
+#tmCard.fs .tm-m.job{padding:10px 12px;border-radius:14px;border:1px dashed var(--line)}
+#tmCard.fs .tm-tree{flex:none;max-height:18vh;overflow:auto;margin:0 12px 6px;padding:8px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+#tmCard.fs .tm-tree:empty{display:none}
+#tmCard.fs .tm-info{flex:none;margin:0 16px 6px}
+#tmCard.fs .tm-compose{flex:none;margin:0 10px calc(env(safe-area-inset-bottom,0px) + 10px);padding:6px 6px 6px 16px;border-radius:26px;background:var(--card2);border:1px solid var(--line);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);align-items:flex-end}
+#tmCard.fs .tm-compose textarea{border:0;background:transparent;box-shadow:none;min-height:40px;padding:9px 0;font-size:15.5px;outline:0}
+#tmCard.fs .tm-compose .b{width:42px;min-height:42px;height:42px;padding:0;border-radius:50%;font-size:0;position:relative}
+#tmCard.fs .tm-compose .b:after{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;border:solid var(--onac,#000);border-width:2.2px 2.2px 0 0;transform:translate(-50%,-30%) rotate(-45deg)}
+#tmCard.fs .tm-men.on{display:flex;gap:6px;overflow-x:auto;padding:0 12px 8px;flex:none}
+.tm-men button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--tx);border-radius:999px;padding:7px 13px;font-size:13px}
 #tmCard.fs #tmTo{display:none}
-#tmCard.fs .tm-men.on{display:flex;gap:6px;overflow-x:auto;padding:6px 0;flex:none}
-.tm-men button{flex:none;border:1px solid var(--line);background:transparent;color:var(--tx);border-radius:999px;padding:6px 12px;font-size:13px}
-body.tmfs nav,body.tmfs #top{visibility:hidden}
+#tmCard.fs .tm-scrim{display:block;position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s}
+#tmCard.fs.dr .tm-scrim{opacity:1;pointer-events:auto}
+#tmCard.fs .tm-dr{display:flex;flex-direction:column;position:absolute;z-index:6;left:0;top:0;bottom:0;width:80%;max-width:330px;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 16px) 12px 14px;background:var(--drawbg,rgba(18,19,24,.92));-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);border-right:1px solid var(--line);transform:translateX(-102%);transition:transform .3s cubic-bezier(.3,.8,.3,1)}
+#tmCard.fs.dr .tm-dr{transform:none}
+#tmCard.fs .tm-drh{display:flex;flex-direction:column;padding:2px 6px 14px}
+#tmCard.fs .tm-drh b{font-size:18px;font-weight:600}
+#tmCard.fs .tm-drh span{font-size:12px;color:var(--mut)}
+#tmCard.fs .tm-dr .tm-chips{flex:1;flex-direction:column;overflow-y:auto;overflow-x:hidden;gap:4px;margin:0;padding:0;min-height:0}
+#tmCard.fs .tm-dr .tm-chip,#tmCard.fs .tm-chips .tm-chip{width:100%;max-width:none;height:48px;min-height:48px;border-radius:14px;border:0;background:transparent;padding:0 12px;justify-content:flex-start;gap:12px;font-size:15px}
+#tmCard.fs .tm-chips .tm-chip.on{background:rgba(var(--acr),.16)}
+#tmCard.fs .tm-drc{display:block;width:100%;margin-top:10px;flex:none}
+body.tmfs nav,body.tmfs #top,body.tmfs #dnav{visibility:hidden}
 </style>
+
 </head>
 <body>
 <div id="top"><div class="tb"><button id="menuBtn" onclick="toggleMenu()" aria-label="Menu"></button><div><div id="pgName">Home</div><div id="pgSub"></div></div></div><div id="seg" class="glass"></div></div>
@@ -904,8 +933,9 @@ body.tmfs nav,body.tmfs #top{visibility:hidden}
 <section id="team">
   <button class="b" id="tmOpenFs" style="width:100%;margin-bottom:12px" onclick="tmFs(true)">Open team chat full screen</button>
   <div class="card" id="tmCard">
-    <div class="tmfs-h"><button class="b ghost" onclick="tmFs(false)" aria-label="Back">&larr; Back</button><div class="tmfs-t"><b id="tmFsT">Team room</b><span id="tmFsS"></span></div></div>
-    <div id="tmChips" class="tm-chips"></div>
+    <div class="tmfs-h"><button class="ib2" onclick="tmDrawer(true)" aria-label="Chats"><i></i><i></i><i></i></button><span class="tmav" id="tmFsA">T</span><div class="tmfs-t"><b id="tmFsT">Team room</b><span id="tmFsS"></span></div><button class="ib2 x" onclick="tmFs(false)" aria-label="Close">&times;</button></div>
+    <div class="tm-scrim" onclick="tmDrawer(false)"></div>
+    <div class="tm-dr"><div class="tm-drh"><b>Team</b><span>Pick who to talk to</span></div><div id="tmChips" class="tm-chips"></div><button class="b ghost tm-drc" onclick="tmClear()">Clear team chat</button></div>
     <div id="tmLog" class="tm-log"></div>
     <div id="tmTree" class="tm-tree"></div>
     <div class="tm-info"><vs-thinking-orb-search id="tmOrb" size="sm" style="display:none;margin-right:6px"></vs-thinking-orb-search><span id="tmInfo">...</span><button class="b ghost tm-stop" onclick="Android.teamStop()">Stop</button></div>
@@ -1607,11 +1637,12 @@ body{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;le
 <style>vs-thinking-orb-search{--vs-color:var(--ac)}</style>
 <script src="vs-thinking-orb-search.js"></script>
 <script id="tmfsjs">
-function tmFsT(){var t=vg('tmFsT'),s=vg('tmFsS');if(!t)return;var r=TM.sel=='room';t.textContent=r?'Team room':tmName(TM.sel);s.textContent=r?(TM.agents.filter(function(a){return a.on!==false;}).length+' members \u00b7 use @name'):'Private chat';}
-function tmFs(on){var c=vg('tmCard');c.classList.toggle('fs',on);document.body.classList.toggle('tmfs',on);clearInterval(window._tmFsI);
+function tmDrawer(o){vg('tmCard').classList.toggle('dr',o);}
+function tmFsT(){var t=vg('tmFsT'),s=vg('tmFsS'),av=vg('tmFsA');if(!t)return;var r=TM.sel=='room';t.textContent=r?'Team room':tmName(TM.sel);av.textContent=(r?'T':tmName(TM.sel).charAt(0).toUpperCase());av.style.background=r?'':tmCol(TM.sel);s.textContent=r?(TM.agents.filter(function(a){return a.on!==false;}).length+' members \u00b7 use @name'):'Private chat';}
+function tmFs(on){var c=vg('tmCard');c.classList.toggle('fs',on);c.classList.remove('dr');try{Android.teamFull(on);}catch(x){}document.body.classList.toggle('tmfs',on);clearInterval(window._tmFsI);
   if(on){tmFsT();window._tmFsI=setInterval(tmFsT,700);setTimeout(function(){var l=vg('tmLog');l.scrollTop=l.scrollHeight;},80);try{history.pushState({tmfs:1},'');}catch(x){}}}
 window.addEventListener('popstate',function(){if(vg('tmCard').classList.contains('fs'))tmFs(false);});
-document.addEventListener('DOMContentLoaded',function(){var t=vg('tmText');if(!t)return;
+document.addEventListener('DOMContentLoaded',function(){var t=vg('tmText');if(!t)return;var ch=vg('tmChips');if(ch)ch.addEventListener('click',function(){setTimeout(function(){tmDrawer(false);},120);});
   t.addEventListener('input',function(){var m=vg('tmMen'),v=t.value,k=v.match(/@(\w*)$/);
     if(!k){m.className='tm-men';m.innerHTML='';return;}
     var q=k[1].toLowerCase(),ag=TM.agents.filter(function(a){return a.on!==false&&a.name.toLowerCase().indexOf(q)==0;});
