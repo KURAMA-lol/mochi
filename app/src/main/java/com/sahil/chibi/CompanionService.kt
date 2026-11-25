@@ -88,6 +88,19 @@ class CompanionService : Service() {
     private lateinit var wm: WindowManager
     private var dock: Dock? = null
     private var island: Island? = null
+    private var crew: Crew? = null
+    private var covered = false
+    private val crewTick = object : Runnable {
+        override fun run() {
+            try {
+                if (crew == null && Settings.canDrawOverlays(this@CompanionService)) {
+                    crew = Crew(this@CompanionService, wm) { if (attached && !hidden) floatArrayOf((lp.x + lp.width / 2).toFloat(), (lp.y + lp.height).toFloat()) else null }
+                }
+                crew?.sync(if (covered || hidden) emptyMap() else Team.working())
+            } catch (e: Throwable) {}
+            main.postDelayed(this, 800)
+        }
+    }
     private val main = Handler(Looper.getMainLooper())
     private lateinit var cfg: AppConfig
 
@@ -222,6 +235,7 @@ class CompanionService : Service() {
         createChannel()
         loadChat()
         running = true
+        main.postDelayed(crewTick, 1500)
         if (Dock.enabled(this) && Settings.canDrawOverlays(this)) { dock = Dock(this, wm) { onDockAction(it) }; dock?.show() }
         if (Island.enabled(this) && Settings.canDrawOverlays(this)) { island = Island(this, wm) { onDockAction(it) }; island?.show() }
         try {
@@ -250,10 +264,11 @@ class CompanionService : Service() {
             ACT_HANGUP -> endCall()
             ACT_COVER -> {
                 if (intent?.getBooleanExtra("on", false) == true) {
-                    coverWas = hidden
+                    coverWas = hidden; covered = true
                     if (!hidden) hideChibi()
                     island?.hide()
                 } else {
+                    covered = false
                     if (!coverWas) { ensureChibi(); if (hidden) showChibi() }
                     island?.show()
                 }
@@ -329,6 +344,7 @@ class CompanionService : Service() {
         try { unregisterReceiver(powerRx) } catch (ex: Exception) {}
         closeRadial()
         dock?.destroy(); dock = null
+        main.removeCallbacks(crewTick); try { crew?.destroy() } catch (e: Throwable) {}; crew = null
         island?.destroy(); island = null
         safeRemove(panel); safeRemove(bubble); safeRemove(chibi)
         chibi = null; attached = false; bubble = null; bubbleAttached = false; panelAttached = false; panelOpen = false
