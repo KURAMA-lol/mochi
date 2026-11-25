@@ -38,6 +38,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Toast
 import android.widget.TextView
 import java.util.Locale
 import kotlin.math.hypot
@@ -102,6 +103,8 @@ class CompanionService : Service() {
     private var scroll: ScrollView? = null
     private var listCol: LinearLayout? = null
     private var input: EditText? = null
+    private var beamRow: BeamRow? = null
+    private var pickId: String? = null
     private var micBtn: android.widget.ImageView? = null
     private var typing: View? = null
     private var chipRow: View? = null
@@ -1196,6 +1199,8 @@ class CompanionService : Service() {
         subtitle?.text = if (busy) "working on it..." else "online"
         subtitle?.setTextColor(if (busy) Theme.ac else Theme.ac2)
         orbV?.ink = Theme.ac
+        beamRow?.ink = Theme.ac
+        beamRow?.active = busy || (input?.hasFocus() == true)
         orbV?.visibility = if (busy) View.VISIBLE else View.GONE
         val empty = (input?.text?.toString()?.trim() ?: "").isEmpty() && pending.isEmpty()
         sendBtn?.setImageResource(if (busy && empty) R.drawable.ni_stop else R.drawable.ni_send)
@@ -1362,7 +1367,8 @@ class CompanionService : Service() {
         val clip = ghostBtn(R.drawable.ni_clip) { attRow.visibility = if (attRow.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
         strip = stripCol; stripBox = stripScroll; attachRow = attRow
 
-        val row = LinearLayout(this).apply {
+        val row = BeamRow(this).apply {
+            ink = Theme.ac
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(3), dp(4), dp(3))
             background = glass(0x14FFFFFF, 0x26FFFFFF, 26)
@@ -1374,6 +1380,7 @@ class CompanionService : Service() {
             imeOptions = EditorInfo.IME_ACTION_SEND
             maxLines = 3
             background = null
+            setOnFocusChangeListener { _, f -> beamRow?.active = f || typing != null }
             setPadding(0, dp(9), dp(8), dp(9))
             setOnEditorActionListener { _, id, _ ->
                 if (id == EditorInfo.IME_ACTION_SEND) { doSend(false); true } else false
@@ -1392,7 +1399,27 @@ class CompanionService : Service() {
         }
         row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(clip); row.addView(mic); row.addView(send)
-        root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8); rightMargin = dp(4) })
+        beamRow = row
+        val modelChip = TextView(this).apply {
+            textSize = 11.5f; setTextColor(0xCCFFFFFF.toInt())
+            setPadding(dp(11), dp(5), dp(11), dp(5))
+            background = glass(0x14FFFFFF, 0x26FFFFFF, 14)
+            fun label() {
+                val pv = pickId?.let { id -> cfg.providers.firstOrNull { it.id == id && it.usable() } }
+                if (pv == null) pickId = null
+                text = "\u25CF " + (pv?.let { it.name } ?: "Auto") + "  \u25BE"
+            }
+            label()
+            setOnClickListener {
+                val list = cfg.providers.filter { it.usable() }
+                val ids = listOf<String?>(null) + list.map { it.id }
+                pickId = ids[(ids.indexOf(pickId) + 1) % ids.size]
+                label()
+                Toast.makeText(this@CompanionService, if (pickId == null) "Auto: best provider picks" else "Only " + (list.firstOrNull { it.id == pickId }?.name ?: "") + " for next messages", Toast.LENGTH_SHORT).show()
+            }
+        }
+        root.addView(modelChip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+        root.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6); rightMargin = dp(4) })
 
         panelV = Theme.version
         panel = root; scroll = sc; listCol = col; input = et; micBtn = mic; sendBtn = send; subtitle = sub
@@ -1663,8 +1690,10 @@ class CompanionService : Service() {
         Memory.bump(this)
         saveChat()
         while (history.size > 60) history.removeAt(0)
-        val conf = ConfigStore.load(this)
-        cfg = conf
+        val conf0 = ConfigStore.load(this)
+        val picked = pickId?.let { id -> conf0.providers.firstOrNull { it.id == id && it.usable() } }
+        val conf = if (picked != null) conf0.copy(providers = listOf(picked)) else conf0
+        cfg = conf0
         var snapshot = Compactor.build(this, conf, history.toList())
         // a follow-up question about an earlier picture or file keeps its subject
         val fu = Attach.followUp(history)
