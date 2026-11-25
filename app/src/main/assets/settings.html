@@ -1639,7 +1639,7 @@ body{font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;le
 <script id="tmfsjs">
 function tmDrawer(o){vg('tmCard').classList.toggle('dr',o);}
 function tmFsT(){var t=vg('tmFsT'),s=vg('tmFsS'),av=vg('tmFsA');if(!t)return;var r=TM.sel=='room';t.textContent=r?'Team room':tmName(TM.sel);av.textContent=(r?'T':tmName(TM.sel).charAt(0).toUpperCase());av.style.background=r?'':tmCol(TM.sel);s.textContent=r?(TM.agents.filter(function(a){return a.on!==false;}).length+' members \u00b7 use @name'):'Private chat';}
-function tmFs(on){var c=vg('tmCard');c.classList.toggle('fs',on);c.classList.remove('dr');try{Android.teamFull(on);}catch(x){}document.body.classList.toggle('tmfs',on);clearInterval(window._tmFsI);
+function tmFs(on){var c=vg('tmCard');c.classList.toggle('fs',on);c.classList.remove('dr');try{if(!on&&document.activeElement)document.activeElement.blur();}catch(x){}try{Android.teamFull(on);}catch(x){}document.body.classList.toggle('tmfs',on);clearInterval(window._tmFsI);
   if(on){tmFsT();window._tmFsI=setInterval(tmFsT,700);setTimeout(function(){var l=vg('tmLog');l.scrollTop=l.scrollHeight;},80);try{history.pushState({tmfs:1},'');}catch(x){}}}
 window.addEventListener('popstate',function(){if(vg('tmCard').classList.contains('fs'))tmFs(false);});
 document.addEventListener('DOMContentLoaded',function(){var t=vg('tmText');if(!t)return;var ch=vg('tmChips');if(ch)ch.addEventListener('click',function(){setTimeout(function(){tmDrawer(false);},120);});
