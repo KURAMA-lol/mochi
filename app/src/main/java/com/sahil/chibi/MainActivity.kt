@@ -191,6 +191,25 @@ class MainActivity : Activity() {
         askRuntimePerms()
     }
 
+    private var coverOn = false
+
+    private fun applyCover(on: Boolean) {
+        if (coverOn == on) return
+        coverOn = on
+        var f = 0
+        if (Theme.light) { f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR; if (android.os.Build.VERSION.SDK_INT >= 26) f = f or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR }
+        if (on) f = f or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        window.decorView.systemUiVisibility = f
+        if (CompanionService.running) {
+            try { startForegroundService(Intent(this, CompanionService::class.java).setAction(CompanionService.ACT_COVER).putExtra("on", on)) } catch (e: Throwable) {}
+        }
+    }
+
+    override fun onStop() {
+        if (coverOn) { applyCover(false); js("try{tmFs(false)}catch(e){}") }
+        super.onStop()
+    }
+
     override fun onPause() {
         ui.removeCallbacks(bloubTick)
         bloub?.evaluateJavascript("Bloub.pause()", null)
@@ -460,6 +479,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun testLlm() { Thread { val r = LocalLlm.test(this@MainActivity); js("window.onLlmTest && onLlmTest(" + r.first + ", " + JSONObject.quote(r.second) + ")") }.start() }
         @JavascriptInterface fun getIsland(): String = JSONObject().put("on", Island.enabled(this@MainActivity)).put("y", Island.nudge(this@MainActivity)).toString()
         @JavascriptInterface fun setIsland(on: Boolean, y: Int) { Island.set(this@MainActivity, on, y); runOnUiThread { restartCompanion() } }
+        @JavascriptInterface fun teamFull(on: Boolean) { runOnUiThread { applyCover(on) } }
         @JavascriptInterface fun getDock(): Boolean = Dock.enabled(this@MainActivity)
         @JavascriptInterface fun setDock(on: Boolean) { Dock.set(this@MainActivity, on); runOnUiThread { restartCompanion() } }
         @JavascriptInterface fun getWidgetCfg(): String = NanaWidget.cfgJson(this@MainActivity)
