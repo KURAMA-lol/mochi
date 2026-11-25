@@ -196,13 +196,21 @@ class MainActivity : Activity() {
     private fun applyCover(on: Boolean) {
         if (coverOn == on) return
         coverOn = on
+        if (!on) { try { (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(window.decorView.windowToken, 0) } catch (e: Throwable) {} }
+        ui.postDelayed({ if (coverOn == on) applyBars(on) }, if (on) 0L else 220L)
+        if (CompanionService.running) {
+            try { startForegroundService(Intent(this, CompanionService::class.java).setAction(CompanionService.ACT_COVER).putExtra("on", on)) } catch (e: Throwable) {}
+        }
+    }
+
+    private fun applyBars(on: Boolean) {
         var f = 0
         if (Theme.light) { f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR; if (android.os.Build.VERSION.SDK_INT >= 26) f = f or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR }
         if (on) f = f or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         window.decorView.systemUiVisibility = f
-        if (CompanionService.running) {
-            try { startForegroundService(Intent(this, CompanionService::class.java).setAction(CompanionService.ACT_COVER).putExtra("on", on)) } catch (e: Throwable) {}
-        }
+        if (::rootV.isInitialized) { rootV.requestApplyInsets(); rootV.requestLayout() }
+        web.requestLayout()
+        ui.postDelayed({ if (::rootV.isInitialized) { rootV.requestLayout(); web.requestLayout() } }, 250)
     }
 
     override fun onStop() {
