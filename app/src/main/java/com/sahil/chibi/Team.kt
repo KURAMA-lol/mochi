@@ -150,6 +150,13 @@ object Team {
         prefs(ctx).edit().putInt("max", o.optInt("max", 0)).putInt("mins", o.optInt("mins", 20)).putString("lead", o.optString("lead", "")).putBoolean("tools", o.optBoolean("tools", false)).apply()
     }
 
+    /** names of members that are busy right now -> short status */
+    fun working(): Map<String, String> {
+        val m = LinkedHashMap<String, String>()
+        for ((k, v) in status) if (v != "idle" && !v.startsWith("error")) m[k] = v
+        return m
+    }
+
     fun state(ctx: Context, since: Int): String {
         app = ctx.applicationContext
         ensureLoaded(ctx)
