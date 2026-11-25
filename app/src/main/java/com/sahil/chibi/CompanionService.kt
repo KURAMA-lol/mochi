@@ -74,6 +74,7 @@ class CompanionService : Service() {
         const val ACT_ASK = "chibi.ask"
         const val ACT_ATTACH = "chibi.attach"
         const val ACT_BROWSER = "chibi.browser"
+        const val ACT_COVER = "chibi.cover"
         private const val CH = "chibi_channel_v2"
         private const val NID = 1
         @Volatile var running = false
@@ -120,6 +121,7 @@ class CompanionService : Service() {
     private var origH = 0
 
     private var hidden = false
+    private var coverWas = false
     private var dragging = false
     private var moved = false
     private var longFired = false
@@ -246,6 +248,16 @@ class CompanionService : Service() {
             ACT_WAKE -> { endWake(); scheduleWake(300) }
             ACT_CALL -> { ensureChibi(); if (hidden) showChibi(); startCall() }
             ACT_HANGUP -> endCall()
+            ACT_COVER -> {
+                if (intent?.getBooleanExtra("on", false) == true) {
+                    coverWas = hidden
+                    if (!hidden) hideChibi()
+                    island?.hide()
+                } else {
+                    if (!coverWas) { ensureChibi(); if (hidden) showChibi() }
+                    island?.show()
+                }
+            }
             ACT_TALK -> {
                 ensureChibi()
                 if (hidden) showChibi()
