@@ -376,6 +376,7 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 81) { llmPicked(resultCode, data); return }
+        if (requestCode == 82) { avatarPicked(resultCode, data); return }
         if (requestCode == 80) {
             if (resultCode != RESULT_OK) return
             val u = data?.data ?: return
@@ -388,6 +389,33 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
+    }
+
+    private var avName = ""
+
+    private fun avatarPicked(resultCode: Int, data: Intent?) {
+        if (resultCode != RESULT_OK) return
+        val u = data?.data ?: return
+        val nm = avName
+        Thread {
+            try {
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, o) }
+                var ss = 1
+                while (o.outWidth / ss > 600 && o.outHeight / ss > 600) ss *= 2
+                val o2 = android.graphics.BitmapFactory.Options().apply { inSampleSize = ss }
+                val bm = contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, o2) } ?: return@Thread
+                val side = minOf(bm.width, bm.height)
+                val sq = android.graphics.Bitmap.createBitmap(bm, (bm.width - side) / 2, (bm.height - side) / 2, side, side)
+                val out = android.graphics.Bitmap.createScaledBitmap(sq, 192, 192, true)
+                val bo = java.io.ByteArrayOutputStream()
+                out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bo)
+                val b64 = android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP)
+                js("window.onAvatar && onAvatar(" + JSONObject.quote(nm) + ", 'data:image/jpeg;base64," + b64 + "')")
+            } catch (ex: Throwable) {
+                js("window.onAvatar && onAvatar(" + JSONObject.quote(nm) + ", '')")
+            }
+        }.start()
     }
 
     private fun llmPicked(resultCode: Int, data: Intent?) {
@@ -487,6 +515,14 @@ class MainActivity : Activity() {
         @JavascriptInterface fun testLlm() { Thread { val r = LocalLlm.test(this@MainActivity); js("window.onLlmTest && onLlmTest(" + r.first + ", " + JSONObject.quote(r.second) + ")") }.start() }
         @JavascriptInterface fun getIsland(): String = JSONObject().put("on", Island.enabled(this@MainActivity)).put("y", Island.nudge(this@MainActivity)).toString()
         @JavascriptInterface fun setIsland(on: Boolean, y: Int) { Island.set(this@MainActivity, on, y); runOnUiThread { restartCompanion() } }
+        @JavascriptInterface fun getCrew(): String = getSharedPreferences("crew", 0).getString("j", "{}") ?: "{}"
+        @JavascriptInterface fun setCrew(j: String) { getSharedPreferences("crew", 0).edit().putString("j", j).apply() }
+        @JavascriptInterface fun pickAvatar(name: String) {
+            runOnUiThread {
+                avName = name
+                try { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "image/*" }, 82) } catch (e: Throwable) {}
+            }
+        }
         @JavascriptInterface fun teamFull(on: Boolean) { runOnUiThread { applyCover(on) } }
         @JavascriptInterface fun getDock(): Boolean = Dock.enabled(this@MainActivity)
         @JavascriptInterface fun setDock(on: Boolean) { Dock.set(this@MainActivity, on); runOnUiThread { restartCompanion() } }
