@@ -1237,6 +1237,10 @@ class CompanionService : Service() {
     private fun md(s: String): CharSequence = Md.render(s) { u -> openUrl(u) }
 
     private fun openUrl(u: String) {
+        if (u.startsWith(com.sahil.chibi.plugins.PluginManager.SETTINGS_LINK)) {
+            try { startActivity(Intent(this, MainActivity::class.java).putExtra("open_plugins", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); closePanel() } catch (ex: Exception) {}
+            return
+        }
         try {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             closePanel()

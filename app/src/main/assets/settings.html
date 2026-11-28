@@ -433,6 +433,48 @@ body.tmfs nav,body.tmfs #top,body.tmfs #dnav{visibility:hidden}
     </script>
   </div>
 
+  <h2>Connected Apps</h2>
+  <div id="plugCards"></div>
+  <script>
+  var PLG=[];
+  function plEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function plFetch(){try{return JSON.parse(Android.getPlugins());}catch(x){return null;}}
+  function plLoad(){var d=plFetch();PLG=d||[];plRender(d===null);}
+  function plRender(na){
+    var h='';
+    PLG.forEach(function(p){
+      h+='<div class="card"><div class="setrow" style="border:0;padding:0"><span style="display:flex;align-items:center;gap:10px"><span style="font-size:24px">'+plEsc(p.icon)+'</span><b>'+plEsc(p.name)+'</b></span>'+
+        (p.connected?'<span class="pill">Connected</span>':'<span class="mut">Not connected</span>')+'</div>'+
+        '<p class="mut">'+plEsc(p.desc)+(p.connected&&p.account?' Account: '+plEsc(p.account):'')+'</p>';
+      if(!p.connected){
+        p.fields.forEach(function(f){
+          h+='<label>'+plEsc(f.label)+'</label><input id="pl_'+plEsc(p.id)+'_'+plEsc(f.key)+'" type="'+(f.secret?'password':'text')+'" placeholder="'+(f.saved?'Saved (type to replace)':plEsc(f.hint))+'" autocomplete="off" autocapitalize="off" spellcheck="false">';
+        });
+        h+='<div class="btns"><button class="b" onclick="plConnect(\''+plEsc(p.id)+'\')">Connect</button></div><p class="mut">'+plEsc(p.help)+'</p>';
+      } else {
+        h+='<div class="btns"><button class="b ghost" onclick="plDisc(\''+plEsc(p.id)+'\')">Disconnect</button></div>';
+      }
+      h+='<p class="mut" id="plMsg_'+plEsc(p.id)+'"></p></div>';
+    });
+    document.getElementById('plugCards').innerHTML=h||'<div class="card"><p class="mut">'+(na?'Not available in this build.':'No apps.')+'</p></div>';
+  }
+  function plMsg(id,t){var e=document.getElementById('plMsg_'+id);if(e)e.textContent=t;}
+  function plConnect(id){
+    var p=PLG.filter(function(x){return x.id===id;})[0];if(!p)return;
+    var o={};p.fields.forEach(function(f){var e=document.getElementById('pl_'+id+'_'+f.key);o[f.key]=e?e.value:'';});
+    plMsg(id,p.fields.length&&p.fields[0].key==='token'?'Checking...':'Finish the Google sign-in in your browser, then come back.');
+    try{Android.connectPlugin(id,JSON.stringify(o));}catch(x){plMsg(id,'Not available in this build.');}
+  }
+  function plDisc(id){try{Android.disconnectPlugin(id);}catch(x){}plLoad();plMsg(id,'Disconnected.');}
+  window.onPluginChanged=function(id,ok,msg){plLoad();plMsg(id,msg);};
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden)return;var d=plFetch();if(!d)return;
+    var ch=d.length!==PLG.length||d.some(function(x,i){return x.connected!==PLG[i].connected;});
+    if(ch){PLG=d;plRender(false);}
+  });
+  window.addEventListener('load',plLoad);
+  </script>
+
   <h2>Gmail</h2>
   <div class="card">
     <label>Gmail address</label>

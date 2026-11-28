@@ -187,6 +187,7 @@ class MainActivity : Activity() {
         web.addJavascriptInterface(Bridge(), "Android")
         buildUi()
         web.loadUrl("file:///android_asset/settings.html")
+        if (intent?.getBooleanExtra("open_plugins", false) == true) web.postDelayed({ js("tab('cfg');var e=document.getElementById('plugCards');if(e)e.scrollIntoView()") }, 1200)
         // ask for mic + notification permission up front (overlay permission needs the settings screen)
         askRuntimePerms()
     }
@@ -536,6 +537,13 @@ class MainActivity : Activity() {
                 "Asking your launcher. Confirm there."
             } else "Your launcher cannot do this. Long-press the home screen, Widgets, Nana."
         }
+        @JavascriptInterface fun getPlugins(): String = com.sahil.chibi.plugins.PluginManager.json(this@MainActivity)
+        @JavascriptInterface fun connectPlugin(id: String, input: String) {
+            com.sahil.chibi.plugins.PluginManager.connect(this@MainActivity.applicationContext, id, input) { ok, msg ->
+                js("window.onPluginChanged && onPluginChanged(" + JSONObject.quote(id) + ", " + ok + ", " + JSONObject.quote(msg) + ")")
+            }
+        }
+        @JavascriptInterface fun disconnectPlugin(id: String) { com.sahil.chibi.plugins.PluginManager.disconnect(this@MainActivity, id) }
         @JavascriptInterface fun getMail(): String = Mail.json(this@MainActivity)
         @JavascriptInterface fun setMail(addr: String, pw: String) { Mail.save(this@MainActivity, addr, pw) }
         @JavascriptInterface fun clearMail() { Mail.clear(this@MainActivity) }

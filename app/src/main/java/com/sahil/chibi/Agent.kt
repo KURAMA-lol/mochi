@@ -33,7 +33,7 @@ object Agent {
         prefs(c).edit().putString("last_task", "REQUEST: " + req.take(300) + "\nDONE SO FAR:\n" + ev.takeLast(8).joinToString("\n").take(1400)).apply()
     }
     /** Words that mean the message may need a tool or a lookup, so it must not take the quick chat path. */
-    private val NEEDS = Regex("""\b(weather|mausam|news|khabar|price|rate|score|latest|time|date|baje|remind\w*|alarm|timer|call|dial|whatsapp|telegram|battery|volume|brightness|wifi|wi-fi|bluetooth|torch|flashlight|screenshot|screen|notification\w*|note|notes|remember|forget|yaad|schedule|team|employee|google|youtube|video|calendar|location|map\w*|navigate|translate|skill\w*|memory|connect\w*|tasker|reach|dekh\w*|photo|picture|image|pic|dikha\w*)\b""", RegexOption.IGNORE_CASE)
+    private val NEEDS = Regex("""\b(weather|mausam|news|khabar|price|rate|score|latest|time|date|baje|remind\w*|alarm|timer|call|dial|whatsapp|telegram|battery|volume|brightness|wifi|wi-fi|bluetooth|torch|flashlight|screenshot|screen|notification\w*|note|notes|remember|forget|yaad|schedule|team|employee|google|youtube|video|calendar|mail\w*|e-mail|gmail|inbox|meeting\w*|events?|appointment\w*|location|map\w*|navigate|translate|skill\w*|memory|connect\w*|tasker|reach|dekh\w*|photo|picture|image|pic|dikha\w*)\b""", RegexOption.IGNORE_CASE)
 
     /** Small talk: short, no link, no action or tool word. These get a quick one-call reply with a lean prompt. */
     /** A picture or file sent with no caption, or a small-talk caption, is plain chat too. Judge the caption, not the attachment text. */
@@ -101,6 +101,7 @@ object Agent {
 
     /** Returns a short description if this call must be approved by the user first, else null. */
     private fun risk(ctx: Context, name: String, args: JSONObject): String? {
+        com.sahil.chibi.plugins.PluginManager.risk(name, args)?.let { return if (it in approved) null else it }
         val pkg = NanaAccess.inst?.foregroundPkg() ?: ""
         val app = pkg.substringAfterLast('.')
         val r = when (name) {
@@ -249,7 +250,7 @@ How to work:
         }
         val acc = NanaAccess.inst != null
         val live = "\n\nLIVE STATUS (trust this): tools ON; phone/browser actions " + (if (actions(ctx)) "ON" else "OFF (user switched it off in settings)") + "; screen control (accessibility) " + (if (acc) "ON" else "OFF (screen_* tools and tapping will not work)") + ". If a needed switch is OFF, say so plainly and tell the user which one to turn on. Never claim you did something unless a tool result in this conversation shows it."
-        val system = base + live + "\n\n" + DOC + Skills.block(ctx) + Connect.block(ctx)
+        val system = base + live + "\n\n" + DOC + Skills.block(ctx) + Connect.block(ctx) + com.sahil.chibi.plugins.PluginManager.promptBlock(ctx)
         val hLast = history.indexOfLast { it.role == "user" }
         val request = if (hLast >= 0) history[hLast].content.substringBefore(Attach.MARK) else ""
         val prevTask = lastTask(ctx)
@@ -520,7 +521,7 @@ How to work:
     private fun ensureRegistered() {
         if (registered) return
         synchronized(this) {
-            if (!registered) { registerBuiltins(); registered = true }
+            if (!registered) { registerBuiltins(); com.sahil.chibi.plugins.PluginManager.register(); registered = true }
         }
     }
 
